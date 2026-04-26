@@ -3,9 +3,7 @@
 
 Asserts:
 - good.pptx produces zero findings (errors and warnings)
-- bad.pptx triggers each of: overflow_text, safe_text_area_text, text_autofit_disabled,
-  font_family, font_size_scale, text_color_allowlist, background_color_palette,
-  animation_present
+- bad.pptx triggers each expected implemented check
 - every check emitted by pptx_lint.py is defined in rules.lint.checks
 
 Exit code: 0 on success, 1 on any failed assertion.
@@ -30,6 +28,10 @@ EXPECTED_BAD_CHECKS = {
     "text_autofit_disabled",
     "font_family",
     "font_size_scale",
+    "safe_margins",
+    "line_height",
+    "alignment_left_top",
+    "geometry_rounding",
     "text_color_allowlist",
     "background_color_palette",
     "animation_present",

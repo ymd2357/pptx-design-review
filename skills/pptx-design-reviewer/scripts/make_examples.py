@@ -15,9 +15,13 @@ bad.pptx
            text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist
 - shape B: safe_text_area_text violation (positioned at x=10, left of x=81 boundary),
            background_color_palette
+- shape C: safe_margins violation for non-text content
+- shape D: line_height and alignment_left_top violations
+- shape E: geometry_rounding violation
 - slide: transition XML violation
 - expected lint output: each of {overflow_text, safe_text_area_text, text_autofit_disabled,
-                                 font_family, font_size_scale, text_color_allowlist,
+                                 font_family, font_size_scale, safe_margins, line_height,
+                                 alignment_left_top, geometry_rounding, text_color_allowlist,
                                  background_color_palette, animation_present}
   fires at least once
 """
@@ -31,8 +35,9 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.text import MSO_AUTO_SIZE
-from pptx.util import Pt
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
+from pptx.util import Emu, Pt
 
 
 PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -121,6 +126,25 @@ def make_bad(out: Path) -> None:
     b.fill.solid()
     b.fill.fore_color.rgb = RGBColor(255, 204, 0)
     _set_run(b.text_frame, "Outside safe area", "Noto Sans JP", 24)
+
+    c = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(10), Pt(120), Pt(48), Pt(48))
+    c.fill.solid()
+    c.fill.fore_color.rgb = RGBColor(238, 238, 238)
+
+    d = slide.shapes.add_textbox(Pt(200), Pt(420), Pt(300), Pt(80))
+    d.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    d.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.BOTTOM
+    d_p = d.text_frame.paragraphs[0]
+    d_p.alignment = PP_ALIGN.RIGHT
+    d_p.line_spacing = Pt(25)
+    d_run = d_p.add_run()
+    d_run.text = "Bad line spacing and alignment"
+    d_run.font.name = "Noto Sans JP"
+    d_run.font.size = Pt(24)
+
+    e = slide.shapes.add_textbox(Emu(round(81.5 * 12700)), Pt(540), Pt(180), Pt(60))
+    e.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    _set_run(e.text_frame, "Half-point geometry", "Noto Sans JP", 24)
 
     prs.save(str(out))
     _inject_slide_xml_child(out, "transition")

@@ -9,6 +9,10 @@ Checks
 - text_autofit_disabled(error)   text frame auto-size is not NONE
 - font_family          (warning) font name not in allowlist
 - font_size_scale      (warning) font size not in allowed scale
+- safe_margins        (warning) non-text element outside safe margins
+- line_height         (warning) explicit paragraph line spacing not in allowed scale
+- alignment_left_top  (warning) explicit text alignment differs from left/top
+- geometry_rounding   (warning) geometry is not on integer pt coordinates
 - text_color_allowlist (warning) explicit text color not in allowlist
 - background_color_palette (warning) explicit shape fill color not in palette
 - animation_present    (error)   slide contains <p:transition> or <p:timing>
@@ -40,7 +44,7 @@ from typing import Any, Iterable, List, Optional
 from pptx import Presentation
 from pptx.dml.color import MSO_COLOR_TYPE
 from pptx.enum.shapes import MSO_SHAPE_TYPE
-from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
 
 # ---- Thresholds (mirror doc/slide-guideline-v1.yml) ------------------------
 
@@ -61,6 +65,7 @@ SAFE_TEXT_AREA_PT = (
 
 ALLOWED_FONT_FAMILIES = ("Noto Sans JP", "Calibri")
 ALLOWED_FONT_SIZES_PT = {80, 56, 36, 32, 24, 20}
+ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
 
 ALLOWED_TEXT_COLORS_HEX = {
     "#333333",  # text.primary
@@ -88,6 +93,7 @@ ALLOWED_FILL_COLORS_HEX = {
 
 # Tolerance for fp comparisons in pt. Geometry rounding policy is 0.5pt.
 TOL_PT = 0.5
+GEOMETRY_INTEGER_TOL_PT = 0.01
 
 PML_NS = {"p": "http://schemas.openxmlformats.org/presentationml/2006/main"}
 
@@ -250,6 +256,50 @@ def check_safe_text_area(slide_idx, slide_id, shape, bbox, findings):
     )
 
 
+def check_safe_margins(slide_idx, slide_id, shape, bbox, findings):
+    if shape.has_text_frame and shape.text_frame.text.strip():
+        return
+    x, y, w, h = bbox
+    out: List[tuple] = []
+    if x < SAFE_MARGIN_LEFT_PT - TOL_PT:
+        out.append(("left", SAFE_MARGIN_LEFT_PT - x))
+    if y < SAFE_MARGIN_TOP_PT - TOL_PT:
+        out.append(("top", SAFE_MARGIN_TOP_PT - y))
+    if x + w > SLIDE_W_PT - SAFE_MARGIN_RIGHT_PT + TOL_PT:
+        out.append(("right", (x + w) - (SLIDE_W_PT - SAFE_MARGIN_RIGHT_PT)))
+    if y + h > SLIDE_H_PT - SAFE_MARGIN_BOTTOM_PT + TOL_PT:
+        out.append(("bottom", (y + h) - (SLIDE_H_PT - SAFE_MARGIN_BOTTOM_PT)))
+    if not out:
+        return
+    msg = "non-text outside safe margins: " + ", ".join(f"{s}+{a:.1f}pt" for s, a in out)
+    findings.append(
+        make_finding(
+            "warning", "safe_margins", slide_idx, slide_id, shape, msg,
+            {"bbox_pt": [round(v, 2) for v in bbox]},
+        )
+    )
+
+
+def check_geometry_rounding(slide_idx, slide_id, shape, bbox, findings):
+    names = ("x", "y", "w", "h")
+    drifted = {
+        name: round(value, 3)
+        for name, value in zip(names, bbox)
+        if abs(value - round(value)) > GEOMETRY_INTEGER_TOL_PT
+    }
+    if not drifted:
+        return
+    msg = "geometry is not rounded to integer pt: " + ", ".join(
+        f"{name}={value:g}pt" for name, value in drifted.items()
+    )
+    findings.append(
+        make_finding(
+            "warning", "geometry_rounding", slide_idx, slide_id, shape, msg,
+            {"bbox_pt": [round(v, 3) for v in bbox], "drifted": drifted},
+        )
+    )
+
+
 def check_autofit(slide_idx, slide_id, shape, findings):
     if not shape.has_text_frame:
         return
@@ -295,6 +345,64 @@ def check_font(slide_idx, slide_id, shape, findings):
                 "warning", "font_size_scale", slide_idx, slide_id, shape,
                 f"font size {pt}pt not in scale {sorted(ALLOWED_FONT_SIZES_PT)} ({count} run(s))",
                 {"size_pt": pt, "runs": count},
+            )
+        )
+
+
+def check_line_height(slide_idx, slide_id, shape, findings):
+    if not shape.has_text_frame:
+        return
+    bad: dict = {}
+    for para in shape.text_frame.paragraphs:
+        if not para.text.strip():
+            continue
+        line_spacing = para.line_spacing
+        if line_spacing is None:
+            continue
+        if isinstance(line_spacing, float):
+            key = f"{line_spacing:g}x"
+        else:
+            pt = round(line_spacing.pt, 1)
+            if pt == int(pt) and int(pt) in ALLOWED_LINE_HEIGHTS_PT:
+                continue
+            key = f"{pt:g}pt"
+        bad[key] = bad.get(key, 0) + 1
+    for value, count in bad.items():
+        findings.append(
+            make_finding(
+                "warning", "line_height", slide_idx, slide_id, shape,
+                f"line spacing {value} not in allowed fixed pt scale {sorted(ALLOWED_LINE_HEIGHTS_PT)} ({count} paragraph(s))",
+                {"line_spacing": value, "paragraphs": count},
+            )
+        )
+
+
+def check_alignment(slide_idx, slide_id, shape, findings):
+    if not shape.has_text_frame:
+        return
+    if not shape.text_frame.text.strip():
+        return
+    vertical = shape.text_frame.vertical_anchor
+    if vertical is not None and vertical != MSO_VERTICAL_ANCHOR.TOP:
+        findings.append(
+            make_finding(
+                "warning", "alignment_left_top", slide_idx, slide_id, shape,
+                f"text vertical alignment is {vertical}; expected TOP",
+                {"vertical_anchor": str(vertical)},
+            )
+        )
+    bad: dict = {}
+    for para in shape.text_frame.paragraphs:
+        if not para.text.strip():
+            continue
+        if para.alignment is not None and para.alignment != PP_ALIGN.LEFT:
+            bad[str(para.alignment)] = bad.get(str(para.alignment), 0) + 1
+    for alignment, count in bad.items():
+        findings.append(
+            make_finding(
+                "warning", "alignment_left_top", slide_idx, slide_id, shape,
+                f"paragraph alignment is {alignment}; expected LEFT ({count} paragraph(s))",
+                {"alignment": alignment, "paragraphs": count},
             )
         )
 
@@ -374,8 +482,12 @@ def lint_pptx(path: Path) -> List[Finding]:
                 continue
             check_overflow(idx, slide_id, shape, bbox, findings)
             check_safe_text_area(idx, slide_id, shape, bbox, findings)
+            check_safe_margins(idx, slide_id, shape, bbox, findings)
+            check_geometry_rounding(idx, slide_id, shape, bbox, findings)
             check_autofit(idx, slide_id, shape, findings)
             check_font(idx, slide_id, shape, findings)
+            check_line_height(idx, slide_id, shape, findings)
+            check_alignment(idx, slide_id, shape, findings)
             check_color(idx, slide_id, shape, findings)
 
     return findings
