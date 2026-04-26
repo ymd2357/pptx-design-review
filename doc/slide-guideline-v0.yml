@@ -1,0 +1,106 @@
+meta:
+  generated_at_utc: "2026-01-24"
+  sources:
+    - pptx: "slide-guideline/【e-learning】guideline.pptx"
+      rules_yaml: "slide-guideline/yaml/【e-learning】guideline.rules.yaml"
+    - pptx: "tmp/canva-export-DAG_P9bfpug-1769251822309.pptx"
+      rules_yaml: "slide-guideline/yaml/canva-export-DAG_P9bfpug-1769251822309.rules.yaml"
+  notes: "Derived numeric guidelines by comparing multiple decks. Review before enforcement."
+
+rules:
+  slide:
+    aspect: "16:9"
+    size_pt:
+      w: 1440
+      h: 810
+
+    # Minimum safe area to keep content away from edges.
+    # Chosen to match the Canva deck's consistent left margin (81pt) and the e-learning deck's top/bottom usage.
+    safe_margins_pt_min:
+      left: 81
+      right: 81
+      top: 40
+      bottom: 80
+
+    overflow:
+      # Hard rule: text must not go outside the slide canvas.
+      text_right_margin_pt_min: 0
+      text_left_margin_pt_min: 0
+      text_top_margin_pt_min: 0
+      text_bottom_margin_pt_min: 0
+
+    grid:
+      # Observed: 0.5pt snapping appears in the exported geometry.
+      # Recommendation: keep geometry snapped (avoid arbitrary decimals) to reduce drift.
+      observed_grid_pt: 0.5
+      recommend_integer_pt: true
+
+  typography:
+    fonts:
+      primary:
+        family: "Noto Sans JP"
+        weights:
+          - "Medium"
+          - "Bold"
+      fallback:
+        family: "Calibri"
+
+    # Use a small set of discrete sizes to keep hierarchy consistent.
+    size_scale_pt:
+      title: 80
+      section_title: 56
+      heading: 36
+      subheading: 32
+      body: 24
+      caption: 20
+
+    minimum_pt:
+      body: 24
+      caption: 20
+
+  color:
+    text:
+      primary: "#333333"
+      alt_dark: "#1E112D"
+      inverse: "#FFFFFF"
+    accent:
+      magenta: "#A51E6D"
+
+  imagery:
+    # Practical minimums for 16:9 slides.
+    min_px:
+      full_bleed_bg: "1920x1080"
+      half_width: "960x540"
+    scaling:
+      avoid_upscale_over: "100%"
+
+observations:
+  e_learning:
+    top_fonts:
+      - "Noto Sans JP Medium"
+      - "Noto Sans JP Bold"
+    frequent_sizes_pt:
+      - 24
+      - 28
+      - 32
+      - 36
+      - 56
+      - 80
+    frequent_text_colors:
+      - "#333333"
+      - "#FFFFFF"
+      - "#A51E6D"
+    issues:
+      - "Some text appears to overflow right edge in the source deck; enforce overflow rule above."
+
+  canva_export:
+    layout_signal:
+      - "Left margin for text is consistently 81pt across observed text boxes."
+    frequent_sizes_pt:
+      - 24
+      - 32
+      - 80
+    frequent_text_colors:
+      - "#1E112D"
+      - "#333333"
+      - "#A51E6D"
