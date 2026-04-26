@@ -2096,14 +2096,24 @@ rules:
         severity: "warning"
       image_upscale_ratio:
         severity: "warning"
+        automation: "automated"
+        detection: "Compare picture source pixel size with displayed PPTX size converted at 96px/in; warn above tokens.value.imagery.avoid_upscale_over_ratio."
       contrast_ratio:
         severity: "warning"
+        automation: "manual_review"
+        reason: "Requires final rendered colors after opacity, image overlays, theme inheritance, and unknown backgrounds; use rules.accessibility.contrast_scope during visual review."
       color_only_meaning:
         severity: "warning"
+        automation: "manual_review"
+        reason: "Requires semantic judgment of whether state, correctness, priority, series identity, or trend direction is encoded by color alone."
       alt_text_required:
         severity: "warning"
+        automation: "automated"
+        detection: "Check picture objects for non-empty PowerPoint alt text title or description; decorative exceptions require manual confirmation."
       reading_order:
         severity: "warning"
+        automation: "manual_review"
+        reason: "Requires comparison between PowerPoint selection pane order, visible logical order, and selected layout template slots."
       geometry_rounding:
         severity: "warning"
 

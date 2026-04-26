@@ -13,6 +13,8 @@ Checks
 - line_height         (warning) explicit paragraph line spacing not in allowed scale
 - alignment_left_top  (warning) explicit text alignment differs from left/top
 - geometry_rounding   (warning) geometry is not on integer pt coordinates
+- image_upscale_ratio (warning) picture displayed larger than source pixels
+- alt_text_required   (warning) meaningful image-like object has no alt text
 - text_color_allowlist (warning) explicit text color not in allowlist
 - background_color_palette (warning) explicit shape fill color not in palette
 - animation_present    (error)   slide contains <p:transition> or <p:timing>
@@ -66,6 +68,8 @@ SAFE_TEXT_AREA_PT = (
 ALLOWED_FONT_FAMILIES = ("Noto Sans JP", "Calibri")
 ALLOWED_FONT_SIZES_PT = {80, 56, 36, 32, 24, 20}
 ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
+MAX_IMAGE_UPSCALE_RATIO = 1.0
+PX_PER_PT = 96 / 72
 
 ALLOWED_TEXT_COLORS_HEX = {
     "#333333",  # text.primary
@@ -171,6 +175,23 @@ def _shape_fill_rgb_hex(shape) -> Optional[str]:
     except (AttributeError, TypeError, ValueError):
         return None
     return _rgb_hex(fore_color)
+
+
+def _c_nv_pr(shape):
+    try:
+        matches = shape._element.xpath(".//p:cNvPr")
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return matches[0] if matches else None
+
+
+def _alt_text_values(shape) -> tuple[str, str]:
+    c_nv_pr = _c_nv_pr(shape)
+    if c_nv_pr is None:
+        return "", ""
+    title = (c_nv_pr.get("title") or "").strip()
+    descr = (c_nv_pr.get("descr") or "").strip()
+    return title, descr
 
 
 def shape_bbox_pt(shape) -> Optional[tuple]:
@@ -296,6 +317,48 @@ def check_geometry_rounding(slide_idx, slide_id, shape, bbox, findings):
         make_finding(
             "warning", "geometry_rounding", slide_idx, slide_id, shape, msg,
             {"bbox_pt": [round(v, 3) for v in bbox], "drifted": drifted},
+        )
+    )
+
+
+def check_image_upscale(slide_idx, slide_id, shape, bbox, findings):
+    if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+        return
+    try:
+        source_w_px, source_h_px = shape.image.size
+    except (AttributeError, ValueError):
+        return
+    if source_w_px <= 0 or source_h_px <= 0:
+        return
+    _, _, display_w_pt, display_h_pt = bbox
+    display_w_px = display_w_pt * PX_PER_PT
+    display_h_px = display_h_pt * PX_PER_PT
+    ratio = max(display_w_px / source_w_px, display_h_px / source_h_px)
+    if ratio <= MAX_IMAGE_UPSCALE_RATIO + 0.01:
+        return
+    findings.append(
+        make_finding(
+            "warning", "image_upscale_ratio", slide_idx, slide_id, shape,
+            f"image displayed at {ratio:.2f}x source pixel size; maximum is {MAX_IMAGE_UPSCALE_RATIO:.2f}x",
+            {
+                "source_px": [source_w_px, source_h_px],
+                "display_px": [round(display_w_px, 1), round(display_h_px, 1)],
+                "upscale_ratio": round(ratio, 3),
+            },
+        )
+    )
+
+
+def check_alt_text(slide_idx, slide_id, shape, findings):
+    if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+        return
+    title, descr = _alt_text_values(shape)
+    if title or descr:
+        return
+    findings.append(
+        make_finding(
+            "warning", "alt_text_required", slide_idx, slide_id, shape,
+            "picture has no alt text title or description",
         )
     )
 
@@ -484,6 +547,8 @@ def lint_pptx(path: Path) -> List[Finding]:
             check_safe_text_area(idx, slide_id, shape, bbox, findings)
             check_safe_margins(idx, slide_id, shape, bbox, findings)
             check_geometry_rounding(idx, slide_id, shape, bbox, findings)
+            check_image_upscale(idx, slide_id, shape, bbox, findings)
+            check_alt_text(idx, slide_id, shape, findings)
             check_autofit(idx, slide_id, shape, findings)
             check_font(idx, slide_id, shape, findings)
             check_line_height(idx, slide_id, shape, findings)

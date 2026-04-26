@@ -32,6 +32,8 @@ EXPECTED_BAD_CHECKS = {
     "line_height",
     "alignment_left_top",
     "geometry_rounding",
+    "image_upscale_ratio",
+    "alt_text_required",
     "text_color_allowlist",
     "background_color_palette",
     "animation_present",
@@ -41,6 +43,14 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "slide_size",
     "overflow_shapes",
     "overflow_images",
+}
+
+LINT004_POLICY = {
+    "image_upscale_ratio": "automated",
+    "contrast_ratio": "manual_review",
+    "color_only_meaning": "manual_review",
+    "alt_text_required": "automated",
+    "reading_order": "manual_review",
 }
 
 
@@ -64,6 +74,27 @@ def _guideline_lint_check_keys() -> set[str]:
                         break
             return keys
     raise AssertionError("rules.lint.checks was not found in doc/slide-guideline-v1.yml")
+
+
+def _guideline_lint_check_automation() -> dict[str, str]:
+    guideline = HERE.parents[2] / "doc" / "slide-guideline-v1.yml"
+    lines = guideline.read_text(encoding="utf-8").splitlines()
+    automation: dict[str, str] = {}
+    current_key: str | None = None
+    in_checks = False
+    for line in lines:
+        if line == "    checks:":
+            in_checks = True
+            continue
+        if in_checks and line.startswith("      ") and line.endswith(":"):
+            current_key = line.strip()[:-1]
+            continue
+        if in_checks and current_key and line.startswith("        automation:"):
+            automation[current_key] = line.split(":", 1)[1].strip().strip('"')
+            continue
+        if in_checks and line and not line.startswith("      ") and not line.startswith("        "):
+            break
+    return automation
 
 
 def main() -> int:
@@ -98,6 +129,13 @@ def main() -> int:
             failures.append(
                 f"pptx_lint.py emitted checks missing from rules.lint.checks: {sorted(unknown)}"
             )
+        automation = _guideline_lint_check_automation()
+        for check, expected in LINT004_POLICY.items():
+            got = automation.get(check)
+            if got != expected:
+                failures.append(
+                    f"rules.lint.checks.{check}.automation expected {expected!r}; got {got!r}"
+                )
 
     if failures:
         print("FAIL:")

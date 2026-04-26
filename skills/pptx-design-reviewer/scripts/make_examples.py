@@ -18,17 +18,20 @@ bad.pptx
 - shape C: safe_margins violation for non-text content
 - shape D: line_height and alignment_left_top violations
 - shape E: geometry_rounding violation
+- picture F: image_upscale_ratio and alt_text_required violations
 - slide: transition XML violation
 - expected lint output: each of {overflow_text, safe_text_area_text, text_autofit_disabled,
                                  font_family, font_size_scale, safe_margins, line_height,
-                                 alignment_left_top, geometry_rounding, text_color_allowlist,
-                                 background_color_palette, animation_present}
+                                 alignment_left_top, geometry_rounding, image_upscale_ratio,
+                                 alt_text_required, text_color_allowlist, background_color_palette,
+                                 animation_present}
   fires at least once
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
 import zipfile
 from xml.etree import ElementTree as ET
 from pathlib import Path
@@ -42,6 +45,10 @@ from pptx.util import Emu, Pt
 
 PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 ET.register_namespace("p", PML_NS)
+
+TINY_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/l9x1YQAAAABJRU5ErkJggg=="
+)
 
 
 def _new_169_deck():
@@ -97,6 +104,12 @@ def _inject_slide_xml_child(path: Path, child_name: str) -> None:
     tmp.replace(path)
 
 
+def _clear_alt_text(shape) -> None:
+    c_nv_pr = shape._element.xpath(".//p:cNvPr")[0]
+    c_nv_pr.set("descr", "")
+    c_nv_pr.attrib.pop("title", None)
+
+
 def make_good(out: Path) -> None:
     prs = _new_169_deck()
     slide = _add_blank_slide(prs)
@@ -145,6 +158,14 @@ def make_bad(out: Path) -> None:
     e = slide.shapes.add_textbox(Emu(round(81.5 * 12700)), Pt(540), Pt(180), Pt(60))
     e.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     _set_run(e.text_frame, "Half-point geometry", "Noto Sans JP", 24)
+
+    tiny = out.with_name("_lint_tiny.png")
+    tiny.write_bytes(TINY_PNG)
+    try:
+        f = slide.shapes.add_picture(str(tiny), Pt(600), Pt(420), width=Pt(96), height=Pt(96))
+        _clear_alt_text(f)
+    finally:
+        tiny.unlink(missing_ok=True)
 
     prs.save(str(out))
     _inject_slide_xml_child(out, "transition")
