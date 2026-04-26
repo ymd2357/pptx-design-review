@@ -730,13 +730,40 @@ layout_templates:
 
   minimum_template_ids:
     - "title"
-    - "section_divider"
-    - "title_body"
+    - "one_message"
     - "two_column"
-    - "media_text"
-    - "step_list"
-    - "quiz"
+    - "diagram"
+    - "table"
+    - "caution"
     - "summary"
+    - "quiz"
+
+  upstream_minimum_template_map:
+    source: "doc/design-system-review-v0.md section 3"
+    title:
+      source_label: "タイトル"
+      template_id: "title"
+    one_message:
+      source_label: "1メッセージ"
+      template_id: "one_message"
+    two_column:
+      source_label: "2カラム"
+      template_id: "two_column"
+    diagram:
+      source_label: "図解"
+      template_id: "diagram"
+    table:
+      source_label: "表"
+      template_id: "table"
+    caution:
+      source_label: "注意"
+      template_id: "caution"
+    summary:
+      source_label: "まとめ"
+      template_id: "summary"
+    quiz:
+      source_label: "確認問題"
+      template_id: "quiz"
 
   templates:
     title:
@@ -791,7 +818,7 @@ layout_templates:
           y_pt: 396
           h_pt: 90
 
-    title_body:
+    one_message:
       purpose: "Default explanation slide with heading and one primary body block."
       slots:
         heading:
@@ -841,8 +868,8 @@ layout_templates:
           h_pt: 456
           padding_pt: "tokens.semantic.space_pt.lg"
 
-    media_text:
-      purpose: "Explain a visual, screenshot, or photo alongside text."
+    diagram:
+      purpose: "Explain a visual structure, process, screenshot, or photo alongside text."
       slots:
         heading:
           kind: "text"
@@ -872,6 +899,59 @@ layout_templates:
           col_span: 7
           y_pt: 618
           h_pt: 48
+
+    table:
+      purpose: "Present a compact data table with a clear heading and optional note."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        table:
+          kind: "component"
+          component: "tokens.component.table_basic"
+          col_start: 1
+          col_span: 12
+          y_pt: 150
+          h_pt: 420
+          max_rows: 8
+          max_columns: 6
+        note:
+          kind: "text"
+          type: "tokens.semantic.type.caption"
+          col_start: 1
+          col_span: 12
+          y_pt: 594
+          h_pt: 54
+
+    caution:
+      purpose: "Call out an important warning, exception, or operational note."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        caution:
+          kind: "component"
+          component: "tokens.component.callout"
+          variant: "warning"
+          col_start: 2
+          col_span: 10
+          y_pt: 180
+          h_pt: 300
+        supporting_text:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 2
+          col_span: 10
+          y_pt: 510
+          h_pt: 96
 
     step_list:
       purpose: "Show ordered actions, process steps, or key sequence."
@@ -1926,7 +2006,7 @@ rules:
           - "section_label"
           - "heading"
           - "supporting_text"
-        title_body:
+        one_message:
           - "heading"
           - "body"
           - "footer_progress"
@@ -1934,11 +2014,19 @@ rules:
           - "heading"
           - "left_panel"
           - "right_panel"
-        media_text:
+        diagram:
           - "heading"
           - "body"
           - "media"
           - "caption"
+        table:
+          - "heading"
+          - "table"
+          - "note"
+        caution:
+          - "heading"
+          - "caution"
+          - "supporting_text"
         step_list:
           - "heading"
           - "steps"
