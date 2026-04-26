@@ -11,12 +11,12 @@ good.pptx
 
 bad.pptx
 - 1 slide, 16:9
-- shape A: overflow (right edge), font_family ("Arial"), font_size_scale (28pt),
+- shape A: overflow_text (right edge), font_family ("Arial"), font_size_scale (28pt),
            text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist
-- shape B: safe_text_area violation (positioned at x=10, left of x=81 boundary),
+- shape B: safe_text_area_text violation (positioned at x=10, left of x=81 boundary),
            background_color_palette
 - slide: transition XML violation
-- expected lint output: each of {overflow, safe_text_area, text_autofit_disabled,
+- expected lint output: each of {overflow_text, safe_text_area_text, text_autofit_disabled,
                                  font_family, font_size_scale, text_color_allowlist,
                                  background_color_palette, animation_present}
   fires at least once

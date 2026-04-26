@@ -2,8 +2,10 @@
 """PPTX lint MVP for slide-guideline-v1 compliance.
 
 Checks
-- overflow             (error)   element extends beyond slide canvas (1440x810pt)
-- safe_text_area       (warning) text-bearing element outside safe text area
+- overflow_text        (error)   text-bearing element extends beyond slide canvas
+- overflow_shapes      (error)   shape element extends beyond slide canvas
+- overflow_images      (error)   image element extends beyond slide canvas
+- safe_text_area_text  (warning) text-bearing element outside safe text area
 - text_autofit_disabled(error)   text frame auto-size is not NONE
 - font_family          (warning) font name not in allowlist
 - font_size_scale      (warning) font size not in allowed scale
@@ -206,10 +208,16 @@ def check_overflow(slide_idx, slide_id, shape, bbox, findings):
         out.append(("bottom", bottom - SLIDE_H_PT))
     if not out:
         return
+    if shape.has_text_frame and shape.text_frame.text.strip():
+        check_id = "overflow_text"
+    elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+        check_id = "overflow_images"
+    else:
+        check_id = "overflow_shapes"
     msg = "outside slide canvas: " + ", ".join(f"{s}+{a:.1f}pt" for s, a in out)
     findings.append(
         make_finding(
-            "error", "overflow", slide_idx, slide_id, shape, msg,
+            "error", check_id, slide_idx, slide_id, shape, msg,
             {"bbox_pt": [round(v, 2) for v in bbox]},
         )
     )
@@ -236,7 +244,7 @@ def check_safe_text_area(slide_idx, slide_id, shape, bbox, findings):
     msg = "text outside safe text area: " + ", ".join(f"{s}+{a:.1f}pt" for s, a in out)
     findings.append(
         make_finding(
-            "warning", "safe_text_area", slide_idx, slide_id, shape, msg,
+            "warning", "safe_text_area_text", slide_idx, slide_id, shape, msg,
             {"bbox_pt": [round(v, 2) for v in bbox]},
         )
     )

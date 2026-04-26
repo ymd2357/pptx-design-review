@@ -2066,6 +2066,8 @@ rules:
     report_only: true
 
     checks:
+      slide_size:
+        severity: "warning"
       overflow_text:
         severity: "error"
       overflow_shapes:
