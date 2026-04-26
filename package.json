@@ -1,0 +1,13 @@
+{
+  "name": "pptx-design-review",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PPTX design review guidelines and tooling",
+  "scripts": {
+    "lint:md": "markdownlint-cli2"
+  },
+  "type": "commonjs",
+  "devDependencies": {
+    "markdownlint-cli2": "^0.22.1"
+  }
+}
