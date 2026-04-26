@@ -222,12 +222,31 @@ distribution:
       purpose: "Before/after visual inspection and design review."
 
   release_gate:
+    procedure_doc: "doc/distribution-release-gate.md"
     required_checks:
-      - "YAML parse succeeds for doc/slide-guideline-v1.yml"
-      - "Markdown lint passes for task and agent docs"
-      - "PPTX lint has no errors on the delivery PPTX"
-      - "PDF visual review confirms readable rendering"
+      - id: "guideline_yaml_parse"
+        type: "automated"
+        command: "node -e \"const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('doc/slide-guideline-v1.yml','utf8')); console.log('YAML OK')\""
+        pass_condition: "Command exits 0 and prints YAML OK."
+      - id: "markdown_lint"
+        type: "automated"
+        command: "npx --no-install markdownlint-cli2 doc/tasks.md AGENTS.md TASKS.md"
+        pass_condition: "Command exits 0 with 0 markdownlint errors."
+      - id: "pptx_lint_errors"
+        type: "automated"
+        command_template: "python3 skills/pptx-design-reviewer/scripts/pptx_lint.py \"tmp/distribution/${DECK_ID}/${DECK_ID}.pptx\" --severity error"
+        report_template: "python3 skills/pptx-design-reviewer/scripts/pptx_lint.py \"tmp/distribution/${DECK_ID}/${DECK_ID}.pptx\" --json > \"tmp/review/${DECK_ID}/lint.json\""
+        pass_condition: "Command exits 0 with no error-severity findings."
+      - id: "pdf_visual_review"
+        type: "manual"
+        checklist: "doc/distribution-release-gate.md#4-pdf-visual-review"
+        artifact_template: "tmp/distribution/${DECK_ID}/${DECK_ID}.pdf"
+        pass_condition: "PDF visual review confirms readable static rendering and records any notes under tmp/review/${DECK_ID}/."
     generated_artifact_policy: "Do not commit generated PPTX, PDF, review images, or lint reports unless the user explicitly asks."
+    ignored_locations:
+      - "tmp/distribution/"
+      - "tmp/review/"
+      - "tmp/exports/"
 
 # -----------------------------------------------------------------------------
 # Tokens
