@@ -335,7 +335,8 @@ tokens:
 
     typography:
       font_family_primary: "Noto Sans JP"
-      font_family_fallback: "Calibri"
+      font_family_latin: "Avenir Next Arabic"
+      font_family_fallback: "Nunito Sans"
       align:
         horizontal_left: "Left"
         horizontal_center: "Center"
@@ -345,10 +346,15 @@ tokens:
         none: "None"
       sizes_pt:
         title: 80
+        large_title: 64
         section_title: 56
+        cover_title: 48
+        large_heading: 40
         heading: 36
         subheading: 32
+        small_heading: 28
         body: 24
+        small_body: 22
         caption: 20
       line_height_pt:
         title: 90
@@ -387,6 +393,53 @@ tokens:
       text_alt_dark: "#1E112D"
       text_inverse: "#FFFFFF"
       accent_magenta: "#A51E6D"
+      brand:
+        primary:
+          p900: "#A51E6D"
+          p800: "#AE357C"
+          p700: "#B74B8A"
+          p600: "#C06299"
+          p500: "#C978A7"
+          p400: "#D28FB6"
+          p300: "#DBA5C5"
+          p200: "#E4BCD3"
+          p100: "#EDD2E2"
+          p50: "#F6E9F0"
+        black:
+          b900: "#333333"
+          b800: "#474747"
+          b700: "#5C5C5C"
+          b600: "#707070"
+          b500: "#858585"
+          b400: "#999999"
+          b300: "#ADADAD"
+          b200: "#C2C2C2"
+          b100: "#D6D6D6"
+          b50: "#EBEBEB"
+        secondary:
+          s900: "#039578"
+          s800: "#1CA086"
+          s700: "#35AA93"
+          s600: "#4FB5A1"
+          s500: "#68BFAE"
+          s400: "#81CABC"
+          s300: "#9AD5C9"
+          s200: "#B3DFD7"
+          s100: "#CDEAE4"
+          s50: "#E6F4F2"
+        gradient:
+          red: "#FF5757"
+          red_deep: "#E6033D"
+          cyan: "#32BED2"
+          purple: "#8C52FF"
+          purple_deep: "#673BA0"
+        gold:
+          base: "#FFBC2A"
+          light: "#FFE177"
+          pale: "#FFF9CF"
+        utility:
+          black: "#000000"
+          off_white: "#FEFEFE"
       border_default: "#DDDDDD"
       overlay_black: "#000000"
       state:
@@ -530,6 +583,13 @@ tokens:
         muted: "tokens.value.color.neutral.n600"
       accent:
         magenta: "tokens.value.color.accent_magenta"
+      brand:
+        primary: "tokens.value.color.brand.primary"
+        black: "tokens.value.color.brand.black"
+        secondary: "tokens.value.color.brand.secondary"
+        gradient: "tokens.value.color.brand.gradient"
+        gold: "tokens.value.color.brand.gold"
+        utility: "tokens.value.color.brand.utility"
       border:
         default: "tokens.value.color.border_default"
       neutral:
@@ -1054,6 +1114,14 @@ rules:
     size_pt:
       w: 1440
       h: 810
+      role: "base_coordinate_system"
+    size_policy:
+      allow_proportional_16_9: true
+      lint_normalization: >
+        1440x810pt is the base coordinate system, not the only accepted PPTX
+        canvas size. For proportional 16:9 decks, lint scales coordinates,
+        typography sizes, line heights, and image display dimensions to the
+        base coordinate system before applying thresholds.
 
     safe_margins_pt_min:
       left: 81
@@ -1140,16 +1208,24 @@ rules:
         weights:
           - "Medium"
           - "Bold"
+      latin:
+        family: "Avenir Next Arabic"
       fallback:
-        family: "Calibri"
+        family: "Nunito Sans"
 
     size_scale_pt:
       title: 80
+      large_title: 64
       section_title: 56
+      cover_title: 48
+      large_heading: 40
       heading: 36
       subheading: 32
+      small_heading: 28
       body: 24
+      small_body: 22
       caption: 20
+    size_tolerance_pt: 1
 
     line_height_pt:
       title: 90
@@ -1158,6 +1234,7 @@ rules:
       subheading: 36
       body: 30
       caption: 24
+    line_height_tolerance_pt: 2
 
     minimum_pt:
       body: 24
@@ -1242,7 +1319,7 @@ rules:
         unit: "pt"
         mode: "fixed"
         source: "tokens.semantic.type.<style>.line_height_pt"
-        tolerance_pt: 0
+        tolerance_pt: "rules.typography.line_height_tolerance_pt"
         allow_auto_line_spacing: false
       spacing:
         unit: "pt"
@@ -1339,6 +1416,57 @@ rules:
         default: "#DDDDDD"
       accent:
         magenta: "#A51E6D"
+      brand:
+        usage_policy:
+          primary_and_black_default: true
+          secondary_allowed_when_needed: true
+          source: "/Users/yamadakenichi/Downloads/design_guideline.pptx"
+        primary:
+          p900: "#A51E6D"
+          p800: "#AE357C"
+          p700: "#B74B8A"
+          p600: "#C06299"
+          p500: "#C978A7"
+          p400: "#D28FB6"
+          p300: "#DBA5C5"
+          p200: "#E4BCD3"
+          p100: "#EDD2E2"
+          p50: "#F6E9F0"
+        black:
+          b900: "#333333"
+          b800: "#474747"
+          b700: "#5C5C5C"
+          b600: "#707070"
+          b500: "#858585"
+          b400: "#999999"
+          b300: "#ADADAD"
+          b200: "#C2C2C2"
+          b100: "#D6D6D6"
+          b50: "#EBEBEB"
+        secondary:
+          s900: "#039578"
+          s800: "#1CA086"
+          s700: "#35AA93"
+          s600: "#4FB5A1"
+          s500: "#68BFAE"
+          s400: "#81CABC"
+          s300: "#9AD5C9"
+          s200: "#B3DFD7"
+          s100: "#CDEAE4"
+          s50: "#E6F4F2"
+        gradient:
+          red: "#FF5757"
+          red_deep: "#E6033D"
+          cyan: "#32BED2"
+          purple: "#8C52FF"
+          purple_deep: "#673BA0"
+        gold:
+          base: "#FFBC2A"
+          light: "#FFE177"
+          pale: "#FFF9CF"
+        utility:
+          black: "#000000"
+          off_white: "#FEFEFE"
       state:
         success: "#009E73"
         warning: "#E69F00"
@@ -1412,6 +1540,29 @@ rules:
             - "callout_border"
             - "emphasis_text"
             - "small_fill"
+        primary_tints:
+          role: "magenta_tints"
+          colors: "tokens.semantic.color.brand.primary"
+          allowed_uses:
+            - "table_header"
+            - "zebra_row_background"
+            - "callout_background"
+            - "subtle_section_background"
+        secondary:
+          role: "secondary_green"
+          colors: "tokens.semantic.color.brand.secondary"
+          allowed_uses:
+            - "secondary_marker"
+            - "supporting_diagram"
+            - "secondary_table_highlight"
+        special:
+          gradient_colors: "tokens.semantic.color.brand.gradient"
+          gold_colors: "tokens.semantic.color.brand.gold"
+          utility_colors: "tokens.semantic.color.brand.utility"
+          allowed_uses:
+            - "design_guideline_defined_gradient"
+            - "gold_badge_or_marker"
+            - "design_guideline_annotation_text"
       state_colors:
         success:
           color: "tokens.semantic.color.state.success"
@@ -1677,6 +1828,11 @@ rules:
         - "tokens.semantic.color.background.muted"
         - "tokens.semantic.color.neutral.n200"
         - "tokens.semantic.color.accent.magenta"
+        - "tokens.semantic.color.brand.primary"
+        - "tokens.semantic.color.brand.black"
+        - "tokens.semantic.color.brand.secondary"
+        - "tokens.semantic.color.brand.gradient"
+        - "tokens.semantic.color.brand.gold"
       accent_fill_area_source: "rules.color.accent_area"
     shadow:
       allowed: false
@@ -2087,6 +2243,7 @@ rules:
     checks:
       slide_size:
         severity: "warning"
+        detection: "Warn only when the PPTX canvas is not proportional to rules.slide.size_pt; proportional 16:9 decks are normalized before other checks."
       overflow_text:
         severity: "error"
       overflow_shapes:
@@ -2116,7 +2273,11 @@ rules:
       image_upscale_ratio:
         severity: "warning"
         automation: "automated"
-        detection: "Compare picture source pixel size with displayed PPTX size converted at 96px/in; warn above tokens.value.imagery.avoid_upscale_over_ratio."
+        detection: "Compare picture source pixel size with displayed PPTX size converted at 96px/in; warn above tokens.value.imagery.avoid_upscale_over_ratio. Exclude explicit template/decorative rasters such as gradient/header/background assets."
+      image_aspect_distortion:
+        severity: "warning"
+        automation: "automated"
+        detection: "Compare picture source aspect ratio with displayed box aspect ratio; warn when the relative delta exceeds 5%. Exclude explicit template/decorative rasters such as gradient/header/background assets."
       contrast_ratio:
         severity: "warning"
         automation: "manual_review"

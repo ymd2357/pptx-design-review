@@ -20,6 +20,14 @@ sys.path.insert(0, str(HERE))
 
 import make_examples  # noqa: E402
 import pptx_lint  # noqa: E402
+from pptx import Presentation  # noqa: E402
+from pptx.dml.color import RGBColor  # noqa: E402
+from pptx.enum.text import MSO_AUTO_SIZE  # noqa: E402
+from pptx.enum.text import MSO_VERTICAL_ANCHOR  # noqa: E402
+from pptx.util import Pt  # noqa: E402
+
+
+A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 
 EXPECTED_BAD_CHECKS = {
@@ -43,6 +51,7 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "slide_size",
     "overflow_shapes",
     "overflow_images",
+    "image_aspect_distortion",
 }
 
 LINT004_POLICY = {
@@ -97,6 +106,185 @@ def _guideline_lint_check_automation() -> dict[str, str]:
     return automation
 
 
+def _make_scaled_good(out: Path) -> None:
+    """Create a 720x405 deck that is compliant after 1440x810 normalization."""
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    title = slide.shapes.add_textbox(Pt(40.5), Pt(20), Pt(639), Pt(60))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = title.text_frame.paragraphs[0].add_run()
+    run.text = "Scaled compliant title"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(28)
+
+    body = slide.shapes.add_textbox(Pt(40.5), Pt(100), Pt(639), Pt(200))
+    body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = body.text_frame.paragraphs[0].add_run()
+    run.text = "Scaled compliant body."
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+
+    prs.save(str(out))
+
+
+def _make_centered_single_line_good(out: Path) -> None:
+    """Create a deck with an intentionally vertically centered one-line label."""
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    label = slide.shapes.add_textbox(Pt(40.5), Pt(20), Pt(300), Pt(30))
+    label.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    label.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+    run = label.text_frame.paragraphs[0].add_run()
+    run.text = "Centered single-line label"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _make_bad_table_cell_fill(out: Path) -> None:
+    """Create a deck where only a table cell uses a non-palette fill color."""
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    table_shape = slide.shapes.add_table(2, 2, Pt(40.5), Pt(40), Pt(400), Pt(120))
+    table = table_shape.table
+    for row in table.rows:
+        for cell in row.cells:
+            cell.text = "Cell"
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor.from_string("FFFFFF")
+    table.cell(0, 0).fill.fore_color.rgb = RGBColor.from_string("123456")
+    prs.save(str(out))
+
+
+def _make_allowed_latin_fonts_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    title = slide.shapes.add_textbox(Pt(40.5), Pt(20), Pt(639), Pt(60))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = title.text_frame.paragraphs[0].add_run()
+    run.text = "SHIFT AI"
+    run.font.name = "Avenir Next Arabic"
+    run.font.size = Pt(28)
+
+    body = slide.shapes.add_textbox(Pt(40.5), Pt(100), Pt(639), Pt(80))
+    body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = body.text_frame.paragraphs[0].add_run()
+    run.text = "Fallback Latin"
+    run.font.name = "Nunito Sans"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _make_scaled_near_font_sizes_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    for i, size in enumerate((11.25, 13.5, 15.75, 31.5)):
+        box = slide.shapes.add_textbox(Pt(40.5), Pt(20 + i * 60), Pt(500), Pt(50))
+        box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+        run = box.text_frame.paragraphs[0].add_run()
+        run.text = f"Near size {size}"
+        run.font.name = "Noto Sans JP"
+        run.font.size = Pt(size)
+    prs.save(str(out))
+
+
+def _make_scaled_near_line_heights_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    for i, line_height in enumerate((20.25, 33.75, 44.1)):
+        box = slide.shapes.add_textbox(Pt(40.5), Pt(20 + i * 70), Pt(500), Pt(60))
+        box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+        para = box.text_frame.paragraphs[0]
+        para.line_spacing = Pt(line_height)
+        run = para.add_run()
+        run.text = f"Near line height {line_height}"
+        run.font.name = "Noto Sans JP"
+        run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _make_bad_table_cell_font(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    table_shape = slide.shapes.add_table(1, 1, Pt(40.5), Pt(40), Pt(300), Pt(60))
+    cell = table_shape.table.cell(0, 0)
+    cell.text = ""
+    run = cell.text_frame.paragraphs[0].add_run()
+    run.text = "Bad table font"
+    run.font.name = "Arial"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _make_bad_east_asian_font(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40.5), Pt(40), Pt(500), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "日本語フォント"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+    r_pr = run._r.get_or_add_rPr()
+    ea = r_pr.find(f"{A_NS}ea")
+    if ea is None:
+        ea = r_pr.makeelement(f"{A_NS}ea")
+        r_pr.append(ea)
+    ea.set("typeface", "Meiryo")
+    prs.save(str(out))
+
+
+def _make_aspect_distorted_image(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    img = out.with_name("_aspect_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        pic = slide.shapes.add_picture(str(img), Pt(40), Pt(40), width=Pt(120), height=Pt(40))
+        make_examples._clear_alt_text(pic)
+    finally:
+        img.unlink(missing_ok=True)
+    prs.save(str(out))
+
+
+def _make_decorative_distorted_image(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    img = out.with_name("_decorative_aspect_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        pic = slide.shapes.add_picture(str(img), Pt(0), Pt(0), width=Pt(720), height=Pt(405))
+        c_nv_pr = pic._element.xpath(".//p:cNvPr")[0]
+        c_nv_pr.set("descr", "header-gradient.png")
+    finally:
+        img.unlink(missing_ok=True)
+    prs.save(str(out))
+
+
 def main() -> int:
     failures: list = []
 
@@ -104,8 +292,28 @@ def main() -> int:
         tmp_dir = Path(tmp)
         good = tmp_dir / "good.pptx"
         bad = tmp_dir / "bad.pptx"
+        scaled_good = tmp_dir / "scaled-good.pptx"
+        centered_single_line_good = tmp_dir / "centered-single-line-good.pptx"
+        bad_table_cell_fill = tmp_dir / "bad-table-cell-fill.pptx"
+        allowed_latin_fonts_good = tmp_dir / "allowed-latin-fonts-good.pptx"
+        scaled_near_font_sizes_good = tmp_dir / "scaled-near-font-sizes-good.pptx"
+        bad_table_cell_font = tmp_dir / "bad-table-cell-font.pptx"
+        scaled_near_line_heights_good = tmp_dir / "scaled-near-line-heights-good.pptx"
+        bad_east_asian_font = tmp_dir / "bad-east-asian-font.pptx"
+        aspect_distorted_image = tmp_dir / "aspect-distorted-image.pptx"
+        decorative_distorted_image = tmp_dir / "decorative-distorted-image.pptx"
         make_examples.make_good(good)
         make_examples.make_bad(bad)
+        _make_scaled_good(scaled_good)
+        _make_centered_single_line_good(centered_single_line_good)
+        _make_bad_table_cell_fill(bad_table_cell_fill)
+        _make_allowed_latin_fonts_good(allowed_latin_fonts_good)
+        _make_scaled_near_font_sizes_good(scaled_near_font_sizes_good)
+        _make_bad_table_cell_font(bad_table_cell_font)
+        _make_scaled_near_line_heights_good(scaled_near_line_heights_good)
+        _make_bad_east_asian_font(bad_east_asian_font)
+        _make_aspect_distorted_image(aspect_distorted_image)
+        _make_decorative_distorted_image(decorative_distorted_image)
 
         good_findings = pptx_lint.lint_pptx(good)
         if good_findings:
@@ -114,6 +322,119 @@ def main() -> int:
                     n=len(good_findings),
                     lines="\n  ".join(f"[{f.severity}] {f.check}: {f.message}" for f in good_findings),
                 )
+            )
+
+        scaled_good_findings = pptx_lint.lint_pptx(scaled_good)
+        if scaled_good_findings:
+            failures.append(
+                "scaled-good.pptx had {n} findings; expected 0 after normalization:\n  {lines}".format(
+                    n=len(scaled_good_findings),
+                    lines="\n  ".join(
+                        f"[{f.severity}] {f.check}: {f.message}" for f in scaled_good_findings
+                    ),
+                )
+            )
+
+        centered_single_line_findings = pptx_lint.lint_pptx(centered_single_line_good)
+        if centered_single_line_findings:
+            failures.append(
+                "centered-single-line-good.pptx had {n} findings; expected 0:\n  {lines}".format(
+                    n=len(centered_single_line_findings),
+                    lines="\n  ".join(
+                        f"[{f.severity}] {f.check}: {f.message}"
+                        for f in centered_single_line_findings
+                    ),
+                )
+            )
+        centered_single_line_strict_findings = pptx_lint.lint_pptx(
+            centered_single_line_good,
+            profile="strict",
+        )
+        if not any(f.check == "alignment_left_top" for f in centered_single_line_strict_findings):
+            failures.append(
+                "centered-single-line-good.pptx did not trigger vertical anchor alignment in strict profile"
+            )
+
+        table_cell_findings = [
+            f
+            for f in pptx_lint.lint_pptx(bad_table_cell_fill)
+            if f.check == "background_color_palette"
+        ]
+        if not any(f.detail.get("scope") == "table_cell" for f in table_cell_findings):
+            failures.append(
+                "bad-table-cell-fill.pptx did not trigger background_color_palette for table cell fill"
+            )
+
+        allowed_latin_font_findings = [
+            f
+            for f in pptx_lint.lint_pptx(allowed_latin_fonts_good)
+            if f.check == "font_family"
+        ]
+        if allowed_latin_font_findings:
+            failures.append(
+                "allowed-latin-fonts-good.pptx triggered font_family for design guideline fonts:\n  "
+                + "\n  ".join(f.message for f in allowed_latin_font_findings)
+            )
+
+        scaled_near_font_size_findings = [
+            f
+            for f in pptx_lint.lint_pptx(scaled_near_font_sizes_good)
+            if f.check == "font_size_scale"
+        ]
+        if scaled_near_font_size_findings:
+            failures.append(
+                "scaled-near-font-sizes-good.pptx triggered font_size_scale inside tolerance:\n  "
+                + "\n  ".join(f.message for f in scaled_near_font_size_findings)
+            )
+
+        scaled_near_line_height_findings = [
+            f
+            for f in pptx_lint.lint_pptx(scaled_near_line_heights_good)
+            if f.check == "line_height"
+        ]
+        if scaled_near_line_height_findings:
+            failures.append(
+                "scaled-near-line-heights-good.pptx triggered line_height inside tolerance:\n  "
+                + "\n  ".join(f.message for f in scaled_near_line_height_findings)
+            )
+
+        table_cell_font_findings = [
+            f
+            for f in pptx_lint.lint_pptx(bad_table_cell_font)
+            if f.check == "font_family"
+        ]
+        if not any(f.detail.get("cells") for f in table_cell_font_findings):
+            failures.append(
+                "bad-table-cell-font.pptx did not trigger font_family for table cell text"
+            )
+
+        east_asian_font_findings = [
+            f
+            for f in pptx_lint.lint_pptx(bad_east_asian_font)
+            if f.check == "font_family"
+        ]
+        if not any(f.detail.get("script") == "ea" and f.detail.get("font") == "Meiryo" for f in east_asian_font_findings):
+            failures.append(
+                "bad-east-asian-font.pptx did not trigger font_family for explicit East Asian font"
+            )
+
+        aspect_findings = [
+            f
+            for f in pptx_lint.lint_pptx(aspect_distorted_image)
+            if f.check == "image_aspect_distortion"
+        ]
+        if not aspect_findings:
+            failures.append("aspect-distorted-image.pptx did not trigger image_aspect_distortion")
+
+        decorative_image_findings = [
+            f
+            for f in pptx_lint.lint_pptx(decorative_distorted_image)
+            if f.check in {"image_aspect_distortion", "image_upscale_ratio"}
+        ]
+        if decorative_image_findings:
+            failures.append(
+                "decorative-distorted-image.pptx triggered raster quality checks for a template raster:\n  "
+                + "\n  ".join(f"{f.check}: {f.message}" for f in decorative_image_findings)
             )
 
         bad_findings = pptx_lint.lint_pptx(bad)

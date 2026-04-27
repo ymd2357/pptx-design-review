@@ -39,7 +39,8 @@ quality, identifying and fixing issues at the source slide deck level.
 These documents define the visual and structural rules used when judging issues:
 
 - [`doc/slide-guideline-v1.yml`](../../doc/slide-guideline-v1.yml) —
-  Current guideline (v1.4, 16:9 / 1440×810pt, screen-only delivery)
+  Current guideline (v1.4, 16:9 / 1440×810pt base coordinate system,
+  screen-only delivery)
 - [`doc/slide-guideline-v0.yml`](../../doc/slide-guideline-v0.yml) —
   Earlier version, retained for traceability
 - [`doc/design-system-review-v0.md`](../../doc/design-system-review-v0.md) —
@@ -52,6 +53,7 @@ guideline violations. The lint mirrors `doc/slide-guideline-v1.yml`.
 
 ```bash
 python3 scripts/pptx_lint.py path/to/DECK.pptx
+python3 scripts/pptx_lint.py path/to/DECK.pptx --profile strict
 python3 scripts/pptx_lint.py path/to/DECK.pptx --severity error
 python3 scripts/pptx_lint.py path/to/DECK.pptx --json > lint.json
 ```
@@ -60,19 +62,61 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 
 | Check | Severity | Description |
 | ------- | ---------- | ------------- |
-| `overflow` | error | Element extends beyond 1440×810pt slide canvas |
-| `safe_text_area` | warning | Text element outside safe text area (x:81, y:40, w:1278, h:690) |
+| `overflow` | error | Element extends beyond the normalized base slide canvas |
+| `safe_text_area` | warning | Text element outside normalized safe text area (x:81, y:40, w:1278, h:690 at 1440×810 base) |
 | `text_autofit_disabled` | error | Text frame auto-size is not NONE |
-| `font_family` | warning | Font family not in `Noto Sans JP` / `Calibri` (weight suffix tolerated) |
-| `font_size_scale` | warning | Font size not in `{20, 24, 32, 36, 56, 80}` |
+| `font_family` | warning | Font family not in `Noto Sans JP` / `Avenir Next Arabic` / `Nunito Sans` (weight suffix tolerated) |
+| `font_size_scale` | warning | Font size not within 1pt of `{20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80}` after normalization |
+| `line_height` | warning | Fixed paragraph line height not within 2pt of `{24, 30, 36, 42, 66, 90}` after normalization |
 | `text_color_allowlist` | warning | Explicit text color is outside the allowed text palette |
 | `background_color_palette` | warning | Explicit shape fill color is outside the allowed fill/background palette |
+| `image_aspect_distortion` | warning | Picture source aspect ratio differs from displayed box aspect ratio |
+| `image_upscale_ratio` | warning | Picture is displayed larger than its source pixels support |
 | `animation_present` | error | Slide contains `<p:transition>` or `<p:timing>` |
-| `slide_size` | warning | Deck slide size differs from 1440×810pt |
+| `slide_size` | warning | Deck slide size is not proportional to the 1440×810pt base |
+
+Template/decorative rasters named or described as gradient/header/background
+assets are excluded from `image_aspect_distortion` and `image_upscale_ratio`.
+Those checks are intended for content-bearing images such as photos, logos,
+screenshots, and diagrams.
+
+Lint policy profiles:
+
+| Profile | Use |
+| ------- | --- |
+| `default` | Normal review. Template-dependent vertical text anchoring is off. |
+| `strict` | Stricter design-system audit. Also checks text frame vertical anchor against TOP. |
+
+For proportional 16:9 decks such as 720×405pt, lint normalizes coordinates,
+font sizes, line heights, and image display dimensions to the 1440×810pt base
+before applying thresholds. `1440×810pt` is the reference coordinate system,
+not the only accepted PPTX canvas size.
 
 Use lint output to scope manual inspection: triage errors first, then warnings,
 then move on to visual checks (overlap, hierarchy, photo handling) that the lint
 does not cover.
+
+For user-facing review reports, do not present raw finding counts as the main
+result. Convert findings into P0-P3 action priorities:
+
+```bash
+python3 scripts/pptx_review_priorities.py path/to/DECK.pptx
+python3 scripts/pptx_review_priorities.py path/to/DECK.pptx --json
+```
+
+Priority meanings:
+
+| Priority | Meaning |
+| -------- | ------- |
+| `P0` | Cannot read, broken content, clipped text, or encoding corruption |
+| `P1` | Direct readability, comprehension, or delivery-quality risk |
+| `P2` | Template/brand/rule divergence that needs allow/fix judgment |
+| `P3` | Mechanical cleanup such as micro-alignment drift |
+
+Do not raise an authored paragraph break as P1 by itself. Explicit line breaks
+can be intentional layout. Treat unexpected visual wrapping that appears only in
+rendered output as a visual-review concern, and escalate only when it causes
+readability or meaning loss.
 
 When the same template element trips the same check on many slides (typical of
 footers/headers copied across the deck), findings are consolidated into one
@@ -87,6 +131,7 @@ to see every per-slide occurrence.
 ```bash
 python3 scripts/make_examples.py
 python3 scripts/test_pptx_lint.py
+python3 scripts/test_pptx_review_priorities.py
 ```
 
 The fixture script writes `examples/good.pptx` and `examples/bad.pptx`.
@@ -137,20 +182,29 @@ python3 scripts/pptx_fix.py path/to/DECK.pptx
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply --backup
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply --rules autofit
+python3 scripts/pptx_fix.py path/to/DECK.pptx --rules font_size
 python3 scripts/pptx_fix.py path/to/DECK.pptx --json
 ```
 
 The default mode is dry-run. `--apply` writes in-place. `--backup` writes
-`DECK.pptx.bak` if absent.
+`DECK.pptx.bak` if absent. By default only `autofit,geometry` run. `font_size`
+must be requested explicitly.
 
 | Rule | Action |
 | ------ | -------- |
 | `autofit` | Set `text_frame.auto_size` to `MSO_AUTO_SIZE.NONE` when it differs |
 | `geometry` | Round shape `left/top/width/height` to nearest 1pt for drift <0.1pt |
+| `font_size` | Snap text run size to nearest allowed size only when explicitly requested and safety checks pass; otherwise report `manual_required` |
 
-Out of fixer scope (require human judgment): `font_family`, `font_size_scale`,
-`overflow`, `safe_text_area`, `animation_present`, `slide_size`. Re-lint after
-applying to triage what remains.
+`font_size` is guarded. It only applies when the affected text is a single
+authored line, the actual size delta is <=1pt, the estimated text still fits the
+box after resizing, the container stays within the slide, and the shape bbox
+does not overlap another shape. Otherwise the action is reported as
+`manual_required` and is not written even with `--apply`.
+
+Out of fixer scope (require human judgment): `font_family`, `overflow`,
+`safe_text_area`, `animation_present`, `slide_size`. Re-lint after applying to
+triage what remains.
 
 After `--apply`, the fixer re-reads the saved file and verifies the change is
 durable on disk. If any action is still detected, it prints a
@@ -171,7 +225,8 @@ Regression test:
 python3 scripts/test_pptx_fix.py
 ```
 
-The test verifies `bad.pptx` autofit fixes and geometry rounding.
+The test verifies `bad.pptx` autofit fixes, geometry rounding, and guarded
+`font_size` apply/manual behavior.
 
 ## Image-based Review (Before/After)
 

@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 from pptx import Presentation
+from pptx.enum.text import MSO_AUTO_SIZE
 from pptx.util import Emu, Pt
 
 HERE = Path(__file__).parent
@@ -41,6 +42,34 @@ def _build_geometry_fixture(out: Path) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     slide.shapes.add_textbox(Emu(DRIFT_LEFT_EMU), Pt(40), Pt(200), Pt(50))
     slide.shapes.add_textbox(Emu(HALF_LEFT_EMU), Pt(120), Pt(200), Pt(50))
+    prs.save(str(out))
+
+
+def _build_safe_font_size_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40), Pt(40), Pt(300), Pt(80))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Short label"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(14.75)
+    prs.save(str(out))
+
+
+def _build_manual_font_size_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40), Pt(40), Pt(300), Pt(27))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Cover label"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(22.5)
     prs.save(str(out))
 
 
@@ -117,6 +146,27 @@ def main() -> int:
         pptx_fix.fix_pptx(backup_deck, apply=True, backup=True, rules=("autofit",))
         if backup_path.read_bytes() != sentinel:
             failures.append("--backup overwrote an existing .bak file")
+
+        # --- font_size only applies when safety checks pass ---
+        safe_font = tmp_dir / "safe-font.pptx"
+        _build_safe_font_size_fixture(safe_font)
+        actions = pptx_fix.fix_pptx(safe_font, apply=True, rules=("font_size",))
+        if not any(a.rule == "font_size" and a.status == "apply" for a in actions):
+            failures.append("font_size fixer did not report an apply action for safe fixture")
+        prs = Presentation(str(safe_font))
+        fixed_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
+        if abs(fixed_size - 14.0) > 1e-6:
+            failures.append(f"font_size safe fixture expected 14pt; got {fixed_size}")
+
+        manual_font = tmp_dir / "manual-font.pptx"
+        _build_manual_font_size_fixture(manual_font)
+        actions = pptx_fix.fix_pptx(manual_font, apply=True, rules=("font_size",))
+        if not any(a.rule == "font_size" and a.status == "manual_required" for a in actions):
+            failures.append("font_size fixer did not report manual_required for unsafe fixture")
+        prs = Presentation(str(manual_font))
+        unchanged_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
+        if abs(unchanged_size - 22.5) > 1e-6:
+            failures.append(f"font_size manual fixture should remain 22.5pt; got {unchanged_size}")
 
         # --- self-check (verify_pptx) reports no residual on fixed file ---
         bad3 = tmp_dir / "bad3.pptx"

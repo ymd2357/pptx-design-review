@@ -11,7 +11,7 @@ good.pptx
 
 bad.pptx
 - 1 slide, 16:9
-- shape A: overflow_text (right edge), font_family ("Arial"), font_size_scale (28pt),
+- shape A: overflow_text (right edge), font_family ("Arial"), font_size_scale (30pt),
            text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist
 - shape B: safe_text_area_text violation (positioned at x=10, left of x=81 boundary),
            background_color_palette
@@ -131,7 +131,7 @@ def make_bad(out: Path) -> None:
 
     a = slide.shapes.add_textbox(Pt(1300), Pt(40), Pt(200), Pt(120))
     a.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-    a_run = _set_run(a.text_frame, "Bad shape A", "Arial", 28)
+    a_run = _set_run(a.text_frame, "Bad shape A", "Arial", 30)
     a_run.font.color.rgb = RGBColor(255, 0, 0)
 
     b = slide.shapes.add_textbox(Pt(10), Pt(300), Pt(300), Pt(50))
@@ -149,7 +149,7 @@ def make_bad(out: Path) -> None:
     d.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.BOTTOM
     d_p = d.text_frame.paragraphs[0]
     d_p.alignment = PP_ALIGN.RIGHT
-    d_p.line_spacing = Pt(25)
+    d_p.line_spacing = Pt(27)
     d_run = d_p.add_run()
     d_run.text = "Bad line spacing and alignment"
     d_run.font.name = "Noto Sans JP"

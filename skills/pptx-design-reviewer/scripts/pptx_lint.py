@@ -14,9 +14,10 @@ Checks
 - alignment_left_top  (warning) explicit text alignment differs from left/top
 - geometry_rounding   (warning) geometry is not on integer pt coordinates
 - image_upscale_ratio (warning) picture displayed larger than source pixels
+- image_aspect_distortion (warning) picture aspect ratio differs from display box
 - alt_text_required   (warning) meaningful image-like object has no alt text
 - text_color_allowlist (warning) explicit text color not in allowlist
-- background_color_palette (warning) explicit shape fill color not in palette
+- background_color_palette (warning) explicit shape/table cell fill color not in palette
 - animation_present    (error)   slide contains <p:transition> or <p:timing>
 
 Source of truth for thresholds is doc/slide-guideline-v1.yml.
@@ -65,16 +66,35 @@ SAFE_TEXT_AREA_PT = (
     SLIDE_H_PT - SAFE_MARGIN_TOP_PT - SAFE_MARGIN_BOTTOM_PT,  # 690
 )
 
-ALLOWED_FONT_FAMILIES = ("Noto Sans JP", "Calibri")
-ALLOWED_FONT_SIZES_PT = {80, 56, 36, 32, 24, 20}
+ALLOWED_FONT_FAMILIES = ("Noto Sans JP", "Avenir Next Arabic", "Nunito Sans")
+ALLOWED_FONT_SIZES_PT = {80, 64, 56, 48, 40, 36, 32, 28, 24, 22, 20}
+FONT_SIZE_TOL_PT = 1.0
 ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
+LINE_HEIGHT_TOL_PT = 2.0
 MAX_IMAGE_UPSCALE_RATIO = 1.0
+MAX_IMAGE_ASPECT_DELTA_RATIO = 0.05
+DECORATIVE_RASTER_KEYWORDS = (
+    "background",
+    "bg",
+    "decoration",
+    "decorative",
+    "footer",
+    "gradient",
+    "header",
+)
 PX_PER_PT = 96 / 72
 
 ALLOWED_TEXT_COLORS_HEX = {
+    "#000000",  # brand.utility.black
     "#333333",  # text.primary
+    "#474747",  # brand.black.b800
+    "#5C5C5C",  # brand.black.b700
     "#666666",  # text.muted
+    "#707070",  # brand.black.b600
+    "#858585",  # brand.black.b500
+    "#999999",  # brand.black.b400
     "#1E112D",  # text.alt_dark
+    "#FEFEFE",  # brand.utility.off_white
     "#FFFFFF",  # text.inverse
     "#A51E6D",  # accent.magenta, allowed for emphasis text
     "#0072B2",  # state.info, allowed for link-like text
@@ -84,8 +104,45 @@ ALLOWED_FILL_COLORS_HEX = {
     "#FFFFFF",  # background.base / neutral.n0
     "#F7F7F7",  # background.muted / neutral.n100
     "#EEEEEE",  # neutral.n200
+    "#EBEBEB",  # brand.black.b50
     "#DDDDDD",  # neutral.n300 / border.default
+    "#D6D6D6",  # brand.black.b100
+    "#C2C2C2",  # brand.black.b200
+    "#ADADAD",  # brand.black.b300
+    "#999999",  # brand.black.b400
+    "#858585",  # brand.black.b500
+    "#707070",  # brand.black.b600
+    "#5C5C5C",  # brand.black.b700
+    "#474747",  # brand.black.b800
+    "#333333",  # brand.black.b900
+    "#F6E9F0",  # brand.primary.p50
+    "#EDD2E2",  # brand.primary.p100
+    "#E4BCD3",  # brand.primary.p200
+    "#DBA5C5",  # brand.primary.p300
+    "#D28FB6",  # brand.primary.p400
+    "#C978A7",  # brand.primary.p500
+    "#C06299",  # brand.primary.p600
+    "#B74B8A",  # brand.primary.p700
+    "#AE357C",  # brand.primary.p800
     "#A51E6D",  # accent.magenta
+    "#E6F4F2",  # brand.secondary.s50
+    "#CDEAE4",  # brand.secondary.s100
+    "#B3DFD7",  # brand.secondary.s200
+    "#9AD5C9",  # brand.secondary.s300
+    "#81CABC",  # brand.secondary.s400
+    "#68BFAE",  # brand.secondary.s500
+    "#4FB5A1",  # brand.secondary.s600
+    "#35AA93",  # brand.secondary.s700
+    "#1CA086",  # brand.secondary.s800
+    "#039578",  # brand.secondary.s900
+    "#FF5757",  # brand.gradient.red
+    "#E6033D",  # brand.gradient.red_deep
+    "#32BED2",  # brand.gradient.cyan
+    "#8C52FF",  # brand.gradient.purple
+    "#673BA0",  # brand.gradient.purple_deep
+    "#FFBC2A",  # brand.gold.base
+    "#FFE177",  # brand.gold.light
+    "#FFF9CF",  # brand.gold.pale
     "#1E112D",  # data series / dark emphasis
     "#0072B2",  # state.info / data series
     "#009E73",  # state.success / data series
@@ -98,8 +155,10 @@ ALLOWED_FILL_COLORS_HEX = {
 # Tolerance for fp comparisons in pt. Geometry rounding policy is 0.5pt.
 TOL_PT = 0.5
 GEOMETRY_INTEGER_TOL_PT = 0.01
+SLIDE_ASPECT_TOL = 0.01
 
 PML_NS = {"p": "http://schemas.openxmlformats.org/presentationml/2006/main"}
+A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # ---- Result types ----------------------------------------------------------
 
@@ -114,6 +173,33 @@ class Finding:
     shape_name: Optional[str]
     message: str
     detail: dict = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class LintPolicy:
+    check_vertical_text_anchor: bool = False
+
+
+LINT_PROFILES = {
+    "default": LintPolicy(),
+    "strict": LintPolicy(check_vertical_text_anchor=True),
+}
+
+
+@dataclass(frozen=True)
+class LintContext:
+    """Coordinate normalization from actual slide size to guideline base size."""
+
+    actual_w_pt: float
+    actual_h_pt: float
+    scale_x: float
+    scale_y: float
+    proportional_to_base: bool
+    policy: LintPolicy
+
+    @property
+    def font_scale(self) -> float:
+        return (self.scale_x + self.scale_y) / 2
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -156,6 +242,44 @@ def _font_name_allowed(name: str) -> bool:
     return False
 
 
+def _run_explicit_typefaces(run) -> list[tuple[str, str]]:
+    try:
+        r_pr = run._r.rPr
+    except AttributeError:
+        return []
+    if r_pr is None:
+        return []
+    typefaces: list[tuple[str, str]] = []
+    for script in ("latin", "ea"):
+        node = r_pr.find(f"{A_NS}{script}")
+        if node is None:
+            continue
+        name = node.get("typeface")
+        if name:
+            typefaces.append((script, name))
+    if not typefaces:
+        name = run.font.name
+        if name:
+            typefaces.append(("font", name))
+    return typefaces
+
+
+def _nearest_allowed_font_size(size_pt: float) -> int:
+    return min(ALLOWED_FONT_SIZES_PT, key=lambda allowed: abs(size_pt - allowed))
+
+
+def _font_size_allowed(size_pt: float) -> bool:
+    return abs(size_pt - _nearest_allowed_font_size(size_pt)) <= FONT_SIZE_TOL_PT
+
+
+def _nearest_allowed_line_height(line_height_pt: float) -> int:
+    return min(ALLOWED_LINE_HEIGHTS_PT, key=lambda allowed: abs(line_height_pt - allowed))
+
+
+def _line_height_allowed(line_height_pt: float) -> bool:
+    return abs(line_height_pt - _nearest_allowed_line_height(line_height_pt)) <= LINE_HEIGHT_TOL_PT
+
+
 def _rgb_hex(color_format) -> Optional[str]:
     """Return #RRGGBB for explicit RGB colors; inherited/theme colors are skipped."""
     try:
@@ -177,6 +301,38 @@ def _shape_fill_rgb_hex(shape) -> Optional[str]:
     return _rgb_hex(fore_color)
 
 
+def _table_cell_fill_rgb_hexes(shape) -> dict[str, list[dict[str, int]]]:
+    if not getattr(shape, "has_table", False):
+        return {}
+
+    colors: dict[str, list[dict[str, int]]] = defaultdict(list)
+    for row_idx, row in enumerate(shape.table.rows, start=1):
+        for col_idx, cell in enumerate(row.cells, start=1):
+            try:
+                fore_color = cell.fill.fore_color
+            except (AttributeError, TypeError, ValueError):
+                continue
+            hex_color = _rgb_hex(fore_color)
+            if hex_color:
+                colors[hex_color].append({"row": row_idx, "col": col_idx})
+    return colors
+
+
+def _iter_text_runs(shape):
+    if getattr(shape, "has_text_frame", False):
+        for para in shape.text_frame.paragraphs:
+            for run in para.runs:
+                yield run, None
+
+    if getattr(shape, "has_table", False):
+        for row_idx, row in enumerate(shape.table.rows, start=1):
+            for col_idx, cell in enumerate(row.cells, start=1):
+                location = {"scope": "table_cell", "row": row_idx, "col": col_idx}
+                for para in cell.text_frame.paragraphs:
+                    for run in para.runs:
+                        yield run, location
+
+
 def _c_nv_pr(shape):
     try:
         matches = shape._element.xpath(".//p:cNvPr")
@@ -194,6 +350,15 @@ def _alt_text_values(shape) -> tuple[str, str]:
     return title, descr
 
 
+def _decorative_template_raster_reason(shape) -> Optional[str]:
+    title, descr = _alt_text_values(shape)
+    haystack = " ".join([getattr(shape, "name", ""), title, descr]).lower()
+    for keyword in DECORATIVE_RASTER_KEYWORDS:
+        if keyword in haystack:
+            return f"keyword:{keyword}"
+    return None
+
+
 def shape_bbox_pt(shape) -> Optional[tuple]:
     if shape.left is None or shape.top is None or shape.width is None or shape.height is None:
         return None
@@ -202,6 +367,37 @@ def shape_bbox_pt(shape) -> Optional[tuple]:
         emu_to_pt(shape.top),
         emu_to_pt(shape.width),
         emu_to_pt(shape.height),
+    )
+
+
+def make_context(
+    actual_w: float,
+    actual_h: float,
+    *,
+    policy: LintPolicy,
+) -> LintContext:
+    scale_x = SLIDE_W_PT / actual_w if actual_w else 1.0
+    scale_y = SLIDE_H_PT / actual_h if actual_h else 1.0
+    base_aspect = SLIDE_W_PT / SLIDE_H_PT
+    actual_aspect = actual_w / actual_h if actual_h else 0
+    proportional = abs(actual_aspect - base_aspect) <= SLIDE_ASPECT_TOL
+    return LintContext(
+        actual_w_pt=actual_w,
+        actual_h_pt=actual_h,
+        scale_x=scale_x,
+        scale_y=scale_y,
+        proportional_to_base=proportional,
+        policy=policy,
+    )
+
+
+def normalize_bbox(ctx: LintContext, bbox: tuple) -> tuple:
+    x, y, w, h = bbox
+    return (
+        x * ctx.scale_x,
+        y * ctx.scale_y,
+        w * ctx.scale_x,
+        h * ctx.scale_y,
     )
 
 
@@ -221,8 +417,9 @@ def make_finding(severity, check, slide_idx, slide_id, shape, message, detail=No
 # ---- Checks ----------------------------------------------------------------
 
 
-def check_overflow(slide_idx, slide_id, shape, bbox, findings):
-    x, y, w, h = bbox
+def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
+    normalized = normalize_bbox(ctx, bbox)
+    x, y, w, h = normalized
     right, bottom = x + w, y + h
     out: List[tuple] = []
     if x < -TOL_PT:
@@ -245,17 +442,21 @@ def check_overflow(slide_idx, slide_id, shape, bbox, findings):
     findings.append(
         make_finding(
             "error", check_id, slide_idx, slide_id, shape, msg,
-            {"bbox_pt": [round(v, 2) for v in bbox]},
+            {
+                "bbox_pt": [round(v, 2) for v in normalized],
+                "actual_bbox_pt": [round(v, 2) for v in bbox],
+            },
         )
     )
 
 
-def check_safe_text_area(slide_idx, slide_id, shape, bbox, findings):
+def check_safe_text_area(ctx, slide_idx, slide_id, shape, bbox, findings):
     if not shape.has_text_frame:
         return
     if not shape.text_frame.text.strip():
         return
-    x, y, w, h = bbox
+    normalized = normalize_bbox(ctx, bbox)
+    x, y, w, h = normalized
     sx, sy, sw, sh = SAFE_TEXT_AREA_PT
     out: List[tuple] = []
     if x < sx - TOL_PT:
@@ -272,15 +473,19 @@ def check_safe_text_area(slide_idx, slide_id, shape, bbox, findings):
     findings.append(
         make_finding(
             "warning", "safe_text_area_text", slide_idx, slide_id, shape, msg,
-            {"bbox_pt": [round(v, 2) for v in bbox]},
+            {
+                "bbox_pt": [round(v, 2) for v in normalized],
+                "actual_bbox_pt": [round(v, 2) for v in bbox],
+            },
         )
     )
 
 
-def check_safe_margins(slide_idx, slide_id, shape, bbox, findings):
+def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings):
     if shape.has_text_frame and shape.text_frame.text.strip():
         return
-    x, y, w, h = bbox
+    normalized = normalize_bbox(ctx, bbox)
+    x, y, w, h = normalized
     out: List[tuple] = []
     if x < SAFE_MARGIN_LEFT_PT - TOL_PT:
         out.append(("left", SAFE_MARGIN_LEFT_PT - x))
@@ -296,16 +501,20 @@ def check_safe_margins(slide_idx, slide_id, shape, bbox, findings):
     findings.append(
         make_finding(
             "warning", "safe_margins", slide_idx, slide_id, shape, msg,
-            {"bbox_pt": [round(v, 2) for v in bbox]},
+            {
+                "bbox_pt": [round(v, 2) for v in normalized],
+                "actual_bbox_pt": [round(v, 2) for v in bbox],
+            },
         )
     )
 
 
-def check_geometry_rounding(slide_idx, slide_id, shape, bbox, findings):
+def check_geometry_rounding(ctx, slide_idx, slide_id, shape, bbox, findings):
+    normalized = normalize_bbox(ctx, bbox)
     names = ("x", "y", "w", "h")
     drifted = {
         name: round(value, 3)
-        for name, value in zip(names, bbox)
+        for name, value in zip(names, normalized)
         if abs(value - round(value)) > GEOMETRY_INTEGER_TOL_PT
     }
     if not drifted:
@@ -316,12 +525,16 @@ def check_geometry_rounding(slide_idx, slide_id, shape, bbox, findings):
     findings.append(
         make_finding(
             "warning", "geometry_rounding", slide_idx, slide_id, shape, msg,
-            {"bbox_pt": [round(v, 3) for v in bbox], "drifted": drifted},
+            {
+                "bbox_pt": [round(v, 3) for v in normalized],
+                "actual_bbox_pt": [round(v, 3) for v in bbox],
+                "drifted": drifted,
+            },
         )
     )
 
 
-def check_image_upscale(slide_idx, slide_id, shape, bbox, findings):
+def check_image_upscale(ctx, slide_idx, slide_id, shape, bbox, findings):
     if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
         return
     try:
@@ -330,7 +543,34 @@ def check_image_upscale(slide_idx, slide_id, shape, bbox, findings):
         return
     if source_w_px <= 0 or source_h_px <= 0:
         return
-    _, _, display_w_pt, display_h_pt = bbox
+    decorative_reason = _decorative_template_raster_reason(shape)
+    if decorative_reason:
+        return
+    normalized = normalize_bbox(ctx, bbox)
+    _, _, display_w_pt, display_h_pt = normalized
+    if display_w_pt <= 0 or display_h_pt <= 0:
+        return
+    source_aspect = source_w_px / source_h_px
+    display_aspect = display_w_pt / display_h_pt
+    aspect_delta_ratio = abs(display_aspect / source_aspect - 1)
+    if aspect_delta_ratio > MAX_IMAGE_ASPECT_DELTA_RATIO:
+        findings.append(
+            make_finding(
+                "warning", "image_aspect_distortion", slide_idx, slide_id, shape,
+                (
+                    f"image aspect ratio changed from {source_aspect:.2f} to "
+                    f"{display_aspect:.2f} ({aspect_delta_ratio:.0%} delta)"
+                ),
+                {
+                    "source_px": [source_w_px, source_h_px],
+                    "source_aspect": round(source_aspect, 4),
+                    "display_aspect": round(display_aspect, 4),
+                    "aspect_delta_ratio": round(aspect_delta_ratio, 4),
+                    "actual_display_pt": [round(bbox[2], 2), round(bbox[3], 2)],
+                    "normalized_display_pt": [round(display_w_pt, 2), round(display_h_pt, 2)],
+                },
+            )
+        )
     display_w_px = display_w_pt * PX_PER_PT
     display_h_px = display_h_pt * PX_PER_PT
     ratio = max(display_w_px / source_w_px, display_h_px / source_h_px)
@@ -343,7 +583,12 @@ def check_image_upscale(slide_idx, slide_id, shape, bbox, findings):
             {
                 "source_px": [source_w_px, source_h_px],
                 "display_px": [round(display_w_px, 1), round(display_h_px, 1)],
+                "actual_display_pt": [round(bbox[2], 2), round(bbox[3], 2)],
+                "normalized_display_pt": [round(display_w_pt, 2), round(display_h_pt, 2)],
                 "upscale_ratio": round(ratio, 3),
+                "source_aspect": round(source_aspect, 4),
+                "display_aspect": round(display_aspect, 4),
+                "aspect_delta_ratio": round(aspect_delta_ratio, 4),
             },
         )
     )
@@ -377,42 +622,67 @@ def check_autofit(slide_idx, slide_id, shape, findings):
     )
 
 
-def check_font(slide_idx, slide_id, shape, findings):
-    if not shape.has_text_frame:
+def check_font(ctx, slide_idx, slide_id, shape, findings):
+    if not shape.has_text_frame and not getattr(shape, "has_table", False):
         return
     bad_fonts: dict = {}
     bad_sizes: dict = {}
-    for para in shape.text_frame.paragraphs:
-        for run in para.runs:
-            if not run.text:
-                continue
-            name = run.font.name
+    bad_font_cells: dict = defaultdict(list)
+    bad_size_cells: dict = defaultdict(list)
+    for run, location in _iter_text_runs(shape):
+        if not run.text:
+            continue
+        for script, name in _run_explicit_typefaces(run):
             if name and not _font_name_allowed(name):
-                bad_fonts[name] = bad_fonts.get(name, 0) + 1
-            size = run.font.size
-            if size is not None:
-                pt = round(size.pt, 1)
-                if pt != int(pt) or int(pt) not in ALLOWED_FONT_SIZES_PT:
-                    bad_sizes[pt] = bad_sizes.get(pt, 0) + 1
-    for name, count in bad_fonts.items():
+                key = (script, name)
+                bad_fonts[key] = bad_fonts.get(key, 0) + 1
+                if location:
+                    bad_font_cells[key].append(location)
+        size = run.font.size
+        if size is not None:
+            actual_pt = round(size.pt, 1)
+            normalized_pt = round(size.pt * ctx.font_scale, 1)
+            if not _font_size_allowed(normalized_pt):
+                key = (actual_pt, normalized_pt)
+                bad_sizes[key] = bad_sizes.get(key, 0) + 1
+                if location:
+                    bad_size_cells[key].append(location)
+    for (script, name), count in bad_fonts.items():
         findings.append(
             make_finding(
                 "warning", "font_family", slide_idx, slide_id, shape,
-                f"font '{name}' not in allowlist {list(ALLOWED_FONT_FAMILIES)} ({count} run(s))",
-                {"font": name, "runs": count},
+                f"{script} font '{name}' not in allowlist {list(ALLOWED_FONT_FAMILIES)} ({count} run(s))",
+                {
+                    "script": script,
+                    "font": name,
+                    "runs": count,
+                    "cells": bad_font_cells.get((script, name), []),
+                },
             )
         )
-    for pt, count in bad_sizes.items():
+    for (actual_pt, normalized_pt), count in bad_sizes.items():
         findings.append(
             make_finding(
                 "warning", "font_size_scale", slide_idx, slide_id, shape,
-                f"font size {pt}pt not in scale {sorted(ALLOWED_FONT_SIZES_PT)} ({count} run(s))",
-                {"size_pt": pt, "runs": count},
+                (
+                    f"font size {normalized_pt}pt normalized from {actual_pt}pt "
+                    f"not within {FONT_SIZE_TOL_PT:g}pt of scale "
+                    f"{sorted(ALLOWED_FONT_SIZES_PT)} ({count} run(s))"
+                ),
+                {
+                    "size_pt": normalized_pt,
+                    "nearest_allowed_size_pt": _nearest_allowed_font_size(normalized_pt),
+                    "actual_size_pt": actual_pt,
+                    "normalization_scale": round(ctx.font_scale, 4),
+                    "tolerance_pt": FONT_SIZE_TOL_PT,
+                    "runs": count,
+                    "cells": bad_size_cells.get((actual_pt, normalized_pt), []),
+                },
             )
         )
 
 
-def check_line_height(slide_idx, slide_id, shape, findings):
+def check_line_height(ctx, slide_idx, slide_id, shape, findings):
     if not shape.has_text_frame:
         return
     bad: dict = {}
@@ -425,28 +695,43 @@ def check_line_height(slide_idx, slide_id, shape, findings):
         if isinstance(line_spacing, float):
             key = f"{line_spacing:g}x"
         else:
-            pt = round(line_spacing.pt, 1)
-            if pt == int(pt) and int(pt) in ALLOWED_LINE_HEIGHTS_PT:
+            actual_pt = round(line_spacing.pt, 1)
+            normalized_pt = round(line_spacing.pt * ctx.font_scale, 1)
+            if _line_height_allowed(normalized_pt):
                 continue
-            key = f"{pt:g}pt"
+            key = f"{normalized_pt:g}pt normalized from {actual_pt:g}pt"
         bad[key] = bad.get(key, 0) + 1
     for value, count in bad.items():
         findings.append(
             make_finding(
                 "warning", "line_height", slide_idx, slide_id, shape,
-                f"line spacing {value} not in allowed fixed pt scale {sorted(ALLOWED_LINE_HEIGHTS_PT)} ({count} paragraph(s))",
-                {"line_spacing": value, "paragraphs": count},
+                (
+                    f"line spacing {value} not within {LINE_HEIGHT_TOL_PT:g}pt of "
+                    f"allowed fixed pt scale {sorted(ALLOWED_LINE_HEIGHTS_PT)} "
+                    f"({count} paragraph(s))"
+                ),
+                {
+                    "line_spacing": value,
+                    "allowed_line_heights_pt": sorted(ALLOWED_LINE_HEIGHTS_PT),
+                    "tolerance_pt": LINE_HEIGHT_TOL_PT,
+                    "paragraphs": count,
+                },
             )
         )
 
 
-def check_alignment(slide_idx, slide_id, shape, findings):
+def check_alignment(ctx, slide_idx, slide_id, shape, findings):
     if not shape.has_text_frame:
         return
     if not shape.text_frame.text.strip():
         return
     vertical = shape.text_frame.vertical_anchor
-    if vertical is not None and vertical != MSO_VERTICAL_ANCHOR.TOP:
+    if (
+        ctx.policy.check_vertical_text_anchor
+        and
+        vertical is not None
+        and vertical != MSO_VERTICAL_ANCHOR.TOP
+    ):
         findings.append(
             make_finding(
                 "warning", "alignment_left_top", slide_idx, slide_id, shape,
@@ -502,17 +787,42 @@ def check_color(slide_idx, slide_id, shape, findings):
             )
         )
 
+    for fill_hex, cells in _table_cell_fill_rgb_hexes(shape).items():
+        if fill_hex in ALLOWED_FILL_COLORS_HEX:
+            continue
+        findings.append(
+            make_finding(
+                "warning", "background_color_palette", slide_idx, slide_id, shape,
+                (
+                    f"table cell fill color {fill_hex} not in palette "
+                    f"{sorted(ALLOWED_FILL_COLORS_HEX)} ({len(cells)} cell(s))"
+                ),
+                {"color_hex": fill_hex, "scope": "table_cell", "cells": cells},
+            )
+        )
+
 
 # ---- Driver ----------------------------------------------------------------
 
 
-def lint_pptx(path: Path) -> List[Finding]:
+def lint_pptx(
+    path: Path,
+    *,
+    profile: str = "default",
+    policy: Optional[LintPolicy] = None,
+) -> List[Finding]:
+    if policy is None:
+        try:
+            policy = LINT_PROFILES[profile]
+        except KeyError as exc:
+            raise ValueError(f"unknown lint profile: {profile}") from exc
     prs = Presentation(str(path))
     findings: List[Finding] = []
 
     actual_w = emu_to_pt(prs.slide_width)
     actual_h = emu_to_pt(prs.slide_height)
-    if abs(actual_w - SLIDE_W_PT) > 1 or abs(actual_h - SLIDE_H_PT) > 1:
+    ctx = make_context(actual_w, actual_h, policy=policy)
+    if not ctx.proportional_to_base:
         findings.append(
             Finding(
                 severity="warning",
@@ -522,10 +832,14 @@ def lint_pptx(path: Path) -> List[Finding]:
                 shape_id=None,
                 shape_name=None,
                 message=(
-                    f"slide size {actual_w:.1f}x{actual_h:.1f}pt differs from "
-                    f"guideline {SLIDE_W_PT}x{SLIDE_H_PT}pt"
+                    f"slide size {actual_w:.1f}x{actual_h:.1f}pt is not proportional to "
+                    f"guideline base {SLIDE_W_PT}x{SLIDE_H_PT}pt"
                 ),
-                detail={"actual_pt": [actual_w, actual_h]},
+                detail={
+                    "actual_pt": [actual_w, actual_h],
+                    "base_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                    "scale": [round(ctx.scale_x, 4), round(ctx.scale_y, 4)],
+                },
             )
         )
 
@@ -543,16 +857,16 @@ def lint_pptx(path: Path) -> List[Finding]:
             bbox = shape_bbox_pt(shape)
             if bbox is None:
                 continue
-            check_overflow(idx, slide_id, shape, bbox, findings)
-            check_safe_text_area(idx, slide_id, shape, bbox, findings)
-            check_safe_margins(idx, slide_id, shape, bbox, findings)
-            check_geometry_rounding(idx, slide_id, shape, bbox, findings)
-            check_image_upscale(idx, slide_id, shape, bbox, findings)
+            check_overflow(ctx, idx, slide_id, shape, bbox, findings)
+            check_safe_text_area(ctx, idx, slide_id, shape, bbox, findings)
+            check_safe_margins(ctx, idx, slide_id, shape, bbox, findings)
+            check_geometry_rounding(ctx, idx, slide_id, shape, bbox, findings)
+            check_image_upscale(ctx, idx, slide_id, shape, bbox, findings)
             check_alt_text(idx, slide_id, shape, findings)
             check_autofit(idx, slide_id, shape, findings)
-            check_font(idx, slide_id, shape, findings)
-            check_line_height(idx, slide_id, shape, findings)
-            check_alignment(idx, slide_id, shape, findings)
+            check_font(ctx, idx, slide_id, shape, findings)
+            check_line_height(ctx, idx, slide_id, shape, findings)
+            check_alignment(ctx, idx, slide_id, shape, findings)
             check_color(idx, slide_id, shape, findings)
 
     return findings
@@ -700,13 +1014,19 @@ def main(argv: List[str]) -> int:
         default=3,
         help="threshold for consolidating recurring findings (default: 3)",
     )
+    ap.add_argument(
+        "--profile",
+        choices=sorted(LINT_PROFILES),
+        default="default",
+        help="lint policy profile (default: default)",
+    )
     args = ap.parse_args(argv)
 
     if not args.pptx.exists():
         print(f"file not found: {args.pptx}", file=sys.stderr)
         return 2
 
-    findings = lint_pptx(args.pptx)
+    findings = lint_pptx(args.pptx, profile=args.profile)
     if not args.no_consolidate:
         findings = consolidate_recurring(findings, min_slides=args.min_recurring_slides)
     selected = filter_by_severity(findings, args.severity)
