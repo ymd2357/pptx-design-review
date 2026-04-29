@@ -2240,62 +2240,477 @@ rules:
     mode: "review"
     report_only: true
 
+    # PRI-001: Pn と未実装候補を lint 実装から独立して参照するため追加。
+    priorities:
+      basis: "Pn は finding 数ではなく、納品物への影響度で決める。"
+      axes:
+        readability: "画面表示で文字、図表、画像の内容を読めるか。"
+        comprehension: "構造、順序、折返し、欠落が理解や意味を阻害しないか。"
+        delivery_quality: "PPTX/PDF の静的配布で必要情報が失われず、提出物として破綻しないか。"
+        brand_template_divergence: "SHIFT AI テンプレート、色、余白、書体からの逸脱が許容範囲か。"
+        micro_fix_impact: "1pt 丸めなど微修正で済み、内容理解への影響が小さいか。"
+      levels:
+        P0:
+          definition: "読めない、見えない、欠落、文字化けなど、内容の成立を壊す。"
+          required_action: "納品前に必ず直す。"
+        P1:
+          definition: "可読性、理解、静的配布、アクセシビリティに直接リスクがある。"
+          required_action: "納品前に修正または明示的に許容判断する。"
+        P2:
+          definition: "ブランド、テンプレート、余白、書体などの逸脱で、品質判断が必要。"
+          required_action: "意図した表現なら許容し、そうでなければスタイルへ寄せる。"
+        P3:
+          definition: "座標丸めなど、見た目や理解への影響が小さい微修正。"
+          required_action: "テンプレート整備や一括補正時に処理する。"
+      unimplemented_can_be_p0_to_p2:
+        - id: "low_contrast"
+          label: "読めないコントラスト"
+        - id: "missing_required_element"
+          label: "欠落"
+        - id: "wrap_break_changes_meaning"
+          label: "意味が変わる折返し"
+        - id: "key_area_cropped"
+          label: "画像重要部の切れ"
+        - id: "heading_hierarchy_broken"
+          label: "階層崩れ"
+
+    # PRI-001: priority 出力が参照する ID 別の正本テーブル。
+    priority_catalog:
+      text_encoding:
+        status: "implemented_priority"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "文字化けしており、内容を正しく読めない"
+        action: "元原稿または正しい日本語から差し替える。"
+      text_overlap:
+        status: "implemented_lint"
+        priority: "P0"
+        axes:
+          - "readability"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "文字衝突で内容を読めない"
+        action: "重なったテキスト枠、行間、レイヤー順を分解して読み直せる状態にする。"
+      low_contrast:
+        status: "planned"
+        priority: "P0"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "読めないコントラストで内容を判別できない"
+        action: "最終レンダリングで文字と背景を測定し、十分なコントラストへ直す。"
+      overflow_text:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "テキストが切れて内容を読めない"
+        action: "テキスト枠、文字量、改行を調整して全内容を表示する。"
+      animation_present:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "静的配布で失われる情報がある可能性がある"
+        action: "PPTX/PDF 配布で必要な情報が静止状態でも読めるか確認し、不要な動きは削除する。"
+      alt_text_required:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "意味を持つ画像に代替テキストがない"
+        action: "画像の機能や内容を説明する代替テキストを入れる。"
+      color_only_meaning:
+        status: "manual_defined"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "色だけで意味を伝えている"
+        action: "ラベル、記号、形状など色以外の手掛かりを追加する。"
+      contrast_ratio:
+        status: "manual_defined"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "コントラスト不足で可読性にリスクがある"
+        action: "最終レンダリングの色を測定し、閾値を満たす配色へ直す。"
+      heading_hierarchy_broken:
+        status: "planned"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "見出し階層が崩れて理解順を追いにくい"
+        action: "見出し、本文、注記のサイズと配置をテンプレート階層へ戻す。"
+      image_aspect_distortion:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像の縦横比が崩れて内容や品質を損なう"
+        action: "画像を元比率で再配置し、必要ならトリミングを見直す。"
+      key_area_cropped:
+        status: "planned"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "画像の重要部が切れて理解を阻害する"
+        action: "被写体、画面操作、図表ラベルなど重要部が残るようにトリミングを直す。"
+      line_height:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "行間が読みやすさを損なう可能性がある"
+        action: "本文量、行間、テキスト枠高さをセットで見直す。"
+      missing_required_element:
+        status: "planned"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "必須要素が欠落して理解や納品品質を損なう"
+        action: "テンプレートスロットに必要な見出し、本文、注記、出典を補う。"
+      object_overlap:
+        status: "implemented_lint"
+        priority: "P1"
+        axes:
+          - "comprehension"
+          - "delivery_quality"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "オブジェクト重なりで内容や構造を追いにくい"
+        action: "重なり、近接不足、レイヤー順を確認し、意図しない被りを解消する。"
+      object_gap_too_small:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "隣接オブジェクトの間隔が狭く、構造を読み取りにくい"
+        action: "隣接要素の役割を確認し、意図した密着でなければ最低間隔を確保する。"
+      overflow_images:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像がスライド外にはみ出し、重要部が切れる可能性がある"
+        action: "画像の表示範囲とトリミングを確認し、必要な情報を画面内に戻す。"
+      overflow_shapes:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "図形がスライド外にはみ出し、構造を損なう可能性がある"
+        action: "図形の役割を確認し、情報要素なら画面内に戻す。"
+      reading_order:
+        status: "manual_defined"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "読み順が視覚順やテンプレート順と合っていない"
+        action: "Selection Pane の順序をテンプレートスロットと論理順へ合わせる。"
+      text_autofit_disabled:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "delivery_quality"
+        issue_title: "自動縮小で文字が読みにくくなるリスクがある"
+        action: "自動縮小を無効化し、枠サイズと文字量を目視で調整する。"
+      wrap_break_changes_meaning:
+        status: "planned"
+        priority: "P1"
+        detection: "manual_review"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "折返しで意味が変わっている"
+        action: "意味単位で改行し、誤読を生む単語分割や係り受けの分断を避ける。"
+      background_color_palette:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "背景・塗り色がブランドパレット外にある"
+        action: "意図した表現なら許容し、そうでなければ許可パレットへ寄せる。"
+      font_family:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "書体がテンプレート指定から外れている"
+        action: "テンプレート書体へ戻すか、代替フォントの必要性を記録する。"
+      font_size_scale:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字サイズが定義スケールから外れている"
+        action: "文字サイズ、テキスト枠、改行をセットで調整する。"
+      image_upscale_ratio:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像解像度が不足し、納品品質を下げる可能性がある"
+        action: "高解像度画像へ差し替えるか、表示サイズを下げる。"
+      inner_padding_imbalance:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストボックス内余白バランスが不自然"
+        action: "内余白、縦位置、枠高さ、文字サイズをセットで整える。"
+      safe_margins:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "非テキスト要素が安全余白から外れている"
+        action: "テンプレート上の意図したフルブリード以外は安全余白へ戻す。"
+      safe_text_area_text:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストが安全領域から外れている"
+        action: "可読性とテンプレート意図を確認し、原則として安全領域へ戻す。"
+      slide_size:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "スライドサイズが基準比率から外れている"
+        action: "16:9 配布前提に合うサイズへ変換するか、例外理由を記録する。"
+      text_color_allowlist:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字色が許可リスト外にある"
+        action: "可読性を確認し、原則として許可された文字色へ戻す。"
+      alignment_left_top:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字揃えがテンプレート基準から外れている"
+        action: "中央揃えなど意図した表現でなければ左上基準へ戻す。"
+      alignment_drift:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "micro_fix_impact"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "近接する要素の揃いがわずかに崩れている"
+        action: "意図した段差でなければ left / top / center の基準線へ揃える。"
+      geometry_rounding:
+        status: "implemented_lint"
+        priority: "P3"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "micro_fix_impact"
+        issue_title: "座標の微小な丸めズレがある"
+        action: "見た目に問題がなければ後回しにし、テンプレート整備時に一括補正する。"
+      text_vertical_balance:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストボックス内の縦余白バランスが視覚的に不自然"
+        action: "font size / line height / text box height / internal margin / vertical anchor をセットで見直し、フォントサイズ変更と枠サイズ変更を対等な選択肢として比較する。"
+        related_check: "rules.lint.priority_catalog.inner_padding_imbalance"
+
     checks:
       slide_size:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.slide_size"
         detection: "Warn only when the PPTX canvas is not proportional to rules.slide.size_pt; proportional 16:9 decks are normalized before other checks."
       overflow_text:
         severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.overflow_text"
       overflow_shapes:
         severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.overflow_shapes"
       overflow_images:
         severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.overflow_images"
+      text_overlap:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_overlap"
+        detection: "Detect normalized text-frame bbox pairs whose intersection area is greater than 1pt²."
+        thresholds:
+          overlap_area_pt2_min_exclusive: 1
+      object_overlap:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.object_overlap"
+        detection: "Detect normalized bbox pairs with at least one non-text object whose intersection area is greater than 1pt²."
+        thresholds:
+          overlap_area_pt2_min_exclusive: 1
       safe_margins:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.safe_margins"
+      object_gap_too_small:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.object_gap_too_small"
+        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below 8pt while the opposite axis overlaps."
+        thresholds:
+          adjacent_gap_pt_min: 8
       safe_text_area_text:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.safe_text_area_text"
       font_family:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.font_family"
       font_size_scale:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.font_size_scale"
       line_height:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.line_height"
       text_autofit_disabled:
         severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_autofit_disabled"
       animation_present:
         severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.animation_present"
       alignment_left_top:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.alignment_left_top"
+      alignment_drift:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.alignment_drift"
+        detection: "Detect left/top/center pairs within a 24pt near-alignment group whose drift exceeds 2pt."
+        thresholds:
+          group_tolerance_pt: 24
+          drift_tolerance_pt: 2
       text_color_allowlist:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_color_allowlist"
       background_color_palette:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.background_color_palette"
       image_upscale_ratio:
         severity: "warning"
         automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.image_upscale_ratio"
         detection: "Compare picture source pixel size with displayed PPTX size converted at 96px/in; warn above tokens.value.imagery.avoid_upscale_over_ratio. Exclude explicit template/decorative rasters such as gradient/header/background assets."
       image_aspect_distortion:
         severity: "warning"
         automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.image_aspect_distortion"
         detection: "Compare picture source aspect ratio with displayed box aspect ratio; warn when the relative delta exceeds 5%. Exclude explicit template/decorative rasters such as gradient/header/background assets."
       contrast_ratio:
         severity: "warning"
         automation: "manual_review"
+        priority_catalog: "rules.lint.priority_catalog.contrast_ratio"
         reason: "Requires final rendered colors after opacity, image overlays, theme inheritance, and unknown backgrounds; use rules.accessibility.contrast_scope during visual review."
       color_only_meaning:
         severity: "warning"
         automation: "manual_review"
+        priority_catalog: "rules.lint.priority_catalog.color_only_meaning"
         reason: "Requires semantic judgment of whether state, correctness, priority, series identity, or trend direction is encoded by color alone."
       alt_text_required:
         severity: "warning"
         automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.alt_text_required"
         detection: "Check picture objects for non-empty PowerPoint alt text title or description; decorative exceptions require manual confirmation."
       reading_order:
         severity: "warning"
         automation: "manual_review"
+        priority_catalog: "rules.lint.priority_catalog.reading_order"
         reason: "Requires comparison between PowerPoint selection pane order, visible logical order, and selected layout template slots."
       geometry_rounding:
         severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.geometry_rounding"
+      inner_padding_imbalance:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.inner_padding_imbalance"
+        detection: "Detect containers with at least two child objects where left/right or top/bottom internal padding ratio is outside 0.5x-2.0x, or any side is below 4pt."
+        thresholds:
+          child_count_min: 2
+          padding_ratio_min: 0.5
+          padding_ratio_max: 2.0
+          side_padding_pt_min: 4
+      text_vertical_balance:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_vertical_balance"
+        evaluation_axes:
+          - "font_size"
+          - "line_height"
+          - "text_box_height"
+          - "internal_margin"
+          - "vertical_anchor"
+        detection: "Detect text boxes where content fits but internal vertical padding or visual center is unbalanced. Combines the 5 evaluation axes; warn when free vertical space, asymmetric internal padding, or visual-center offset exceeds thresholds defined in pptx_lint.py."
+        thresholds:
+          dead_space_ratio_max: 0.40
+          top_or_bottom_dead_space_pt_max: 60
+          middle_anchor_padding_asymmetry_pt_max: 12
+          visual_center_offset_ratio_max: 0.20
+          min_box_height_pt: 30
+        fix_strategy:
+          equal_options:
+            - "font_size_change"
+            - "text_box_size_change"
+          principle: "フォントサイズ変更とテキストボックスサイズ変更は対等な選択肢として扱い、片方を他方に内包させない。anchor、line height、internal margin と合わせて 5 軸で再設計する。"
+          excluded_from_auto_fix: true
 
     rounding_policy:
       allow_grid_pt: 0.5

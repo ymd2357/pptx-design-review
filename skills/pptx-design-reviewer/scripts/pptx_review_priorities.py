@@ -13,6 +13,7 @@ import sys
 from collections import defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Iterable
 
 from pptx import Presentation
@@ -57,6 +58,71 @@ def _clip(text: str, limit: int = 80) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 1] + "..."
+
+
+def load_priority_catalog(guideline_path: Path | None = None) -> dict[str, SimpleNamespace]:
+    if guideline_path is None:
+        guideline_path = HERE.parents[2] / "doc" / "slide-guideline-v1.yml"
+
+    required_fields = {
+        "priority",
+        "detection",
+        "fix_policy",
+        "impact_axis",
+        "issue_title",
+        "action",
+    }
+
+    def strip_yaml_scalar(raw: str) -> str:
+        value = raw.strip()
+        if not value:
+            return ""
+        if value[0] in {"'", '"'} and value[-1:] == value[0]:
+            return value[1:-1]
+        return value
+
+    lines = guideline_path.read_text(encoding="utf-8").splitlines()
+    entries: dict[str, dict[str, str]] = {}
+    current_check: str | None = None
+    in_catalog = False
+
+    for line in lines:
+        if line == "    priority_catalog:":
+            in_catalog = True
+            continue
+        if not in_catalog:
+            continue
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if line.startswith("    ") and not line.startswith("      "):
+            break
+        if line.startswith("      ") and not line.startswith("        ") and line.strip().endswith(":"):
+            current_check = line.strip()[:-1]
+            entries[current_check] = {}
+            continue
+        if current_check and line.startswith("        ") and ":" in line:
+            key, raw_value = line.strip().split(":", 1)
+            entries[current_check][key] = strip_yaml_scalar(raw_value)
+
+    if not entries:
+        raise RuntimeError(f"rules.lint.priority_catalog was not found in {guideline_path}")
+
+    catalog: dict[str, SimpleNamespace] = {}
+    for check, values in entries.items():
+        missing = sorted(required_fields - values.keys())
+        if missing:
+            raise RuntimeError(f"priority_catalog.{check} is missing fields: {missing}")
+        catalog[check] = SimpleNamespace(
+            check=check,
+            priority=values["priority"],
+            detection=values["detection"],
+            fix_policy=values["fix_policy"],
+            impact_axis=values["impact_axis"],
+            issue_title=values["issue_title"],
+            action=values["action"],
+            status=values.get("status", ""),
+        )
+    return catalog
 
 
 def _issue(
@@ -141,16 +207,16 @@ def summarize_priorities(path: Path) -> list[PriorityIssue]:
     findings = pptx_lint.consolidate_recurring(raw_findings)
     issues = _text_quality_issues(path)
 
-    p0_checks = {"overflow_text", "text_autofit_disabled"}
+    p0_checks = {"overflow_text", "text_autofit_disabled", "text_overlap"}
     slides = _slides_for(findings, p0_checks)
     if slides:
         issues.append(
             _issue(
                 "P0",
-                "テキストが切れる、または自動縮小で読めなくなるリスクがある",
+                "テキストが読めない、または自動縮小で読みにくくなるリスクがある",
                 slides,
                 _evidence_for(findings, p0_checks),
-                "該当スライドを目視確認し、テキスト枠・文字量・改行を調整する。",
+                "該当スライドを目視確認し、テキスト枠・文字量・改行・重なりを調整する。",
                 p0_checks,
             )
         )
@@ -169,17 +235,34 @@ def summarize_priorities(path: Path) -> list[PriorityIssue]:
             )
         )
 
+    p1_structure = {"object_overlap"}
+    slides = _slides_for(findings, p1_structure)
+    if slides:
+        issues.append(
+            _issue(
+                "P1",
+                "オブジェクト重なりで内容や構造を追いにくい",
+                slides,
+                _evidence_for(findings, p1_structure),
+                "重なり、近接不足、レイヤー順を確認し、意図しない被りを解消する。",
+                p1_structure,
+            )
+        )
+
     p2_checks = {
         "overflow_images",
         "overflow_shapes",
         "safe_margins",
         "safe_text_area_text",
         "alignment_left_top",
+        "alignment_drift",
         "font_size_scale",
         "font_family",
+        "inner_padding_imbalance",
         "line_height",
         "image_aspect_distortion",
         "image_upscale_ratio",
+        "object_gap_too_small",
         "text_color_allowlist",
         "background_color_palette",
         "slide_size",

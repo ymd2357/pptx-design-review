@@ -70,6 +70,11 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 | `line_height` | warning | Fixed paragraph line height not within 2pt of `{24, 30, 36, 42, 66, 90}` after normalization |
 | `text_color_allowlist` | warning | Explicit text color is outside the allowed text palette |
 | `background_color_palette` | warning | Explicit shape fill color is outside the allowed fill/background palette |
+| `text_overlap` | error | Text frame bounding boxes overlap each other |
+| `object_overlap` | error | Non-text object bounding boxes overlap |
+| `object_gap_too_small` | warning | Adjacent object gap is below the minimum spacing |
+| `alignment_drift` | warning | Nearby left/top/center alignment drifts beyond tolerance |
+| `inner_padding_imbalance` | warning | Child objects are unbalanced inside a container |
 | `image_aspect_distortion` | warning | Picture source aspect ratio differs from displayed box aspect ratio |
 | `image_upscale_ratio` | warning | Picture is displayed larger than its source pixels support |
 | `animation_present` | error | Slide contains `<p:transition>` or `<p:timing>` |
@@ -194,13 +199,16 @@ must be requested explicitly.
 | ------ | -------- |
 | `autofit` | Set `text_frame.auto_size` to `MSO_AUTO_SIZE.NONE` when it differs |
 | `geometry` | Round shape `left/top/width/height` to nearest 1pt for drift <0.1pt |
-| `font_size` | Snap text run size to nearest allowed size only when explicitly requested and safety checks pass; otherwise report `manual_required` |
+| `font_size` | Snap text run size to nearest allowed size only when `FONT_SIZE_FIXER_ENABLED` is on, explicitly requested, and safety checks pass; otherwise report `manual_required` |
 
-`font_size` is guarded. It only applies when the affected text is a single
+`font_size` is guarded and disabled by default with `FONT_SIZE_FIXER_ENABLED =
+False`. Even when enabled, it only applies when the affected text is a single
 authored line, the actual size delta is <=1pt, the estimated text still fits the
 box after resizing, the container stays within the slide, and the shape bbox
 does not overlap another shape. Otherwise the action is reported as
-`manual_required` and is not written even with `--apply`.
+`manual_required` and is not written even with `--apply`. Font size and text-box
+size are peer changes and must be reviewed as a set; neither one contains the
+other. Internal margins and vertical anchor are part of that same judgment.
 
 Out of fixer scope (require human judgment): `font_family`, `overflow`,
 `safe_text_area`, `animation_present`, `slide_size`. Re-lint after applying to
@@ -524,3 +532,29 @@ issue, consult the user
 1. Confirm font availability on the target machine
 2. Substitute with a close system font
 3. Embed fonts if the tool allows
+
+## テキストボックス縦余白バランス (LINT-006)
+
+`text_vertical_balance` は、文字が枠内に収まっていても縦方向の見た目が
+不自然なテキストボックスを warning として拾う。
+
+評価軸:
+
+- font size
+- line height
+- text box height
+- internal margin
+- vertical anchor
+
+修正判断では、font size 変更と text box size 変更を対等な選択肢として扱う。
+片方を他方の下位手段にせず、anchor、line height、internal margin と合わせて
+5 軸で比較する。
+
+lint が沈黙しても、長い枠を `MIDDLE` anchor で置いたケース、全幅の既定
+anchor 枠、閾値内でも視覚中心が気持ち悪いケースは rendered slide で手動確認する。
+
+記録形式:
+
+```text
+slide N / shape name / anchor / box h / margin top/bottom / 採用した変更軸
+```

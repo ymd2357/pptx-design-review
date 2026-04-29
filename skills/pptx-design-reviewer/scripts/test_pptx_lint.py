@@ -22,6 +22,7 @@ import make_examples  # noqa: E402
 import pptx_lint  # noqa: E402
 from pptx import Presentation  # noqa: E402
 from pptx.dml.color import RGBColor  # noqa: E402
+from pptx.enum.shapes import MSO_SHAPE  # noqa: E402
 from pptx.enum.text import MSO_AUTO_SIZE  # noqa: E402
 from pptx.enum.text import MSO_VERTICAL_ANCHOR  # noqa: E402
 from pptx.util import Pt  # noqa: E402
@@ -47,12 +48,21 @@ EXPECTED_BAD_CHECKS = {
     "animation_present",
 }
 
+LINT005_CHECKS = {
+    "text_overlap",
+    "object_overlap",
+    "object_gap_too_small",
+    "alignment_drift",
+    "inner_padding_imbalance",
+}
+
 KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "slide_size",
     "overflow_shapes",
     "overflow_images",
     "image_aspect_distortion",
-}
+    "text_vertical_balance",
+} | LINT005_CHECKS
 
 LINT004_POLICY = {
     "image_upscale_ratio": "automated",
@@ -285,6 +295,144 @@ def _make_decorative_distorted_image(out: Path) -> None:
     prs.save(str(out))
 
 
+def _add_lint005_text_box(slide, *, x: int, y: int, width: int, text: str):
+    box = slide.shapes.add_textbox(Pt(x), Pt(y), Pt(width), Pt(42))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+    box.text_frame.margin_top = Pt(6)
+    box.text_frame.margin_bottom = Pt(6)
+    para = box.text_frame.paragraphs[0]
+    para.line_spacing = Pt(30)
+    run = para.add_run()
+    run.text = text
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    return box
+
+
+def _add_lint005_rect(slide, *, x: int, y: int, width: int, height: int):
+    shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(x), Pt(y), Pt(width), Pt(height))
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = RGBColor.from_string("EEEEEE")
+    return shape
+
+
+def _make_object_relationships_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint005_text_box(slide, x=120, y=100, width=300, text="Aligned text one")
+    _add_lint005_text_box(slide, x=120, y=180, width=300, text="Aligned text two")
+    _add_lint005_rect(slide, x=520, y=100, width=120, height=80)
+    _add_lint005_rect(slide, x=680, y=100, width=120, height=80)
+    prs.save(str(out))
+
+
+def _make_object_relationships_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    _add_lint005_text_box(slide, x=120, y=100, width=260, text="Text overlap A")
+    _add_lint005_text_box(slide, x=140, y=120, width=260, text="Text overlap B")
+
+    _add_lint005_rect(slide, x=500, y=100, width=120, height=80)
+    _add_lint005_rect(slide, x=560, y=130, width=120, height=80)
+
+    _add_lint005_rect(slide, x=900, y=100, width=80, height=80)
+    _add_lint005_rect(slide, x=984, y=100, width=80, height=80)
+
+    _add_lint005_rect(slide, x=120, y=300, width=100, height=60)
+    _add_lint005_rect(slide, x=125, y=390, width=100, height=60)
+
+    _add_lint005_rect(slide, x=500, y=300, width=360, height=180)
+    _add_lint005_rect(slide, x=502, y=330, width=60, height=40)
+    _add_lint005_rect(slide, x=580, y=360, width=60, height=40)
+    prs.save(str(out))
+
+
+def _add_lint006_text_box(slide, *, y: int, height: int, anchor, margin_top: int, margin_bottom: int):
+    box = slide.shapes.add_textbox(Pt(120), Pt(y), Pt(520), Pt(height))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.margin_top = Pt(margin_top)
+    box.text_frame.margin_bottom = Pt(margin_bottom)
+    if anchor is not None:
+        box.text_frame.vertical_anchor = anchor
+    para = box.text_frame.paragraphs[0]
+    para.line_spacing = Pt(30)
+    run = para.add_run()
+    run.text = "Text vertical balance sample"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    return box
+
+
+def _make_text_vertical_balance_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint006_text_box(
+        slide,
+        y=120,
+        height=42,
+        anchor=MSO_VERTICAL_ANCHOR.MIDDLE,
+        margin_top=6,
+        margin_bottom=6,
+    )
+    prs.save(str(out))
+
+
+def _make_top_anchor_bottom_void_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint006_text_box(
+        slide,
+        y=120,
+        height=250,
+        anchor=MSO_VERTICAL_ANCHOR.TOP,
+        margin_top=6,
+        margin_bottom=6,
+    )
+    prs.save(str(out))
+
+
+def _make_middle_anchor_asymmetric_margin_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint006_text_box(
+        slide,
+        y=120,
+        height=120,
+        anchor=MSO_VERTICAL_ANCHOR.MIDDLE,
+        margin_top=30,
+        margin_bottom=6,
+    )
+    prs.save(str(out))
+
+
+def _make_oversized_box_top_anchor_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint006_text_box(
+        slide,
+        y=120,
+        height=220,
+        anchor=None,
+        margin_top=6,
+        margin_bottom=6,
+    )
+    prs.save(str(out))
+
+
 def main() -> int:
     failures: list = []
 
@@ -302,6 +450,12 @@ def main() -> int:
         bad_east_asian_font = tmp_dir / "bad-east-asian-font.pptx"
         aspect_distorted_image = tmp_dir / "aspect-distorted-image.pptx"
         decorative_distorted_image = tmp_dir / "decorative-distorted-image.pptx"
+        object_relationships_good = tmp_dir / "object-relationships-good.pptx"
+        object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
+        text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
+        top_anchor_bottom_void_bad = tmp_dir / "top-anchor-bottom-void-bad.pptx"
+        middle_anchor_asymmetric_margin_bad = tmp_dir / "middle-anchor-asymmetric-margin-bad.pptx"
+        oversized_box_top_anchor_bad = tmp_dir / "oversized-box-top-anchor-bad.pptx"
         make_examples.make_good(good)
         make_examples.make_bad(bad)
         _make_scaled_good(scaled_good)
@@ -314,6 +468,12 @@ def main() -> int:
         _make_bad_east_asian_font(bad_east_asian_font)
         _make_aspect_distorted_image(aspect_distorted_image)
         _make_decorative_distorted_image(decorative_distorted_image)
+        _make_object_relationships_good(object_relationships_good)
+        _make_object_relationships_bad(object_relationships_bad)
+        _make_text_vertical_balance_good(text_vertical_balance_good)
+        _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
+        _make_middle_anchor_asymmetric_margin_bad(middle_anchor_asymmetric_margin_bad)
+        _make_oversized_box_top_anchor_bad(oversized_box_top_anchor_bad)
 
         good_findings = pptx_lint.lint_pptx(good)
         if good_findings:
@@ -437,6 +597,25 @@ def main() -> int:
                 + "\n  ".join(f"{f.check}: {f.message}" for f in decorative_image_findings)
             )
 
+        lint005_good_findings = [
+            f for f in pptx_lint.lint_pptx(object_relationships_good) if f.check in LINT005_CHECKS
+        ]
+        if lint005_good_findings:
+            failures.append(
+                "object-relationships-good.pptx triggered LINT-005 checks:\n  "
+                + "\n  ".join(f"{f.check}: {f.message}" for f in lint005_good_findings)
+            )
+
+        lint005_bad_check_set = {
+            f.check for f in pptx_lint.lint_pptx(object_relationships_bad) if f.check in LINT005_CHECKS
+        }
+        missing_lint005 = LINT005_CHECKS - lint005_bad_check_set
+        if missing_lint005:
+            failures.append(
+                f"object-relationships-bad.pptx did not trigger {sorted(missing_lint005)}; "
+                f"got {sorted(lint005_bad_check_set)}"
+            )
+
         bad_findings = pptx_lint.lint_pptx(bad)
         bad_check_set = {f.check for f in bad_findings}
         missing = EXPECTED_BAD_CHECKS - bad_check_set
@@ -457,6 +636,30 @@ def main() -> int:
                 failures.append(
                     f"rules.lint.checks.{check}.automation expected {expected!r}; got {got!r}"
                 )
+
+        vertical_balance_good_findings = [
+            f
+            for f in pptx_lint.lint_pptx(text_vertical_balance_good)
+            if f.check == "text_vertical_balance"
+        ]
+        if vertical_balance_good_findings:
+            failures.append(
+                "text-vertical-balance-good.pptx triggered text_vertical_balance:\n  "
+                + "\n  ".join(f.message for f in vertical_balance_good_findings)
+            )
+
+        for fixture, label in (
+            (top_anchor_bottom_void_bad, "top-anchor-bottom-void-bad.pptx"),
+            (middle_anchor_asymmetric_margin_bad, "middle-anchor-asymmetric-margin-bad.pptx"),
+            (oversized_box_top_anchor_bad, "oversized-box-top-anchor-bad.pptx"),
+        ):
+            vertical_balance_findings = [
+                f
+                for f in pptx_lint.lint_pptx(fixture)
+                if f.check == "text_vertical_balance"
+            ]
+            if not vertical_balance_findings:
+                failures.append(f"{label} did not trigger text_vertical_balance")
 
     if failures:
         print("FAIL:")
