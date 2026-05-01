@@ -54,6 +54,7 @@ from typing import Any, Iterable, List, Optional
 
 from pptx import Presentation
 from pptx.dml.color import MSO_COLOR_TYPE
+from pptx.enum.dml import MSO_FILL
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
 
@@ -373,6 +374,26 @@ def _shape_has_visible_text(shape) -> bool:
     if not getattr(shape, "has_text_frame", False):
         return False
     return bool(shape.text_frame.text.strip())
+
+
+def _shape_has_visible_fill_or_line(shape) -> bool:
+    try:
+        fill_type = shape.fill.type
+    except AttributeError:
+        fill_type = None
+    if fill_type is not None and fill_type != MSO_FILL.BACKGROUND:
+        return True
+
+    try:
+        line_fill_type = shape.line.fill.type
+        line_width = shape.line.width
+    except AttributeError:
+        return False
+    if line_fill_type is None:
+        return False
+    if line_width is None:
+        return True
+    return line_width.pt > TOL_PT
 
 
 def _shape_kind(shape) -> str:
@@ -1265,6 +1286,8 @@ def check_text_vertical_balance(ctx, slide_idx, slide_id, shape, bbox, findings)
         return
     text_frame = shape.text_frame
     if not text_frame.text.strip():
+        return
+    if not _shape_has_visible_fill_or_line(shape):
         return
 
     normalized = normalize_bbox(ctx, bbox)

@@ -2702,6 +2702,7 @@ rules:
           - "internal_margin"
           - "vertical_anchor"
         detection: "Detect text boxes where content fits but internal vertical padding or visual center is unbalanced. Combines the 5 evaluation axes; warn when free vertical space, asymmetric internal padding, or visual-center offset exceeds thresholds defined in pptx_lint.py."
+        scope: "Visible text containers only; invisible text boxes without fill or stroke are selection geometry and are not evaluated as visual containers."
         thresholds:
           dead_space_ratio_max: 0.40
           top_or_bottom_dead_space_pt_max: 60

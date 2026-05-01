@@ -407,6 +407,8 @@ def _make_object_relationships_bad(out: Path) -> None:
 
 def _add_lint006_text_box(slide, *, y: int, height: int, anchor, margin_top: int, margin_bottom: int):
     box = slide.shapes.add_textbox(Pt(120), Pt(y), Pt(520), Pt(height))
+    box.fill.solid()
+    box.fill.fore_color.rgb = RGBColor.from_string("F7F7F7")
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     box.text_frame.margin_top = Pt(margin_top)
     box.text_frame.margin_bottom = Pt(margin_bottom)
@@ -419,6 +421,25 @@ def _add_lint006_text_box(slide, *, y: int, height: int, anchor, margin_top: int
     run.font.name = "Noto Sans JP"
     run.font.size = Pt(24)
     return box
+
+
+def _make_invisible_text_box_vertical_balance_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(520), Pt(220))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.margin_top = Pt(0)
+    box.text_frame.margin_bottom = Pt(0)
+    box.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.TOP
+    para = box.text_frame.paragraphs[0]
+    para.line_spacing = Pt(30)
+    run = para.add_run()
+    run.text = "Invisible text box with extra selection height"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
 
 
 def _make_text_vertical_balance_good(out: Path) -> None:
@@ -509,6 +530,9 @@ def main() -> int:
         structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
         object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
+        invisible_text_box_vertical_balance_good = (
+            tmp_dir / "invisible-text-box-vertical-balance-good.pptx"
+        )
         top_anchor_bottom_void_bad = tmp_dir / "top-anchor-bottom-void-bad.pptx"
         middle_anchor_asymmetric_margin_bad = tmp_dir / "middle-anchor-asymmetric-margin-bad.pptx"
         oversized_box_top_anchor_bad = tmp_dir / "oversized-box-top-anchor-bad.pptx"
@@ -531,6 +555,7 @@ def main() -> int:
         _make_structural_containment_overflow(structural_containment_overflow)
         _make_object_relationships_bad(object_relationships_bad)
         _make_text_vertical_balance_good(text_vertical_balance_good)
+        _make_invisible_text_box_vertical_balance_good(invisible_text_box_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
         _make_middle_anchor_asymmetric_margin_bad(middle_anchor_asymmetric_margin_bad)
         _make_oversized_box_top_anchor_bad(oversized_box_top_anchor_bad)
@@ -768,6 +793,16 @@ def main() -> int:
             failures.append(
                 "text-vertical-balance-good.pptx triggered text_vertical_balance:\n  "
                 + "\n  ".join(f.message for f in vertical_balance_good_findings)
+            )
+        invisible_text_box_vertical_balance_findings = [
+            f
+            for f in pptx_lint.lint_pptx(invisible_text_box_vertical_balance_good)
+            if f.check == "text_vertical_balance"
+        ]
+        if invisible_text_box_vertical_balance_findings:
+            failures.append(
+                "invisible-text-box-vertical-balance-good.pptx triggered text_vertical_balance:\n  "
+                + "\n  ".join(f.message for f in invisible_text_box_vertical_balance_findings)
             )
 
         for fixture, label in (
