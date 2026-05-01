@@ -2496,6 +2496,7 @@ rules:
         impact_axis: "brand_template_divergence"
         issue_title: "非テキスト要素が安全余白から外れている"
         action: "テンプレート上の意図したフルブリード以外は安全余白へ戻す。"
+        exception: "Template/decorative rasters named or described as background/header/footer/gradient/decoration assets are excluded."
       safe_text_area_text:
         status: "implemented_lint"
         priority: "P2"
@@ -2575,6 +2576,7 @@ rules:
         severity: "error"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.overflow_images"
+        exception: "Template/decorative rasters named or described as background/header/footer/gradient/decoration assets are excluded."
       text_overlap:
         severity: "error"
         automation: "automated"

@@ -295,6 +295,37 @@ def _make_decorative_distorted_image(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_decorative_overflow_image(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    img = out.with_name("_decorative_overflow_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        pic = slide.shapes.add_picture(str(img), Pt(500), Pt(-120), width=Pt(320), height=Pt(280))
+        c_nv_pr = pic._element.xpath(".//p:cNvPr")[0]
+        c_nv_pr.set("descr", "decoration_top_right.png")
+    finally:
+        img.unlink(missing_ok=True)
+    prs.save(str(out))
+
+
+def _make_content_overflow_image(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    img = out.with_name("_content_overflow_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        pic = slide.shapes.add_picture(str(img), Pt(500), Pt(-120), width=Pt(320), height=Pt(280))
+        make_examples._clear_alt_text(pic)
+    finally:
+        img.unlink(missing_ok=True)
+    prs.save(str(out))
+
+
 def _add_lint005_text_box(slide, *, x: int, y: int, width: int, text: str):
     box = slide.shapes.add_textbox(Pt(x), Pt(y), Pt(width), Pt(42))
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
@@ -471,6 +502,8 @@ def main() -> int:
         bad_east_asian_font = tmp_dir / "bad-east-asian-font.pptx"
         aspect_distorted_image = tmp_dir / "aspect-distorted-image.pptx"
         decorative_distorted_image = tmp_dir / "decorative-distorted-image.pptx"
+        decorative_overflow_image = tmp_dir / "decorative-overflow-image.pptx"
+        content_overflow_image = tmp_dir / "content-overflow-image.pptx"
         object_relationships_good = tmp_dir / "object-relationships-good.pptx"
         structural_containment_good = tmp_dir / "structural-containment-good.pptx"
         structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
@@ -491,6 +524,8 @@ def main() -> int:
         _make_bad_east_asian_font(bad_east_asian_font)
         _make_aspect_distorted_image(aspect_distorted_image)
         _make_decorative_distorted_image(decorative_distorted_image)
+        _make_decorative_overflow_image(decorative_overflow_image)
+        _make_content_overflow_image(content_overflow_image)
         _make_object_relationships_good(object_relationships_good)
         _make_structural_containment_good(structural_containment_good)
         _make_structural_containment_overflow(structural_containment_overflow)
@@ -620,6 +655,29 @@ def main() -> int:
             failures.append(
                 "decorative-distorted-image.pptx triggered raster quality checks for a template raster:\n  "
                 + "\n  ".join(f"{f.check}: {f.message}" for f in decorative_image_findings)
+            )
+
+        decorative_overflow_findings = [
+            f
+            for f in pptx_lint.lint_pptx(decorative_overflow_image)
+            if f.check in {"overflow_images", "safe_margins"}
+        ]
+        if decorative_overflow_findings:
+            failures.append(
+                "decorative-overflow-image.pptx triggered overflow/safe margin checks:\n  "
+                + "\n  ".join(f"{f.check}: {f.message}" for f in decorative_overflow_findings)
+            )
+
+        content_overflow_findings = [
+            f
+            for f in pptx_lint.lint_pptx(content_overflow_image)
+            if f.check in {"overflow_images", "safe_margins"}
+        ]
+        content_overflow_checks = {f.check for f in content_overflow_findings}
+        if {"overflow_images", "safe_margins"} - content_overflow_checks:
+            failures.append(
+                "content-overflow-image.pptx did not trigger overflow/safe margin checks; got "
+                f"{sorted(content_overflow_checks)}"
             )
 
         lint005_good_findings = [

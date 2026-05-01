@@ -667,6 +667,7 @@ def make_finding(severity, check, slide_idx, slide_id, shape, message, detail=No
 
 
 def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
+    decorative_reason = _decorative_template_raster_reason(shape)
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized
     right, bottom = x + w, y + h
@@ -684,6 +685,8 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     if shape.has_text_frame and shape.text_frame.text.strip():
         check_id = "overflow_text"
     elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+        if decorative_reason:
+            return
         check_id = "overflow_images"
     else:
         check_id = "overflow_shapes"
@@ -732,6 +735,8 @@ def check_safe_text_area(ctx, slide_idx, slide_id, shape, bbox, findings):
 
 def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings):
     if shape.has_text_frame and shape.text_frame.text.strip():
+        return
+    if shape.shape_type == MSO_SHAPE_TYPE.PICTURE and _decorative_template_raster_reason(shape):
         return
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized

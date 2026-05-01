@@ -81,10 +81,11 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 | `animation_present` | error | Slide contains `<p:transition>` or `<p:timing>` |
 | `slide_size` | warning | Deck slide size is not proportional to the 1440×810pt base |
 
-Template/decorative rasters named or described as gradient/header/background
-assets are excluded from `image_aspect_distortion` and `image_upscale_ratio`.
-Those checks are intended for content-bearing images such as photos, logos,
-screenshots, and diagrams.
+Template/decorative rasters named or described as
+gradient/header/background/footer/decoration assets are excluded from
+`overflow_images`, `safe_margins`, `image_aspect_distortion`, and
+`image_upscale_ratio`. Those checks are intended for content-bearing images
+such as photos, logos, screenshots, and diagrams.
 
 Lint policy profiles:
 
