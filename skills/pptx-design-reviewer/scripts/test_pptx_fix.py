@@ -147,26 +147,39 @@ def main() -> int:
         if backup_path.read_bytes() != sentinel:
             failures.append("--backup overwrote an existing .bak file")
 
-        # --- font_size only applies when safety checks pass ---
+        # --- font_size is behind an explicit feature flag ---
         safe_font = tmp_dir / "safe-font.pptx"
         _build_safe_font_size_fixture(safe_font)
         actions = pptx_fix.fix_pptx(safe_font, apply=True, rules=("font_size",))
-        if not any(a.rule == "font_size" and a.status == "apply" for a in actions):
-            failures.append("font_size fixer did not report an apply action for safe fixture")
+        if actions:
+            failures.append("font_size fixer should be disabled by default")
         prs = Presentation(str(safe_font))
-        fixed_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
-        if abs(fixed_size - 14.0) > 1e-6:
-            failures.append(f"font_size safe fixture expected 14pt; got {fixed_size}")
-
-        manual_font = tmp_dir / "manual-font.pptx"
-        _build_manual_font_size_fixture(manual_font)
-        actions = pptx_fix.fix_pptx(manual_font, apply=True, rules=("font_size",))
-        if not any(a.rule == "font_size" and a.status == "manual_required" for a in actions):
-            failures.append("font_size fixer did not report manual_required for unsafe fixture")
-        prs = Presentation(str(manual_font))
         unchanged_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
-        if abs(unchanged_size - 22.5) > 1e-6:
-            failures.append(f"font_size manual fixture should remain 22.5pt; got {unchanged_size}")
+        if abs(unchanged_size - 14.75) > 1e-6:
+            failures.append(f"disabled font_size fixer should leave 14.75pt; got {unchanged_size}")
+
+        old_font_size_enabled = pptx_fix.RULE_ENABLED["font_size"]
+        pptx_fix.RULE_ENABLED["font_size"] = True
+        try:
+            actions = pptx_fix.fix_pptx(safe_font, apply=True, rules=("font_size",))
+            if not any(a.rule == "font_size" and a.status == "apply" for a in actions):
+                failures.append("font_size fixer did not report an apply action for safe fixture")
+            prs = Presentation(str(safe_font))
+            fixed_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
+            if abs(fixed_size - 14.0) > 1e-6:
+                failures.append(f"font_size safe fixture expected 14pt; got {fixed_size}")
+
+            manual_font = tmp_dir / "manual-font.pptx"
+            _build_manual_font_size_fixture(manual_font)
+            actions = pptx_fix.fix_pptx(manual_font, apply=True, rules=("font_size",))
+            if not any(a.rule == "font_size" and a.status == "manual_required" for a in actions):
+                failures.append("font_size fixer did not report manual_required for unsafe fixture")
+            prs = Presentation(str(manual_font))
+            unchanged_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
+            if abs(unchanged_size - 22.5) > 1e-6:
+                failures.append(f"font_size manual fixture should remain 22.5pt; got {unchanged_size}")
+        finally:
+            pptx_fix.RULE_ENABLED["font_size"] = old_font_size_enabled
 
         # --- self-check (verify_pptx) reports no residual on fixed file ---
         bad3 = tmp_dir / "bad3.pptx"

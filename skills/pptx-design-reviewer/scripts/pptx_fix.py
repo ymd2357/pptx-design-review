@@ -7,8 +7,8 @@ Fixes (mechanical, no semantic decisions):
             but only when the current value is within 0.1pt of an integer
             (catches float drift; preserves intentional sub-pt placements)
 - font_size text run size snapped to the nearest allowed scale size only when
-            explicitly requested and all safety checks pass; otherwise reported
-            as manual_required
+            the feature flag is enabled, explicitly requested, and all safety
+            checks pass; otherwise reported as manual_required
 
 Out of fixer scope (require human judgment):
 - font_family, overflow, safe_text_area, animation_present, slide_size
@@ -56,6 +56,7 @@ SLIDE_W_PT = 1440
 SLIDE_H_PT = 810
 ALLOWED_FONT_SIZES_PT = {80, 64, 56, 48, 40, 36, 32, 28, 24, 22, 20}
 FONT_SIZE_FIX_DELTA_MAX_PT = 1.0
+FONT_SIZE_FIXER_ENABLED = False
 
 DEFAULT_RULES = ("autofit", "geometry")
 ALL_RULES = ("autofit", "geometry", "font_size")
@@ -364,6 +365,16 @@ DETECTORS: dict = {
     "font_size": _detect_font_size,
 }
 
+RULE_ENABLED: dict[str, bool] = {
+    "autofit": True,
+    "geometry": True,
+    "font_size": FONT_SIZE_FIXER_ENABLED,
+}
+
+
+def _enabled_rules(rules: Sequence[str]) -> tuple[str, ...]:
+    return tuple(rule for rule in rules if RULE_ENABLED.get(rule, True))
+
 
 # ---- Apply -----------------------------------------------------------------
 
@@ -405,9 +416,10 @@ def fix_pptx(
 ) -> List[FixAction]:
     prs = Presentation(str(path))
     actions: List[FixAction] = []
+    active_rules = _enabled_rules(rules)
 
     for shape, idx, sid, slide in _walk(prs):
-        for rule in rules:
+        for rule in active_rules:
             det: Optional[Callable] = DETECTORS.get(rule)
             if det is None:
                 continue
@@ -436,8 +448,9 @@ def verify_pptx(path: Path, *, rules: Sequence[str] = DEFAULT_RULES) -> List[Fix
     """
     prs = Presentation(str(path))
     residual: List[FixAction] = []
+    active_rules = _enabled_rules(rules)
     for shape, idx, sid, slide in _walk(prs):
-        for rule in rules:
+        for rule in active_rules:
             det = DETECTORS.get(rule)
             if det is None:
                 continue
