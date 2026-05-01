@@ -2586,9 +2586,10 @@ rules:
         severity: "error"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.object_overlap"
-        detection: "Detect normalized bbox pairs with at least one non-text object whose intersection area is greater than 1pt²."
+        detection: "Detect normalized bbox pairs with at least one non-text object whose intersection area is greater than 1pt², excluding structural containment relationships emitted by structure metadata."
         thresholds:
           overlap_area_pt2_min_exclusive: 1
+          structural_containment_overlap_ratio_min: 0.9
       safe_margins:
         severity: "warning"
         automation: "automated"

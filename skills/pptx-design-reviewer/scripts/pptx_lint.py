@@ -19,7 +19,8 @@ Checks
 - text_color_allowlist (warning) explicit text color not in allowlist
 - background_color_palette (warning) explicit shape/table cell fill color not in palette
 - text_overlap       (error)   text frames overlap each other
-- object_overlap     (error)   non-text object bboxes overlap
+- object_overlap     (error)   non-text object bboxes overlap, excluding
+                                structural containment
 - object_gap_too_small (warning) adjacent object gap is below minimum spacing
 - alignment_drift    (warning) nearby left/top/center alignment differs
 - inner_padding_imbalance (warning) child objects are unbalanced inside a container
@@ -32,6 +33,7 @@ Constants below mirror that file; keep them in sync if the guideline changes.
 Usage
     python3 pptx_lint.py DECK.pptx
     python3 pptx_lint.py DECK.pptx --json
+    python3 pptx_lint.py DECK.pptx --structure-json
     python3 pptx_lint.py DECK.pptx --severity error
 
 Exit code
@@ -78,6 +80,7 @@ FONT_SIZE_TOL_PT = 1.0
 ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
 LINE_HEIGHT_TOL_PT = 2.0
 OBJECT_OVERLAP_AREA_PT2_MIN = 1.0
+STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN = 0.9
 OBJECT_GAP_MIN_PT = 8.0
 ALIGNMENT_GROUP_TOL_PT = 24.0
 ALIGNMENT_DRIFT_TOL_PT = 2.0
@@ -227,6 +230,16 @@ class ShapeRecord:
     actual_bbox_pt: tuple
     bbox_pt: tuple
     kind: str
+
+
+@dataclass(frozen=True)
+class StructureRelation:
+    relation: str
+    container: ShapeRecord
+    child: ShapeRecord
+    overlap_area_pt2: float
+    overlap_bbox_pt: tuple
+    metadata: dict = field(default_factory=dict)
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -385,6 +398,33 @@ def _bbox_edges(bbox: tuple) -> tuple[float, float, float, float]:
     return x, y, x + w, y + h
 
 
+def _bbox_area(bbox: tuple) -> float:
+    return max(0.0, bbox[2]) * max(0.0, bbox[3])
+
+
+def _bbox_center(bbox: tuple) -> tuple[float, float]:
+    x, y, w, h = bbox
+    return x + w / 2, y + h / 2
+
+
+def _point_in_bbox(point: tuple[float, float], bbox: tuple, tolerance: float = TOL_PT) -> bool:
+    x, y = point
+    x1, y1, x2, y2 = _bbox_edges(bbox)
+    return x1 - tolerance <= x <= x2 + tolerance and y1 - tolerance <= y <= y2 + tolerance
+
+
+def _bbox_overflow_sides(outer: tuple, inner: tuple) -> dict[str, float]:
+    ox1, oy1, ox2, oy2 = _bbox_edges(outer)
+    ix1, iy1, ix2, iy2 = _bbox_edges(inner)
+    overflow = {
+        "left": max(0.0, ox1 - ix1),
+        "top": max(0.0, oy1 - iy1),
+        "right": max(0.0, ix2 - ox2),
+        "bottom": max(0.0, iy2 - oy2),
+    }
+    return {side: value for side, value in overflow.items() if value > TOL_PT}
+
+
 def _intersection_bbox(a: tuple, b: tuple) -> Optional[tuple]:
     ax1, ay1, ax2, ay2 = _bbox_edges(a)
     bx1, by1, bx2, by2 = _bbox_edges(b)
@@ -423,6 +463,70 @@ def _shape_record_detail(record: ShapeRecord) -> dict:
         "kind": record.kind,
         "bbox_pt": [round(v, 2) for v in record.bbox_pt],
     }
+
+
+def _structure_relation_detail(relation: StructureRelation) -> dict:
+    detail = {
+        "relation": relation.relation,
+        "container": _shape_record_detail(relation.container),
+        "child": _shape_record_detail(relation.child),
+        "overlap_area_pt2": round(relation.overlap_area_pt2, 2),
+        "overlap_bbox_pt": [round(v, 2) for v in relation.overlap_bbox_pt],
+    }
+    detail.update(relation.metadata)
+    return detail
+
+
+def _containment_relation(
+    first: ShapeRecord,
+    second: ShapeRecord,
+    overlap_bbox: tuple,
+) -> Optional[StructureRelation]:
+    if _bbox_contains(first.bbox_pt, second.bbox_pt):
+        return StructureRelation(
+            relation="contains",
+            container=first,
+            child=second,
+            overlap_area_pt2=overlap_bbox[2] * overlap_bbox[3],
+            overlap_bbox_pt=overlap_bbox,
+        )
+    if _bbox_contains(second.bbox_pt, first.bbox_pt):
+        return StructureRelation(
+            relation="contains",
+            container=second,
+            child=first,
+            overlap_area_pt2=overlap_bbox[2] * overlap_bbox[3],
+            overlap_bbox_pt=overlap_bbox,
+        )
+    overlap_area = overlap_bbox[2] * overlap_bbox[3]
+    for container, child in ((first, second), (second, first)):
+        child_area = _bbox_area(child.bbox_pt)
+        if child_area <= 0:
+            continue
+        overlap_ratio = overlap_area / child_area
+        if (
+            overlap_ratio >= STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN
+            and _point_in_bbox(_bbox_center(child.bbox_pt), container.bbox_pt)
+        ):
+            return StructureRelation(
+                relation="contains_with_child_overflow",
+                container=container,
+                child=child,
+                overlap_area_pt2=overlap_area,
+                overlap_bbox_pt=overlap_bbox,
+                metadata={
+                    "child_overlap_ratio": round(overlap_ratio, 4),
+                    "child_overflow_pt": {
+                        side: round(value, 2)
+                        for side, value in _bbox_overflow_sides(
+                            container.bbox_pt,
+                            child.bbox_pt,
+                        ).items()
+                    },
+                    "threshold_overlap_ratio": STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN,
+                },
+            )
+    return None
 
 
 def _rgb_hex(color_format) -> Optional[str]:
@@ -947,11 +1051,26 @@ def check_color(slide_idx, slide_id, shape, findings):
         )
 
 
+def extract_structure_relations(records: list[ShapeRecord]) -> list[StructureRelation]:
+    relations: list[StructureRelation] = []
+    for idx, first in enumerate(records):
+        for second in records[idx + 1:]:
+            overlap_bbox = _intersection_bbox(first.bbox_pt, second.bbox_pt)
+            if overlap_bbox is None:
+                continue
+            relation = _containment_relation(first, second, overlap_bbox)
+            if relation is not None:
+                relations.append(relation)
+    return relations
+
+
 def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], findings):
     for idx, first in enumerate(records):
         for second in records[idx + 1:]:
             overlap_bbox = _intersection_bbox(first.bbox_pt, second.bbox_pt)
             if overlap_bbox is not None:
+                if _containment_relation(first, second, overlap_bbox) is not None:
+                    continue
                 overlap_area_pt2 = overlap_bbox[2] * overlap_bbox[3]
                 if overlap_area_pt2 > OBJECT_OVERLAP_AREA_PT2_MIN:
                     if first.kind == "text" and second.kind == "text":
@@ -1065,14 +1184,16 @@ def _is_container_candidate(record: ShapeRecord) -> bool:
 
 
 def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    children_by_container: dict[int, list[ShapeRecord]] = defaultdict(list)
+    for relation in extract_structure_relations(records):
+        if not _is_container_candidate(relation.container):
+            continue
+        children_by_container[id(relation.container)].append(relation.child)
+
     for container in records:
         if not _is_container_candidate(container):
             continue
-        children = [
-            child
-            for child in records
-            if child is not container and _bbox_contains(container.bbox_pt, child.bbox_pt)
-        ]
+        children = children_by_container.get(id(container), [])
         if len(children) < 2:
             continue
 
@@ -1344,6 +1465,46 @@ def lint_pptx(
     return findings
 
 
+def extract_pptx_structure(
+    path: Path,
+    *,
+    profile: str = "default",
+    policy: Optional[LintPolicy] = None,
+) -> list[dict]:
+    if policy is None:
+        try:
+            policy = LINT_PROFILES[profile]
+        except KeyError as exc:
+            raise ValueError(f"unknown lint profile: {profile}") from exc
+    prs = Presentation(str(path))
+    actual_w = emu_to_pt(prs.slide_width)
+    actual_h = emu_to_pt(prs.slide_height)
+    ctx = make_context(actual_w, actual_h, policy=policy)
+
+    structure: list[dict] = []
+    for idx, slide in enumerate(prs.slides, start=1):
+        slide_id = getattr(slide, "slide_id", None)
+        records: list[ShapeRecord] = []
+        for shape in iter_shapes(slide.shapes):
+            bbox = shape_bbox_pt(shape)
+            if bbox is None:
+                continue
+            records.append(
+                ShapeRecord(
+                    shape=shape,
+                    actual_bbox_pt=bbox,
+                    bbox_pt=normalize_bbox(ctx, bbox),
+                    kind=_shape_kind(shape),
+                )
+            )
+        for relation in extract_structure_relations(records):
+            detail = _structure_relation_detail(relation)
+            detail["slide_index"] = idx
+            detail["slide_id"] = slide_id
+            structure.append(detail)
+    return structure
+
+
 # ---- Consolidation (recurring template-level issues) ----------------------
 
 
@@ -1470,6 +1631,11 @@ def main(argv: List[str]) -> int:
     ap.add_argument("pptx", type=Path, help="path to .pptx")
     ap.add_argument("--json", action="store_true", help="emit findings as JSON")
     ap.add_argument(
+        "--structure-json",
+        action="store_true",
+        help="emit structural containment metadata as JSON instead of lint findings",
+    )
+    ap.add_argument(
         "--severity",
         choices=["all", "warning", "error"],
         default="all",
@@ -1497,6 +1663,11 @@ def main(argv: List[str]) -> int:
     if not args.pptx.exists():
         print(f"file not found: {args.pptx}", file=sys.stderr)
         return 2
+
+    if args.structure_json:
+        payload = extract_pptx_structure(args.pptx, profile=args.profile)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
 
     findings = lint_pptx(args.pptx, profile=args.profile)
     if not args.no_consolidate:

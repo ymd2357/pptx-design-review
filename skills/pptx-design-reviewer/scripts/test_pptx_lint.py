@@ -329,6 +329,27 @@ def _make_object_relationships_good(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_structural_containment_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint005_rect(slide, x=500, y=300, width=360, height=180)
+    _add_lint005_rect(slide, x=530, y=330, width=60, height=40)
+    _add_lint005_rect(slide, x=770, y=410, width=60, height=40)
+    prs.save(str(out))
+
+
+def _make_structural_containment_overflow(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint005_rect(slide, x=500, y=300, width=360, height=180)
+    _add_lint005_rect(slide, x=530, y=330, width=340, height=40)
+    prs.save(str(out))
+
+
 def _make_object_relationships_bad(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -451,6 +472,8 @@ def main() -> int:
         aspect_distorted_image = tmp_dir / "aspect-distorted-image.pptx"
         decorative_distorted_image = tmp_dir / "decorative-distorted-image.pptx"
         object_relationships_good = tmp_dir / "object-relationships-good.pptx"
+        structural_containment_good = tmp_dir / "structural-containment-good.pptx"
+        structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
         object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
         top_anchor_bottom_void_bad = tmp_dir / "top-anchor-bottom-void-bad.pptx"
@@ -469,6 +492,8 @@ def main() -> int:
         _make_aspect_distorted_image(aspect_distorted_image)
         _make_decorative_distorted_image(decorative_distorted_image)
         _make_object_relationships_good(object_relationships_good)
+        _make_structural_containment_good(structural_containment_good)
+        _make_structural_containment_overflow(structural_containment_overflow)
         _make_object_relationships_bad(object_relationships_bad)
         _make_text_vertical_balance_good(text_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
@@ -604,6 +629,45 @@ def main() -> int:
             failures.append(
                 "object-relationships-good.pptx triggered LINT-005 checks:\n  "
                 + "\n  ".join(f"{f.check}: {f.message}" for f in lint005_good_findings)
+            )
+        structural_containment_findings = [
+            f
+            for f in pptx_lint.lint_pptx(structural_containment_good)
+            if f.check in {"object_overlap", "inner_padding_imbalance"}
+        ]
+        if structural_containment_findings:
+            failures.append(
+                "structural-containment-good.pptx treated containment as a lint issue:\n  "
+                + "\n  ".join(
+                    f"{f.check}: {f.message}" for f in structural_containment_findings
+                )
+            )
+        structure = pptx_lint.extract_pptx_structure(structural_containment_good)
+        if not any(
+            relation["relation"] == "contains"
+            and relation["container"]["shape_name"]
+            and relation["child"]["shape_name"]
+            for relation in structure
+        ):
+            failures.append("object-relationships-good.pptx did not expose containment structure")
+        structural_overflow_object_overlap = [
+            f
+            for f in pptx_lint.lint_pptx(structural_containment_overflow)
+            if f.check == "object_overlap"
+        ]
+        if structural_overflow_object_overlap:
+            failures.append(
+                "structural-containment-overflow.pptx treated mostly-contained child as object_overlap:\n  "
+                + "\n  ".join(f.message for f in structural_overflow_object_overlap)
+            )
+        overflow_structure = pptx_lint.extract_pptx_structure(structural_containment_overflow)
+        if not any(
+            relation["relation"] == "contains_with_child_overflow"
+            and relation.get("child_overflow_pt")
+            for relation in overflow_structure
+        ):
+            failures.append(
+                "structural-containment-overflow.pptx did not expose child overflow structure"
             )
 
         lint005_bad_check_set = {

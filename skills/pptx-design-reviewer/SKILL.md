@@ -56,6 +56,7 @@ python3 scripts/pptx_lint.py path/to/DECK.pptx
 python3 scripts/pptx_lint.py path/to/DECK.pptx --profile strict
 python3 scripts/pptx_lint.py path/to/DECK.pptx --severity error
 python3 scripts/pptx_lint.py path/to/DECK.pptx --json > lint.json
+python3 scripts/pptx_lint.py path/to/DECK.pptx --structure-json > structure.json
 ```
 
 Exit code: `1` if any error, `0` otherwise. Checks (initial set):
@@ -71,7 +72,7 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 | `text_color_allowlist` | warning | Explicit text color is outside the allowed text palette |
 | `background_color_palette` | warning | Explicit shape fill color is outside the allowed fill/background palette |
 | `text_overlap` | error | Text frame bounding boxes overlap each other |
-| `object_overlap` | error | Non-text object bounding boxes overlap |
+| `object_overlap` | error | Non-text object bounding boxes overlap, excluding structural containment metadata |
 | `object_gap_too_small` | warning | Adjacent object gap is below the minimum spacing |
 | `alignment_drift` | warning | Nearby left/top/center alignment drifts beyond tolerance |
 | `inner_padding_imbalance` | warning | Child objects are unbalanced inside a container |
@@ -100,6 +101,11 @@ not the only accepted PPTX canvas size.
 Use lint output to scope manual inspection: triage errors first, then warnings,
 then move on to visual checks (overlap, hierarchy, photo handling) that the lint
 does not cover.
+
+`--structure-json` emits non-finding structural metadata such as `contains` and
+`contains_with_child_overflow`. Use it to identify card backgrounds, header
+bands, grouped visual regions, and mostly-contained child objects before
+deciding whether a remaining overlap is an actual collision.
 
 For user-facing review reports, do not present raw finding counts as the main
 result. Convert findings into P0-P3 action priorities:
