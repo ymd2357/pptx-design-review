@@ -37,10 +37,85 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 各チェックが P0/P1/P2/P3 のどこに落ちるか、
 機械検出・手動レビュー・auto-fix 対象のどれかを明示してから進める。
 
+## チェック観点一覧
+
+正本は `doc/slide-guideline-v1.yml` の
+`rules.lint.priority_catalog` とする。
+この表は、進行中のレビューで Pn 判定を確認するための索引であり、
+件数順の finding 一覧ではない。
+
+| Pn | ID | 状態 | 検出 | 修正 | 観点 |
+| --- | --- | --- | --- | --- | --- |
+| P0 | `text_encoding` | implemented_priority | automated | manual_review | 文字化けで読めない |
+| P0 | `text_overlap` | implemented_lint | automated | manual_review | 文字衝突で読めない |
+| P0 | `low_contrast` | planned | manual_review | manual_review | 読めないコントラスト |
+| P0 | `overflow_text` | implemented_lint | automated | manual_review | テキストが切れて読めない |
+| P1 | `animation_present` | implemented_lint | automated | manual_review | 静的配布で失われる情報 |
+| P1 | `alt_text_required` | implemented_lint | automated | manual_review | 意味を持つ画像の代替テキスト欠落 |
+| P1 | `color_only_meaning` | manual_defined | manual_review | manual_review | 色だけで意味を伝えている |
+| P1 | `contrast_ratio` | manual_defined | manual_review | manual_review | コントラスト不足 |
+| P1 | `heading_hierarchy_broken` | planned | manual_review | manual_review | 見出し階層崩れ |
+| P1 | `image_aspect_distortion` | implemented_lint | automated | manual_review | 画像の縦横比崩れ |
+| P1 | `key_area_cropped` | planned | manual_review | manual_review | 画像重要部の欠け |
+| P1 | `line_height` | implemented_lint | automated | manual_review | 行間が読みやすさを損なう |
+| P1 | `missing_required_element` | planned | automated | manual_review | 必須要素欠落 |
+| P1 | `object_overlap` | implemented_lint | automated | manual_review | オブジェクト重なり |
+| P1 | `overflow_images` | implemented_lint | automated | manual_review | 画像のスライド外はみ出し |
+| P1 | `overflow_shapes` | implemented_lint | automated | manual_review | 図形のスライド外はみ出し |
+| P1 | `reading_order` | manual_defined | manual_review | manual_review | 読み順不整合 |
+| P1 | `text_autofit_disabled` | implemented_lint | automated | auto_fix | 自動縮小による可読性リスク |
+| P1 | `wrap_break_changes_meaning` | planned | manual_review | manual_review | 折返しで意味が変わる |
+| P2 | `object_gap_too_small` | implemented_lint | automated | manual_review | 隣接オブジェクト間隔が狭い |
+| P2 | `background_color_palette` | implemented_lint | automated | manual_review | 背景・塗り色がパレット外 |
+| P2 | `font_family` | implemented_lint | automated | manual_review | 書体がテンプレート外 |
+| P2 | `font_size_scale` | implemented_lint | automated | manual_review | 文字サイズが定義スケール外 |
+| P2 | `image_upscale_ratio` | implemented_lint | automated | manual_review | 画像解像度不足 |
+| P2 | `inner_padding_imbalance` | implemented_lint | automated | manual_review | テキストボックス内余白バランス不自然 |
+| P2 | `safe_margins` | implemented_lint | automated | manual_review | 非テキスト要素が安全余白外 |
+| P2 | `safe_text_area_text` | implemented_lint | automated | manual_review | テキストが安全領域外 |
+| P2 | `slide_size` | implemented_lint | automated | manual_review | スライドサイズが基準比率外 |
+| P2 | `text_color_allowlist` | implemented_lint | automated | manual_review | 文字色が許可リスト外 |
+| P2 | `alignment_left_top` | implemented_lint | automated | manual_review | 文字揃えがテンプレート基準外 |
+| P2 | `alignment_drift` | implemented_lint | automated | manual_review | 近接要素の揃いズレ |
+| P2 | `text_vertical_balance` | implemented_lint | automated | manual_review | テキストボックス内の縦余白バランス不自然 |
+| P3 | `geometry_rounding` | implemented_lint | automated | auto_fix | 座標の微小な丸めズレ |
+
 ## 260329 seminar deck 現状メモ
 
 対象:
-`tmp/review/260329-seminar-curriculum-proposal/260329_seminar_curriculum_proposal.p0-p2-8-font-size-fixed.pptx`
+`tmp/review/260329-seminar-curriculum-proposal/260329_seminar_curriculum_proposal.p0-p2-13-left-align-fixed.pptx`
+
+### P2 レビュー反復記録
+
+`P2-N` は `tmp/review/260329-seminar-curriculum-proposal/` 配下の
+artifact ファイル名と一致する通し番号として運用してきた経緯がある。
+台帳化されていなかったので、ここに索引を残す。
+
+| # | 種別 | 内容 | 主な artifact |
+| --- | --- | --- | --- |
+| P0 | fix | 初期 fix と目視 | `260329_seminar_curriculum_proposal.p0-fixed.pptx`, `p0-review-images/` |
+| P2-2 | review | 目視レビュー | `p2-2-review-images/` |
+| P2-3 | review | 目視レビュー | `p2-3-review-images/` |
+| P2-4 | review | 目視レビュー | `p2-4-review-images/` |
+| P2-5 | sample | サンプル生成と目視 | `260329_seminar_curriculum_proposal.p0-p2-5-sample-fixed.pptx`, `p2-5-sample-images/` |
+| P2-6 | fix | line-height 修正 | `260329_seminar_curriculum_proposal.p0-p2-6-line-height-only-fixed.pptx`, `260329_seminar_curriculum_proposal.p0-p2-6-fixed.pptx`, `p2-6-powerpoint-review-images/` |
+| P2-7 | fix | font-family 修正 | `260329_seminar_curriculum_proposal.p0-p2-7-font-family-fixed.pptx`, `p2-7-powerpoint-review-images/` |
+| P2-8 | fix | font-size 修正 | `260329_seminar_curriculum_proposal.p0-p2-8-font-size-fixed.pptx`, `p2-8-powerpoint-review-images/` |
+| P2-9 | rule | 構造的オーバーラップをメタ化 (commit `e2790e1`) | `p2-9-evaluation-{lint,priorities,structure}.json`, `p2-9-evaluation-images/` |
+| P2-10 | rule | 装飾ラスターを overflow 判定から除外 (commit `e680e62`) | `p2-10-evaluation-{lint,priorities}.json` |
+| P2-11 | eval | 評価のみ | `p2-11-after-{lint,priorities}.json`, `p2-11-evaluation-{lint,priorities}.json` |
+| P2-12 | fix | object_gap 修正 | `260329_seminar_curriculum_proposal.p0-p2-12-object-gap-fixed.pptx`, `p2-12-review-images/` |
+| P2-13 | fix | left-align (alignment_left_top) 修正 | `260329_seminar_curriculum_proposal.p0-p2-13-left-align-fixed.pptx`, `p2-13-review-images/`, `p2-13-review-images-corrected/` |
+| P2-14 | rule | 不可視テキスト枠を縦余白判定から除外 + font_size fixer デフォルト OFF (commits `0044959`, `b944b86`) | `p2-14-after-{lint,priorities}.json` |
+| P2-15 | _未着手_ | 候補: P3 `geometry_rounding` 138件を `pptx_fix.py --rules geometry` で一括 auto-fix → 目視 DIFF | — |
+
+種別:
+
+- `fix`: PPTX 自体を修正して新しい正本候補を生成した回
+- `rule`: lint ルール側を改修し、PPTX は更新していない回（評価 JSON のみ）
+- `review`: 目視レビューと finding 整理のみ
+- `sample`: サンプル生成と目視
+- `eval`: 既存 PPTX に対する評価のみ
 
 進行上の前提:
 
@@ -54,7 +129,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 - 既に `_invalid-do-not-use/` に移した旧生成物は、判断材料として使わない。
 - 生成 PPTX、PNG、PDF、HTML などのレビュー成果物は git に入れない。
 
-2026-04-29 時点の `pptx_lint.py --json` 残件:
+2026-04-29 時点の `pptx_lint.py --json` 残件 (P2-8 fix 直後の値、参考):
 
 | check | count | severity |
 | ------- | ------- | ---------- |
@@ -64,9 +139,15 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | `alignment_left_top` | 2 | warning |
 | `geometry_rounding` | 138 | warning |
 
-`pptx_review_priorities.py` 上は P2 と P3 が残っている。
-ただし Pn 定義自体が `PRI-001` の見直し対象であり、
-現行の P2 一括判定を最終分類として扱わない。
+P2-14 後 (2026-05-02 時点) の状況:
+
+- `severity=error` は 0 件、`pptx_review_priorities.py` の P0/P1 該当も 0 件
+- `overflow_images` 1 件 → P2-10 (装飾ラスター除外ルール) で消滅
+- `alignment_left_top` 2 件 → P2-13 (left-align fix) で解消
+- 残るのは P2 の `alignment_drift` / `inner_padding_imbalance` 再発系と、
+  P3 の `geometry_rounding` 138 件
+- 配布ゲートとしては止まる要因なし。次の P2-15 で `geometry_rounding` を
+  `pptx_fix.py --rules geometry` で一括 auto-fix し、目視 DIFF を取る案が有力。
 
 ## Next
 
