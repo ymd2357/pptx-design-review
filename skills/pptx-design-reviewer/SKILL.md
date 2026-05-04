@@ -221,6 +221,12 @@ Out of fixer scope (require human judgment): `font_family`, `overflow`,
 `safe_text_area`, `animation_present`, `slide_size`. Re-lint after applying to
 triage what remains.
 
+For `manual_review` items not covered by `pptx_fix.py` (`line_height`,
+`font_family`, `font_size_scale` with the flag off, `object_gap_too_small`,
+`alignment_left_top`, `inner_padding_imbalance`), write a one-shot
+python-pptx script under `tmp/review/<deck-id>/scripts/` and re-lint.
+Recipes and the keep-the-script rationale: `references/manual-fix-recipes.md`.
+
 After `--apply`, the fixer re-reads the saved file and verifies the change is
 durable on disk. If any action is still detected, it prints a
 `WARNING: self-check found N residual actions ...` line to stderr and exits
