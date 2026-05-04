@@ -33,6 +33,7 @@ REQUIRED_CATALOG_CHECKS = {
     "image_upscale_ratio",
     "inner_padding_imbalance",
     "line_height",
+    "low_contrast",
     "object_gap_too_small",
     "object_overlap",
     "overflow_images",
@@ -51,7 +52,6 @@ REQUIRED_CATALOG_CHECKS = {
 REQUIRED_PLANNED_CHECKS = {
     "heading_hierarchy_broken",
     "key_area_cropped",
-    "low_contrast",
     "missing_required_element",
     "wrap_break_changes_meaning",
 }

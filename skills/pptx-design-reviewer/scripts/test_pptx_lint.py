@@ -20,6 +20,7 @@ sys.path.insert(0, str(HERE))
 
 import make_examples  # noqa: E402
 import pptx_lint  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 from pptx import Presentation  # noqa: E402
 from pptx.dml.color import RGBColor  # noqa: E402
 from pptx.enum.shapes import MSO_SHAPE  # noqa: E402
@@ -45,6 +46,8 @@ EXPECTED_BAD_CHECKS = {
     "alt_text_required",
     "text_color_allowlist",
     "background_color_palette",
+    "contrast_ratio",
+    "low_contrast",
     "animation_present",
 }
 
@@ -66,7 +69,7 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
 
 LINT004_POLICY = {
     "image_upscale_ratio": "automated",
-    "contrast_ratio": "manual_review",
+    "contrast_ratio": "automated",
     "color_only_meaning": "manual_review",
     "alt_text_required": "automated",
     "reading_order": "manual_review",
@@ -171,6 +174,27 @@ def _make_bad_table_cell_fill(out: Path) -> None:
             cell.fill.fore_color.rgb = RGBColor.from_string("FFFFFF")
     table.cell(0, 0).fill.fore_color.rgb = RGBColor.from_string("123456")
     prs.save(str(out))
+
+
+def _make_rendered_low_contrast_case(out: Path, image_dir: Path) -> None:
+    """Create a deck whose rendered PNG has low contrast not encoded in PPTX colors."""
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40.5), Pt(40), Pt(300), Pt(80))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Rendered low contrast"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+    image_dir.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (720, 405), "white")
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((70, 70, 300, 92), fill="#BBBBBB")
+    image.save(image_dir / "slide-01.png")
 
 
 def _make_allowed_latin_fonts_good(out: Path) -> None:
@@ -516,6 +540,8 @@ def main() -> int:
         scaled_good = tmp_dir / "scaled-good.pptx"
         centered_single_line_good = tmp_dir / "centered-single-line-good.pptx"
         bad_table_cell_fill = tmp_dir / "bad-table-cell-fill.pptx"
+        rendered_low_contrast = tmp_dir / "rendered-low-contrast.pptx"
+        rendered_low_contrast_images = tmp_dir / "rendered-low-contrast-images"
         allowed_latin_fonts_good = tmp_dir / "allowed-latin-fonts-good.pptx"
         scaled_near_font_sizes_good = tmp_dir / "scaled-near-font-sizes-good.pptx"
         bad_table_cell_font = tmp_dir / "bad-table-cell-font.pptx"
@@ -541,6 +567,7 @@ def main() -> int:
         _make_scaled_good(scaled_good)
         _make_centered_single_line_good(centered_single_line_good)
         _make_bad_table_cell_fill(bad_table_cell_fill)
+        _make_rendered_low_contrast_case(rendered_low_contrast, rendered_low_contrast_images)
         _make_allowed_latin_fonts_good(allowed_latin_fonts_good)
         _make_scaled_near_font_sizes_good(scaled_near_font_sizes_good)
         _make_bad_table_cell_font(bad_table_cell_font)
@@ -608,6 +635,29 @@ def main() -> int:
         if not any(f.detail.get("scope") == "table_cell" for f in table_cell_findings):
             failures.append(
                 "bad-table-cell-fill.pptx did not trigger background_color_palette for table cell fill"
+            )
+
+        rendered_without_images_findings = [
+            f
+            for f in pptx_lint.lint_pptx(rendered_low_contrast)
+            if f.check in {"low_contrast", "contrast_ratio"}
+        ]
+        if rendered_without_images_findings:
+            failures.append(
+                "rendered-low-contrast.pptx triggered contrast without rendered images:\n  "
+                + "\n  ".join(f"{f.check}: {f.message}" for f in rendered_without_images_findings)
+            )
+        rendered_with_images_findings = [
+            f
+            for f in pptx_lint.lint_pptx(
+                rendered_low_contrast,
+                rendered_image_dir=rendered_low_contrast_images,
+            )
+            if f.check == "low_contrast" and f.detail.get("measurement") == "rendered_image"
+        ]
+        if not rendered_with_images_findings:
+            failures.append(
+                "rendered-low-contrast.pptx did not trigger rendered-image low_contrast"
             )
 
         allowed_latin_font_findings = [

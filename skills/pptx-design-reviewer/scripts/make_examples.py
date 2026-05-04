@@ -12,9 +12,10 @@ good.pptx
 bad.pptx
 - 1 slide, 16:9
 - shape A: overflow_text (right edge), font_family ("Arial"), font_size_scale (30pt),
-           text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist
+           text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist,
+           contrast_ratio
 - shape B: safe_text_area_text violation (positioned at x=10, left of x=81 boundary),
-           background_color_palette
+           background_color_palette, low_contrast
 - shape C: safe_margins violation for non-text content
 - shape D: line_height and alignment_left_top violations
 - shape E: geometry_rounding violation
@@ -24,7 +25,7 @@ bad.pptx
                                  font_family, font_size_scale, safe_margins, line_height,
                                  alignment_left_top, geometry_rounding, image_upscale_ratio,
                                  alt_text_required, text_color_allowlist, background_color_palette,
-                                 animation_present}
+                                 contrast_ratio, low_contrast, animation_present}
   fires at least once
 """
 
@@ -138,7 +139,8 @@ def make_bad(out: Path) -> None:
     b.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     b.fill.solid()
     b.fill.fore_color.rgb = RGBColor(255, 204, 0)
-    _set_run(b.text_frame, "Outside safe area", "Noto Sans JP", 24)
+    b_run = _set_run(b.text_frame, "Outside safe area", "Noto Sans JP", 24)
+    b_run.font.color.rgb = RGBColor(255, 255, 255)
 
     c = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(10), Pt(120), Pt(48), Pt(48))
     c.fill.solid()
