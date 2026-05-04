@@ -42,7 +42,7 @@ import shutil
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, List, Optional, Sequence
+from typing import Any, Callable, Iterable, List, Optional, Sequence
 
 from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
@@ -60,6 +60,11 @@ FONT_SIZE_FIXER_ENABLED = False
 
 DEFAULT_RULES = ("autofit", "geometry")
 ALL_RULES = ("autofit", "geometry", "font_size")
+CHECK_TO_RULE = {
+    "text_autofit_disabled": "autofit",
+    "geometry_rounding": "geometry",
+    "font_size_scale": "font_size",
+}
 
 
 @dataclass
@@ -376,6 +381,129 @@ def _enabled_rules(rules: Sequence[str]) -> tuple[str, ...]:
     return tuple(rule for rule in rules if RULE_ENABLED.get(rule, True))
 
 
+def _finding_field(finding: Any, key: str, default: Any = None) -> Any:
+    if isinstance(finding, dict):
+        return finding.get(key, default)
+    return getattr(finding, key, default)
+
+
+def _finding_detail(finding: Any) -> dict:
+    detail = _finding_field(finding, "detail", {})
+    return detail if isinstance(detail, dict) else {}
+
+
+def _finding_detail_value(finding: Any, key: str, default: Any = None) -> Any:
+    detail = _finding_detail(finding)
+    if key in detail:
+        return detail[key]
+    return _finding_field(finding, key, default)
+
+
+def _finding_rule(finding: Any) -> Optional[str]:
+    check = _finding_field(finding, "check")
+    if check is None:
+        return None
+    return CHECK_TO_RULE.get(check, check)
+
+
+def _finding_matches_action(finding: Any, action: FixAction) -> bool:
+    if _finding_rule(finding) != action.rule:
+        return False
+
+    finding_slide = _finding_field(finding, "slide_index")
+    if finding_slide is not None and finding_slide != action.slide_index:
+        return False
+
+    finding_shape_id = _finding_field(finding, "shape_id")
+    if finding_shape_id is not None and action.shape_id is not None:
+        return finding_shape_id == action.shape_id
+
+    finding_shape_name = _finding_field(finding, "shape_name")
+    if finding_shape_name is not None and action.shape_name is not None:
+        return finding_shape_name == action.shape_name
+
+    return True
+
+
+def _candidate_values_present(candidate_values: Any) -> bool:
+    if candidate_values is None:
+        return False
+    if isinstance(candidate_values, (list, tuple, set, dict)):
+        return len(candidate_values) > 0
+    return True
+
+
+def _finding_reasons(finding: Any) -> list[str]:
+    reasons: list[str] = []
+    for key in (
+        "manual_required_reason",
+        "manual_reason",
+        "fixability_reason",
+        "reason",
+        "reasons",
+    ):
+        value = _finding_detail_value(finding, key)
+        if value is None:
+            continue
+        if isinstance(value, str):
+            reasons.append(value)
+        elif isinstance(value, (list, tuple, set)):
+            reasons.extend(str(item) for item in value if item is not None)
+        else:
+            reasons.append(str(value))
+    return reasons
+
+
+def _fixability_decision_from_finding(finding: Any) -> Optional[tuple[str, list[str]]]:
+    """Return an action status override from evidence-schema findings.
+
+    Legacy findings that do not declare fixability fall back to the existing
+    detector-only behavior.
+    """
+    fixability = _finding_detail_value(finding, "fixability")
+    if fixability is None:
+        return None
+
+    if fixability == "auto_fix_candidate":
+        candidate_values = _finding_detail_value(finding, "candidate_values")
+        if _candidate_values_present(candidate_values):
+            return "apply", []
+        return "manual_required", ["missing_candidate_values"]
+
+    reasons = _finding_reasons(finding)
+    if fixability == "manual_required":
+        return "manual_required", reasons or ["finding_marked_manual_required"]
+
+    return "manual_required", reasons or [f"fixability_{fixability}"]
+
+
+def _apply_finding_fixability(action: FixAction, finding: Any) -> FixAction:
+    decision = _fixability_decision_from_finding(finding)
+    if decision is None:
+        return action
+
+    status, reasons = decision
+    if status == "manual_required":
+        action.status = "manual_required"
+        action.reasons = sorted(set(action.reasons + reasons))
+    elif action.status != "manual_required":
+        action.status = status
+    return action
+
+
+def _apply_matching_finding_fixability(
+    action: FixAction,
+    findings: Optional[Sequence[Any]],
+) -> FixAction:
+    if not findings:
+        return action
+
+    for finding in findings:
+        if _finding_matches_action(finding, action):
+            return _apply_finding_fixability(action, finding)
+    return action
+
+
 # ---- Apply -----------------------------------------------------------------
 
 
@@ -413,6 +541,7 @@ def fix_pptx(
     apply: bool = False,
     backup: bool = False,
     rules: Sequence[str] = DEFAULT_RULES,
+    findings: Optional[Sequence[Any]] = None,
 ) -> List[FixAction]:
     prs = Presentation(str(path))
     actions: List[FixAction] = []
@@ -426,6 +555,7 @@ def fix_pptx(
             action = det(shape, idx, sid, slide)
             if action is None:
                 continue
+            action = _apply_matching_finding_fixability(action, findings)
             actions.append(action)
             if action.status == "apply":
                 _apply_action(shape, action)
@@ -438,7 +568,12 @@ def fix_pptx(
     return actions
 
 
-def verify_pptx(path: Path, *, rules: Sequence[str] = DEFAULT_RULES) -> List[FixAction]:
+def verify_pptx(
+    path: Path,
+    *,
+    rules: Sequence[str] = DEFAULT_RULES,
+    findings: Optional[Sequence[Any]] = None,
+) -> List[FixAction]:
     """Re-read the file from disk and report any actions still pending.
 
     A non-empty result after a successful --apply means the change was not
@@ -455,6 +590,8 @@ def verify_pptx(path: Path, *, rules: Sequence[str] = DEFAULT_RULES) -> List[Fix
             if det is None:
                 continue
             action = det(shape, idx, sid, slide)
+            if action is not None:
+                action = _apply_matching_finding_fixability(action, findings)
             if action is not None and action.status == "apply":
                 residual.append(action)
     return residual

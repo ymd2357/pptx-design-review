@@ -18,6 +18,8 @@ Checks
 - alt_text_required   (warning) meaningful image-like object has no alt text
 - text_color_allowlist (warning) explicit text color not in allowlist
 - background_color_palette (warning) explicit shape/table cell fill color not in palette
+- contrast_ratio      (warning) explicit text/background colors fail contrast threshold
+- low_contrast        (error)   explicit text/background colors are unreadably low contrast
 - text_overlap       (error)   text frames overlap each other
 - object_overlap     (error)   non-text object bboxes overlap, excluding
                                 structural containment
@@ -47,11 +49,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, List, Optional
 
+from PIL import Image
 from pptx import Presentation
 from pptx.dml.color import MSO_COLOR_TYPE
 from pptx.enum.dml import MSO_FILL
@@ -173,6 +176,51 @@ ALLOWED_FILL_COLORS_HEX = {
     "#D55E00",  # state.danger / data series
     "#56B4E9",  # data series
     "#CC79A7",  # data series
+}
+
+CONTRAST_RATIO_NORMAL_TEXT_MIN = 4.5
+CONTRAST_RATIO_LARGE_TEXT_MIN = 3.0
+LOW_CONTRAST_RATIO_MAX = 3.0
+LARGE_TEXT_MIN_SIZE_PT = 36.0
+DEFAULT_SLIDE_BACKGROUND_HEX = "#FFFFFF"
+RENDERED_CONTRAST_PALETTE_COLORS = 16
+RENDERED_CONTRAST_MIN_FOREGROUND_PIXELS = 8
+RENDERED_CONTRAST_MIN_FOREGROUND_RATIO = 0.001
+RENDERED_CONTRAST_MAX_SAMPLE_PX = 240
+
+TEXT_COLOR_TOKEN_BY_HEX = {
+    "#000000": "brand.utility.black",
+    "#333333": "text.primary",
+    "#474747": "brand.black.b800",
+    "#5C5C5C": "brand.black.b700",
+    "#666666": "text.muted",
+    "#707070": "brand.black.b600",
+    "#858585": "brand.black.b500",
+    "#999999": "brand.black.b400",
+    "#1E112D": "text.alt_dark",
+    "#FEFEFE": "brand.utility.off_white",
+    "#FFFFFF": "text.inverse",
+    "#A51E6D": "accent.magenta",
+    "#0072B2": "state.info",
+}
+
+FILL_COLOR_TOKEN_BY_HEX = {
+    "#FFFFFF": "background.base",
+    "#F7F7F7": "background.muted",
+    "#EEEEEE": "neutral.n200",
+    "#EBEBEB": "brand.black.b50",
+    "#DDDDDD": "border.default",
+    "#333333": "brand.black.b900",
+    "#F6E9F0": "brand.primary.p50",
+    "#A51E6D": "accent.magenta",
+    "#E6F4F2": "brand.secondary.s50",
+    "#039578": "brand.secondary.s900",
+    "#FFBC2A": "brand.gold.base",
+    "#1E112D": "data.dark",
+    "#0072B2": "state.info",
+    "#009E73": "state.success",
+    "#E69F00": "state.warning",
+    "#D55E00": "state.danger",
 }
 
 # Tolerance for fp comparisons in pt. Geometry rounding policy is 0.5pt.
@@ -563,12 +611,222 @@ def _rgb_hex(color_format) -> Optional[str]:
     return f"#{str(rgb).upper()}"
 
 
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    color = hex_color.lstrip("#")
+    return int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+
+
+def _linearized_srgb_channel(value: int) -> float:
+    normalized = value / 255
+    if normalized <= 0.03928:
+        return normalized / 12.92
+    return ((normalized + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(hex_color: str) -> float:
+    r, g, b = _hex_to_rgb(hex_color)
+    return (
+        0.2126 * _linearized_srgb_channel(r)
+        + 0.7152 * _linearized_srgb_channel(g)
+        + 0.0722 * _linearized_srgb_channel(b)
+    )
+
+
+def _contrast_ratio(foreground_hex: str, background_hex: str) -> float:
+    fg_lum = _relative_luminance(foreground_hex)
+    bg_lum = _relative_luminance(background_hex)
+    lighter = max(fg_lum, bg_lum)
+    darker = min(fg_lum, bg_lum)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _nearest_color_hex(source_hex: str, candidates: Iterable[str]) -> str:
+    source = _hex_to_rgb(source_hex)
+    return min(candidates, key=lambda candidate: _rgb_distance(source, _hex_to_rgb(candidate)))
+
+
+def _contrast_candidate(
+    foreground_hex: str,
+    background_hex: str,
+    required_ratio: float,
+) -> Optional[dict]:
+    passing = [
+        color
+        for color in ALLOWED_TEXT_COLORS_HEX
+        if _contrast_ratio(color, background_hex) >= required_ratio
+    ]
+    if not passing:
+        return None
+    candidate = _nearest_color_hex(foreground_hex, passing)
+    return {
+        "foreground_hex": candidate,
+        "foreground_token": TEXT_COLOR_TOKEN_BY_HEX.get(candidate),
+        "background_hex": background_hex,
+        "recalculated_ratio": round(_contrast_ratio(candidate, background_hex), 2),
+        "required_ratio": required_ratio,
+    }
+
+
+def _allowed_text_color_candidate(color_hex: str) -> dict:
+    candidate = _nearest_color_hex(color_hex, ALLOWED_TEXT_COLORS_HEX)
+    return {
+        "color_hex": candidate,
+        "color_token": TEXT_COLOR_TOKEN_BY_HEX.get(candidate),
+        "allowed_colors_hex": sorted(ALLOWED_TEXT_COLORS_HEX),
+    }
+
+
+def _allowed_fill_color_candidate(color_hex: str) -> dict:
+    candidate = _nearest_color_hex(color_hex, ALLOWED_FILL_COLORS_HEX)
+    return {
+        "color_hex": candidate,
+        "color_token": FILL_COLOR_TOKEN_BY_HEX.get(candidate),
+        "allowed_colors_hex": sorted(ALLOWED_FILL_COLORS_HEX),
+    }
+
+
+def _rgb_tuple_to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02X}{:02X}{:02X}".format(*rgb)
+
+
+def _rgb_distance(first: tuple[int, int, int], second: tuple[int, int, int]) -> float:
+    return sum((a - b) ** 2 for a, b in zip(first, second)) ** 0.5
+
+
+def _rendered_slide_image_path(image_dir: Path, slide_idx: int) -> Optional[Path]:
+    candidates = [
+        image_dir / f"slide-{slide_idx:02d}.png",
+        image_dir / f"slide-{slide_idx:03d}.png",
+        image_dir / f"slide_{slide_idx:02d}.png",
+        image_dir / f"slide_{slide_idx:03d}.png",
+        image_dir / f"{slide_idx}.png",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _rendered_crop_for_bbox(ctx: LintContext, image: Image.Image, bbox_pt: tuple) -> Optional[Image.Image]:
+    x, y, w, h = bbox_pt
+    left = int(max(0, round(x / ctx.actual_w_pt * image.width)))
+    top = int(max(0, round(y / ctx.actual_h_pt * image.height)))
+    right = int(min(image.width, round((x + w) / ctx.actual_w_pt * image.width)))
+    bottom = int(min(image.height, round((y + h) / ctx.actual_h_pt * image.height)))
+    if right <= left or bottom <= top:
+        return None
+    return image.crop((left, top, right, bottom)).convert("RGB")
+
+
+def _dominant_rendered_contrast(crop: Image.Image) -> Optional[dict]:
+    sample = crop.copy()
+    sample.thumbnail(
+        (RENDERED_CONTRAST_MAX_SAMPLE_PX, RENDERED_CONTRAST_MAX_SAMPLE_PX),
+        Image.Resampling.LANCZOS,
+    )
+    if sample.width <= 0 or sample.height <= 0:
+        return None
+
+    quantized = sample.quantize(
+        colors=RENDERED_CONTRAST_PALETTE_COLORS,
+        method=Image.Quantize.MEDIANCUT,
+    ).convert("RGB")
+    counts = Counter(quantized.get_flattened_data())
+    if len(counts) < 2:
+        return None
+
+    total = sample.width * sample.height
+    background_rgb, background_count = counts.most_common(1)[0]
+    min_pixels = max(
+        RENDERED_CONTRAST_MIN_FOREGROUND_PIXELS,
+        int(total * RENDERED_CONTRAST_MIN_FOREGROUND_RATIO),
+    )
+    candidates = [
+        (rgb, count)
+        for rgb, count in counts.items()
+        if rgb != background_rgb
+        and count >= min_pixels
+        and _rgb_distance(rgb, background_rgb) >= 4
+    ]
+    if not candidates:
+        return None
+
+    foreground_rgb, foreground_count = max(
+        candidates,
+        key=lambda item: _rgb_distance(item[0], background_rgb),
+    )
+    foreground_hex = _rgb_tuple_to_hex(foreground_rgb)
+    background_hex = _rgb_tuple_to_hex(background_rgb)
+    return {
+        "text_hex": foreground_hex,
+        "background_hex": background_hex,
+        "contrast_ratio": round(_contrast_ratio(foreground_hex, background_hex), 2),
+        "foreground_pixels": foreground_count,
+        "background_pixels": background_count,
+        "sample_pixels": total,
+    }
+
+
 def _shape_fill_rgb_hex(shape) -> Optional[str]:
     try:
         fore_color = shape.fill.fore_color
     except (AttributeError, TypeError, ValueError):
         return None
     return _rgb_hex(fore_color)
+
+
+def _solid_shape_fill_rgb_hex(shape) -> Optional[str]:
+    try:
+        if shape.fill.type != MSO_FILL.SOLID:
+            return None
+    except (AttributeError, TypeError, ValueError):
+        return None
+    return _shape_fill_rgb_hex(shape)
+
+
+def _text_shape_background_rgb_hex(shape) -> tuple[Optional[str], str]:
+    try:
+        fill_type = shape.fill.type
+    except (AttributeError, TypeError, ValueError):
+        return DEFAULT_SLIDE_BACKGROUND_HEX, "slide_background_assumed"
+    if fill_type == MSO_FILL.SOLID:
+        fill_hex = _shape_fill_rgb_hex(shape)
+        if fill_hex:
+            return fill_hex, "shape_solid_fill"
+        return None, "unknown_solid_fill"
+    if fill_type in (None, MSO_FILL.BACKGROUND):
+        return DEFAULT_SLIDE_BACKGROUND_HEX, "slide_background_assumed"
+    return None, f"unsupported_fill_type:{fill_type}"
+
+
+def _text_record_background_rgb_hex(record: ShapeRecord, records: list[ShapeRecord]) -> tuple[Optional[str], str]:
+    own_background, own_source = _text_shape_background_rgb_hex(record.shape)
+    if own_source == "shape_solid_fill" or own_background is None:
+        return own_background, own_source
+
+    text_center = _bbox_center(record.bbox_pt)
+    candidates: list[tuple[float, ShapeRecord, str]] = []
+    unknown_covering_background = False
+    for candidate in records:
+        if candidate is record:
+            continue
+        if candidate.kind == "text":
+            continue
+        if not _point_in_bbox(text_center, candidate.bbox_pt):
+            continue
+        fill_hex = _solid_shape_fill_rgb_hex(candidate.shape)
+        if fill_hex:
+            candidates.append((_bbox_area(candidate.bbox_pt), candidate, fill_hex))
+            continue
+        if candidate.kind in {"image", "shape"}:
+            unknown_covering_background = True
+
+    if candidates:
+        _, candidate, fill_hex = min(candidates, key=lambda item: item[0])
+        return fill_hex, f"behind_solid_fill:{_shape_label(candidate)}"
+    if unknown_covering_background:
+        return None, "unknown_covering_background"
+    return own_background, own_source
 
 
 def _table_cell_fill_rgb_hexes(shape) -> dict[str, list[dict[str, int]]]:
@@ -601,6 +859,18 @@ def _iter_text_runs(shape):
                 for para in cell.text_frame.paragraphs:
                     for run in para.runs:
                         yield run, location
+
+
+def _text_frame_explicit_run_colors(text_frame) -> list[str]:
+    colors: set[str] = set()
+    for para in text_frame.paragraphs:
+        for run in para.runs:
+            if not run.text:
+                continue
+            hex_color = _rgb_hex(run.font.color)
+            if hex_color:
+                colors.add(hex_color)
+    return sorted(colors)
 
 
 def _c_nv_pr(shape):
@@ -718,6 +988,8 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
             {
                 "bbox_pt": [round(v, 2) for v in normalized],
                 "actual_bbox_pt": [round(v, 2) for v in bbox],
+                "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
+                "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
             },
         )
     )
@@ -749,6 +1021,8 @@ def check_safe_text_area(ctx, slide_idx, slide_id, shape, bbox, findings):
             {
                 "bbox_pt": [round(v, 2) for v in normalized],
                 "actual_bbox_pt": [round(v, 2) for v in bbox],
+                "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
+                "safe_text_area_pt": [round(v, 2) for v in SAFE_TEXT_AREA_PT],
             },
         )
     )
@@ -779,6 +1053,13 @@ def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings):
             {
                 "bbox_pt": [round(v, 2) for v in normalized],
                 "actual_bbox_pt": [round(v, 2) for v in bbox],
+                "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
+                "safe_margin_pt": {
+                    "left": SAFE_MARGIN_LEFT_PT,
+                    "right": SAFE_MARGIN_RIGHT_PT,
+                    "top": SAFE_MARGIN_TOP_PT,
+                    "bottom": SAFE_MARGIN_BOTTOM_PT,
+                },
             },
         )
     )
@@ -879,6 +1160,7 @@ def check_alt_text(slide_idx, slide_id, shape, findings):
         make_finding(
             "warning", "alt_text_required", slide_idx, slide_id, shape,
             "picture has no alt text title or description",
+            {"alt_title": title, "alt_description": descr},
         )
     )
 
@@ -893,6 +1175,7 @@ def check_autofit(slide_idx, slide_id, shape, findings):
         make_finding(
             "error", "text_autofit_disabled", slide_idx, slide_id, shape,
             f"text auto-size is {af} (must be NONE)",
+            {"auto_size": str(af), "expected_auto_size": "NONE"},
         )
     )
 
@@ -1030,9 +1313,22 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
         )
 
 
-def check_color(slide_idx, slide_id, shape, findings):
+def check_color(
+    ctx,
+    slide_idx,
+    slide_id,
+    record: ShapeRecord,
+    records: list[ShapeRecord],
+    findings,
+    *,
+    measure_structural_contrast: bool = True,
+):
+    shape = record.shape
     if shape.has_text_frame:
         bad_text_colors: dict = {}
+        low_contrast_runs: dict = {}
+        contrast_ratio_runs: dict = {}
+        background_hex, background_source = _text_record_background_rgb_hex(record, records)
         for para in shape.text_frame.paragraphs:
             for run in para.runs:
                 if not run.text:
@@ -1040,6 +1336,28 @@ def check_color(slide_idx, slide_id, shape, findings):
                 hex_color = _rgb_hex(run.font.color)
                 if hex_color and hex_color not in ALLOWED_TEXT_COLORS_HEX:
                     bad_text_colors[hex_color] = bad_text_colors.get(hex_color, 0) + 1
+                if not measure_structural_contrast or not hex_color or not background_hex:
+                    continue
+                size_pt = run.font.size.pt * ctx.font_scale if run.font.size is not None else None
+                threshold = (
+                    CONTRAST_RATIO_LARGE_TEXT_MIN
+                    if size_pt is not None and size_pt >= LARGE_TEXT_MIN_SIZE_PT
+                    else CONTRAST_RATIO_NORMAL_TEXT_MIN
+                )
+                ratio = _contrast_ratio(hex_color, background_hex)
+                key = (
+                    hex_color,
+                    background_hex,
+                    threshold,
+                    background_source,
+                    "large_text" if threshold == CONTRAST_RATIO_LARGE_TEXT_MIN else "normal_text",
+                    round(size_pt, 2) if size_pt is not None else None,
+                    round(ratio, 2),
+                )
+                if ratio < LOW_CONTRAST_RATIO_MAX:
+                    low_contrast_runs[key] = low_contrast_runs.get(key, 0) + 1
+                elif ratio < threshold:
+                    contrast_ratio_runs[key] = contrast_ratio_runs.get(key, 0) + 1
         for hex_color, count in bad_text_colors.items():
             findings.append(
                 make_finding(
@@ -1049,6 +1367,70 @@ def check_color(slide_idx, slide_id, shape, findings):
                         f"{sorted(ALLOWED_TEXT_COLORS_HEX)} ({count} run(s))"
                     ),
                     {"color_hex": hex_color, "runs": count},
+                )
+            )
+        for key, count in low_contrast_runs.items():
+            (
+                text_hex,
+                background_hex,
+                threshold,
+                background_source,
+                text_class,
+                size_pt,
+                ratio,
+            ) = key
+            findings.append(
+                make_finding(
+                    "error", "low_contrast", slide_idx, slide_id, shape,
+                    (
+                        f"text/background contrast ratio {ratio:.2f}:1 is below "
+                        f"unreadable threshold {LOW_CONTRAST_RATIO_MAX:.1f}:1 "
+                        f"for {text_class} ({count} run(s))"
+                    ),
+                    {
+                        "text_hex": text_hex,
+                        "foreground_hex": text_hex,
+                        "original_run_color_hex": text_hex,
+                        "background_hex": background_hex,
+                        "background_source": background_source,
+                        "contrast_ratio": ratio,
+                        "required_ratio": threshold,
+                        "low_contrast_threshold": LOW_CONTRAST_RATIO_MAX,
+                        "text_class": text_class,
+                        "font_size_pt": size_pt,
+                        "runs": count,
+                    },
+                )
+            )
+        for key, count in contrast_ratio_runs.items():
+            (
+                text_hex,
+                background_hex,
+                threshold,
+                background_source,
+                text_class,
+                size_pt,
+                ratio,
+            ) = key
+            findings.append(
+                make_finding(
+                    "warning", "contrast_ratio", slide_idx, slide_id, shape,
+                    (
+                        f"text/background contrast ratio {ratio:.2f}:1 is below "
+                        f"required {threshold:.1f}:1 for {text_class} ({count} run(s))"
+                    ),
+                    {
+                        "text_hex": text_hex,
+                        "foreground_hex": text_hex,
+                        "original_run_color_hex": text_hex,
+                        "background_hex": background_hex,
+                        "background_source": background_source,
+                        "contrast_ratio": ratio,
+                        "required_ratio": threshold,
+                        "text_class": text_class,
+                        "font_size_pt": size_pt,
+                        "runs": count,
+                    },
                 )
             )
 
@@ -1074,7 +1456,77 @@ def check_color(slide_idx, slide_id, shape, findings):
                 ),
                 {"color_hex": fill_hex, "scope": "table_cell", "cells": cells},
             )
+            )
+
+
+def check_rendered_contrast(
+    ctx,
+    slide_idx,
+    slide_id,
+    record: ShapeRecord,
+    image: Image.Image,
+    image_path: Path,
+    findings,
+):
+    shape = record.shape
+    if not shape.has_text_frame:
+        return
+    if not shape.text_frame.text.strip():
+        return
+    crop = _rendered_crop_for_bbox(ctx, image, record.actual_bbox_pt)
+    if crop is None:
+        return
+    measured = _dominant_rendered_contrast(crop)
+    if measured is None:
+        return
+
+    size_pt = _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
+    threshold = (
+        CONTRAST_RATIO_LARGE_TEXT_MIN
+        if size_pt is not None and size_pt >= LARGE_TEXT_MIN_SIZE_PT
+        else CONTRAST_RATIO_NORMAL_TEXT_MIN
+    )
+    ratio = measured["contrast_ratio"]
+    if ratio >= threshold:
+        return
+
+    text_class = "large_text" if threshold == CONTRAST_RATIO_LARGE_TEXT_MIN else "normal_text"
+    check_id = "low_contrast" if ratio < LOW_CONTRAST_RATIO_MAX else "contrast_ratio"
+    severity = "error" if check_id == "low_contrast" else "warning"
+    if check_id == "low_contrast":
+        message = (
+            f"rendered text/background contrast ratio {ratio:.2f}:1 is below "
+            f"unreadable threshold {LOW_CONTRAST_RATIO_MAX:.1f}:1 for {text_class}"
         )
+    else:
+        message = (
+            f"rendered text/background contrast ratio {ratio:.2f}:1 is below "
+            f"required {threshold:.1f}:1 for {text_class}"
+        )
+    detail = {
+        **measured,
+        "measurement": "rendered_image",
+        "rendered_image_path": str(image_path),
+        "foreground_hex": measured["text_hex"],
+        "original_run_colors_hex": _text_frame_explicit_run_colors(shape.text_frame),
+        "required_ratio": threshold,
+        "low_contrast_threshold": LOW_CONTRAST_RATIO_MAX,
+        "text_class": text_class,
+        "font_size_pt": round(size_pt, 2) if size_pt is not None else None,
+        "bbox_pt": [round(v, 2) for v in record.bbox_pt],
+        "actual_bbox_pt": [round(v, 2) for v in record.actual_bbox_pt],
+    }
+    findings.append(
+        make_finding(
+            severity,
+            check_id,
+            slide_idx,
+            slide_id,
+            shape,
+            message,
+            detail,
+        )
+    )
 
 
 def extract_structure_relations(records: list[ShapeRecord]) -> list[StructureRelation]:
@@ -1413,6 +1865,7 @@ def lint_pptx(
     *,
     profile: str = "default",
     policy: Optional[LintPolicy] = None,
+    rendered_image_dir: Optional[Path] = None,
 ) -> List[Finding]:
     if policy is None:
         try:
@@ -1425,6 +1878,12 @@ def lint_pptx(
     actual_w = emu_to_pt(prs.slide_width)
     actual_h = emu_to_pt(prs.slide_height)
     ctx = make_context(actual_w, actual_h, policy=policy)
+    rendered_images: dict[int, tuple[Path, Image.Image]] = {}
+    if rendered_image_dir is not None:
+        for idx in range(1, len(prs.slides) + 1):
+            image_path = _rendered_slide_image_path(rendered_image_dir, idx)
+            if image_path is not None:
+                rendered_images[idx] = (image_path, Image.open(image_path).convert("RGB"))
     if not ctx.proportional_to_base:
         findings.append(
             Finding(
@@ -1454,6 +1913,7 @@ def lint_pptx(
                 make_finding(
                     "error", "animation_present", idx, slide_id, None,
                     "slide contains animation/transition XML: " + ", ".join(markers),
+                    {"markers": markers},
                 )
             )
         records: list[ShapeRecord] = []
@@ -1486,7 +1946,26 @@ def lint_pptx(
             check_font(ctx, idx, slide_id, shape, findings)
             check_line_height(ctx, idx, slide_id, shape, findings)
             check_alignment(ctx, idx, slide_id, shape, findings)
-            check_color(idx, slide_id, shape, findings)
+            check_color(
+                ctx,
+                idx,
+                slide_id,
+                record,
+                records,
+                findings,
+                measure_structural_contrast=rendered_image_dir is None,
+            )
+            if idx in rendered_images:
+                image_path, rendered_image = rendered_images[idx]
+                check_rendered_contrast(
+                    ctx,
+                    idx,
+                    slide_id,
+                    record,
+                    rendered_image,
+                    image_path,
+                    findings,
+                )
             if not overflowed:
                 check_text_vertical_balance(ctx, idx, slide_id, shape, bbox, findings)
 
@@ -1651,6 +2130,179 @@ def filter_by_severity(findings: List[Finding], min_sev: str) -> List[Finding]:
     return findings
 
 
+MANUAL_REQUIRED_REASONS = {
+    "slide_size": "slide canvas change can reflow all content",
+    "animation_present": "static delivery impact requires author decision",
+    "overflow_text": "requires layout or copy decision",
+    "overflow_shapes": "requires visual layout decision",
+    "overflow_images": "requires crop or placement decision",
+    "safe_text_area_text": "requires layout hierarchy decision",
+    "safe_margins": "requires placement decision",
+    "image_aspect_distortion": "requires source image or crop decision",
+    "image_upscale_ratio": "requires higher-resolution image or size decision",
+    "alt_text_required": "requires semantic description from author",
+    "font_family": "font replacement can affect text metrics and brand intent",
+    "font_size_scale": "font size snapping requires layout fit review",
+    "line_height": "line spacing change requires text fit review",
+    "alignment_left_top": "alignment can be intentional and needs visual review",
+    "text_color_allowlist": "color substitution requires semantic and brand review",
+    "background_color_palette": "fill color substitution requires brand review",
+    "contrast_ratio": "contrast repair requires foreground/background design decision",
+    "low_contrast": "unreadable contrast requires visual design decision",
+    "text_overlap": "overlap repair requires layout decision",
+    "object_overlap": "overlap repair requires layout decision",
+    "object_gap_too_small": "spacing repair requires layout decision",
+    "alignment_drift": "alignment repair requires grouping intent review",
+    "inner_padding_imbalance": "container padding repair requires composition review",
+    "text_vertical_balance": "vertical balance repair requires visual review",
+}
+
+
+def _geometry_auto_fixable(evidence: dict) -> bool:
+    if evidence.get("affected_slides"):
+        return False
+    drifted = evidence.get("drifted")
+    if not isinstance(drifted, dict) or not drifted:
+        return False
+    return all(abs(value - round(value)) < 0.1 for value in drifted.values())
+
+
+def _fixability_for_json(check: str, evidence: dict) -> dict:
+    if check == "text_autofit_disabled":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "autofit",
+            "fixability_reason": "mechanical text_frame.auto_size NONE change",
+        }
+    if check == "geometry_rounding" and _geometry_auto_fixable(evidence):
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "geometry",
+            "fixability_reason": "all drifted geometry values are within 0.1pt of integer coordinates",
+        }
+    if check == "geometry_rounding":
+        reason = "geometry delta is not within the safe auto-rounding tolerance"
+        return {
+            "fixability": "manual_required",
+            "fixability_rule": "geometry",
+            "fixability_reason": reason,
+            "manual_required_reason": reason,
+        }
+    reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
+    return {
+        "fixability": "manual_required",
+        "fixability_rule": None,
+        "fixability_reason": reason,
+        "manual_required_reason": reason,
+    }
+
+
+def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
+    if check == "text_autofit_disabled":
+        return {"auto_size": "NONE"}
+    if check == "geometry_rounding":
+        candidate: dict = {}
+        if isinstance(evidence.get("drifted"), dict):
+            candidate["rounded_values_pt"] = {
+                key: round(value) for key, value in evidence["drifted"].items()
+            }
+        if isinstance(evidence.get("bbox_pt"), list) and len(evidence["bbox_pt"]) == 4:
+            candidate["rounded_bbox_pt"] = [round(value) for value in evidence["bbox_pt"]]
+        return candidate or None
+    if check == "font_family":
+        return {
+            "allowed_font_families": list(ALLOWED_FONT_FAMILIES),
+            "candidate_font_family": ALLOWED_FONT_FAMILIES[0],
+        }
+    if check == "font_size_scale":
+        return {
+            "size_pt": evidence.get("nearest_allowed_size_pt"),
+            "allowed_size_scale_pt": sorted(ALLOWED_FONT_SIZES_PT),
+        }
+    if check == "line_height":
+        return {"allowed_line_heights_pt": sorted(ALLOWED_LINE_HEIGHTS_PT)}
+    if check == "alignment_left_top":
+        candidate = {}
+        if "alignment" in evidence:
+            candidate["alignment"] = "LEFT"
+        if "vertical_anchor" in evidence:
+            candidate["vertical_anchor"] = "TOP"
+        return candidate or None
+    if check == "text_color_allowlist" and evidence.get("color_hex"):
+        return _allowed_text_color_candidate(evidence["color_hex"])
+    if check == "background_color_palette" and evidence.get("color_hex"):
+        return _allowed_fill_color_candidate(evidence["color_hex"])
+    if check in {"contrast_ratio", "low_contrast"}:
+        foreground = evidence.get("foreground_hex") or evidence.get("text_hex")
+        background = evidence.get("background_hex")
+        required = evidence.get("required_ratio")
+        if foreground and background and required:
+            candidate = _contrast_candidate(foreground, background, required)
+            if candidate is not None:
+                candidate["candidate_token"] = candidate.get("foreground_token")
+            return candidate
+    return None
+
+
+def _measurement_confidence_for_json(evidence: dict) -> Optional[dict]:
+    if evidence.get("measurement") != "rendered_image":
+        return None
+    sample_pixels = evidence.get("sample_pixels") or 0
+    foreground_pixels = evidence.get("foreground_pixels") or 0
+    foreground_ratio = foreground_pixels / sample_pixels if sample_pixels else 0
+    if foreground_pixels >= 50 and foreground_ratio >= 0.005:
+        level = "medium"
+    else:
+        level = "low"
+    return {
+        "level": level,
+        "method": "dominant_rendered_crop_palette",
+        "foreground_pixels": foreground_pixels,
+        "background_pixels": evidence.get("background_pixels"),
+        "sample_pixels": sample_pixels,
+        "foreground_ratio": round(foreground_ratio, 4),
+        "palette_colors": RENDERED_CONTRAST_PALETTE_COLORS,
+        "limitations": "dominant colors are measured from the rendered text bbox crop",
+    }
+
+
+def _evidence_for_json(check: str, detail: dict) -> dict:
+    evidence = dict(detail or {})
+    if "text_hex" in evidence and "foreground_hex" not in evidence:
+        evidence["foreground_hex"] = evidence["text_hex"]
+    if evidence.get("foreground_hex"):
+        evidence["foreground_token"] = TEXT_COLOR_TOKEN_BY_HEX.get(evidence["foreground_hex"])
+    if evidence.get("background_hex"):
+        evidence["background_token"] = (
+            FILL_COLOR_TOKEN_BY_HEX.get(evidence["background_hex"])
+            or TEXT_COLOR_TOKEN_BY_HEX.get(evidence["background_hex"])
+        )
+    if check in {"contrast_ratio", "low_contrast"} and "original_run_color_hex" not in evidence:
+        evidence["original_run_color_hex"] = evidence.get("foreground_hex")
+    return evidence
+
+
+def finding_to_json_dict(finding: Finding) -> dict:
+    raw = asdict(finding)
+    evidence = _evidence_for_json(finding.check, finding.detail)
+    fixability = _fixability_for_json(finding.check, evidence)
+    candidate_values = _candidate_values_for_json(finding.check, evidence)
+    measurement_confidence = _measurement_confidence_for_json(evidence)
+    schema_detail = {
+        **evidence,
+        "check_id": finding.check,
+        "evidence": evidence,
+        "fixability": fixability["fixability"],
+        "fixability_rule": fixability.get("fixability_rule"),
+        "fixability_reason": fixability.get("fixability_reason"),
+        "candidate_values": candidate_values,
+        "manual_required_reason": fixability.get("manual_required_reason"),
+        "measurement_confidence": measurement_confidence,
+    }
+    raw["detail"] = schema_detail
+    return raw
+
+
 # ---- CLI -------------------------------------------------------------------
 
 
@@ -1686,6 +2338,14 @@ def main(argv: List[str]) -> int:
         default="default",
         help="lint policy profile (default: default)",
     )
+    ap.add_argument(
+        "--rendered-image-dir",
+        type=Path,
+        help=(
+            "directory containing PowerPoint-rendered slide PNGs "
+            "(slide-01.png, slide-001.png, or 1.png) for rendered contrast lint"
+        ),
+    )
     args = ap.parse_args(argv)
 
     if not args.pptx.exists():
@@ -1697,13 +2357,17 @@ def main(argv: List[str]) -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return 0
 
-    findings = lint_pptx(args.pptx, profile=args.profile)
+    findings = lint_pptx(
+        args.pptx,
+        profile=args.profile,
+        rendered_image_dir=args.rendered_image_dir,
+    )
     if not args.no_consolidate:
         findings = consolidate_recurring(findings, min_slides=args.min_recurring_slides)
     selected = filter_by_severity(findings, args.severity)
 
     if args.json:
-        payload: List[Any] = [asdict(f) for f in selected]
+        payload: List[Any] = [finding_to_json_dict(f) for f in selected]
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(format_text(selected), end="")

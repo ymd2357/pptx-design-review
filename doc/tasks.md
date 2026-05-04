@@ -50,12 +50,12 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | --- | --- | --- | --- | --- | --- |
 | P0-1 | `text_encoding` | implemented_priority | automated | manual_review | 文字化けで読めない |
 | P0-2 | `text_overlap` | implemented_lint | automated | manual_review | 文字衝突で読めない |
-| P0-3 | `low_contrast` | planned | manual_review | manual_review | 読めないコントラスト |
+| P0-3 | `low_contrast` | implemented_lint | automated | manual_review | 読めないコントラスト |
 | P0-4 | `overflow_text` | implemented_lint | automated | manual_review | テキストが切れて読めない |
 | P1-1 | `animation_present` | implemented_lint | automated | manual_review | 静的配布で失われる情報 |
 | P1-2 | `alt_text_required` | implemented_lint | automated | manual_review | 意味を持つ画像の代替テキスト欠落 |
 | P1-3 | `color_only_meaning` | manual_defined | manual_review | manual_review | 色だけで意味を伝えている |
-| P1-4 | `contrast_ratio` | manual_defined | manual_review | manual_review | コントラスト不足 |
+| P1-4 | `contrast_ratio` | implemented_lint | automated | manual_review | コントラスト不足 |
 | P1-5 | `heading_hierarchy_broken` | planned | manual_review | manual_review | 見出し階層崩れ |
 | P1-6 | `image_aspect_distortion` | implemented_lint | automated | manual_review | 画像の縦横比崩れ |
 | P1-7 | `key_area_cropped` | planned | manual_review | manual_review | 画像重要部の欠け |
@@ -222,16 +222,146 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | n/a | `review-images/`, `before.txt`, `after.txt`, `priorities-after.md` | legacy_evidence | 初期確認ログ。観点別採用判断へ復元するときの補助材料。 |
 | n/a | `powerpoint-test/`, `.pptx.bak`, `.DS_Store` | local_noise | 採用判断の根拠にしない。 |
 
+### REV-016 観点別レビュー判定表
+
+復元用の生成物は
+`tmp/review/260329-seminar-curriculum-proposal/rev-016-lint-timeline.tsv`
+と
+`tmp/review/260329-seminar-curriculum-proposal/rev-016-artifact-map.tsv`
+に置く。どちらもローカル evidence であり git には入れない。
+
+判定:
+
+- `done`: 修正またはルール評価が後続の正本候補に反映済み。
+- `inferred_done`: 最新 lint / priority では検出 0 件だが、
+  個別の目視 evidence は復元できていない。
+- `remaining`: 最新 lint に残件があり、許容または修正判断が残る。
+- `not_recorded`: 手動レビュー観点として定義済みだが、この deck での
+  evidence が復元できていない。
+- `not_applicable`: この deck の確認対象外。
+
+最新 lint 件数は `REV-015` の `p2-15-after-lint.json` を基準にする。
+`REV-014` の `p2-14-after-lint.json` は `alignment_left_top` 2 件を含むため、
+正本系列の採用状態としては使わない。
+
+| 観点No | ID | 判定 | 最新 lint | 目視確認 | 対応 REV | 根拠 / メモ |
+| --- | --- | --- | ---: | --- | --- | --- |
+| P0-1 | `text_encoding` | inferred_done | n/a | automated_only | `REV-015` | `p2-15-after-priorities.json` で P0/P1 なし。 |
+| P0-2 | `text_overlap` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P0-3 | `low_contrast` | remaining | 21 | rendered_automated | `REV-017` | `rev-017-rendered-contrast-lint.json` で PowerPoint 書き出し画像から `low_contrast` を機械検出。P0 修正対象。 |
+| P0-4 | `overflow_text` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-1 | `animation_present` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-2 | `alt_text_required` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-3 | `color_only_meaning` | not_recorded | n/a | not_recorded | n/a | manual_defined 観点。色以外の手掛かり確認は未記録。 |
+| P1-4 | `contrast_ratio` | remaining | 9 | rendered_automated | `REV-017` | `rev-017-rendered-contrast-lint.json` で PowerPoint 書き出し画像から `contrast_ratio` を機械検出。 |
+| P1-5 | `heading_hierarchy_broken` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。階層の目視判定は未記録。 |
+| P1-6 | `image_aspect_distortion` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-7 | `key_area_cropped` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。重要部トリミングの個別判定は未記録。 |
+| P1-8 | `line_height` | done | 0 | visual_done | `REV-006` | `p0-p2-6-*.pptx` と `p2-6-powerpoint-review-images/`。 |
+| P1-9 | `missing_required_element` | not_recorded | n/a | not_recorded | n/a | planned 観点。必須要素の deck 別判定は未記録。 |
+| P1-10 | `object_overlap` | done | 0 | automated_only | `REV-009` | `p2-9-evaluation-structure.json` で構造メタ化。最新 lint で未検出。 |
+| P1-11 | `overflow_images` | done | 0 | automated_only | `REV-010` | 装飾ラスター除外ルールで解消。最新 lint で未検出。 |
+| P1-12 | `overflow_shapes` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-13 | `reading_order` | not_recorded | n/a | not_recorded | n/a | manual_defined 観点。Selection Pane 順序の evidence は未記録。 |
+| P1-14 | `text_autofit_disabled` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P1-15 | `wrap_break_changes_meaning` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。意味が変わる折返しの目視判定は未記録。 |
+| P2-1 | `object_gap_too_small` | done | 0 | visual_done | `REV-012` | `p0-p2-12-object-gap-fixed.pptx` と `p2-12-review-images/`。 |
+| P2-2 | `background_color_palette` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P2-3 | `font_family` | done | 0 | visual_done | `REV-007` | `p0-p2-7-font-family-fixed.pptx` と PowerPoint review images。 |
+| P2-4 | `font_size_scale` | done | 0 | visual_done | `REV-008` | `p0-p2-8-font-size-fixed.pptx` と PowerPoint review images。 |
+| P2-5 | `image_upscale_ratio` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P2-6 | `inner_padding_imbalance` | remaining | 17 | needs_visual_judgment | `REV-015` | 最新 lint 残件。許容または修正判断が必要。 |
+| P2-7 | `safe_margins` | remaining | 1 | needs_visual_judgment | `REV-015` | 最新 lint 残件。テンプレート意図の確認が必要。 |
+| P2-8 | `safe_text_area_text` | remaining | 27 | needs_visual_judgment | `REV-015` | 最新 lint 残件。安全領域外テキストの許容判断が必要。 |
+| P2-9 | `slide_size` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P2-10 | `text_color_allowlist` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
+| P2-11 | `alignment_left_top` | done | 0 | visual_done | `REV-013` | `p0-p2-13-left-align-fixed.pptx`。`REV-014` の 2 件残りは正本系列に採用しない。 |
+| P2-12 | `alignment_drift` | remaining | 89 | needs_visual_judgment | `REV-015` | 最新 lint 残件。マスター/スタイル起因か許容差かを確認する。 |
+| P2-13 | `text_vertical_balance` | done | 0 | automated_only | `REV-013`, `REV-014` | `REV-013` 系列で 0 件。`REV-014` はルール evidence のみで正本採用には使わない。 |
+| P3-1 | `geometry_rounding` | remaining | 129 | visual_done | `REV-015` | 残件は `.25/.5/.75pt` 単位。auto-fix 対象外として defer。 |
+
 ## Next
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
-| REV-016 | todo | P0 | 既存 artifact/evidence から観点別レビュー判定表を復元する | `P0-*` / `P1-*` / `P2-1`〜`P2-13` / `P3-1` ごとに、最新 lint 件数、目視確認、判断、根拠 artifact、対応 REV が一覧化され、採用済み・不採用・要再確認が区別されている |
+| LINT-007 | todo | P0 | lint finding の evidence schema を全チェック横断で設計・実装する | 各 finding が、検出理由、対象要素、値、閾値、根拠画像、修正可否、候補値、レビュー判断状態を共通 schema で出力し、auto-fix や目視レビューに使える粒度で JSON に残る |
+| REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点だけを目視判定する | 機械検出した `P0-3`, `P1-4` のコントラスト残件と、`not_recorded` の手動観点 (`P1-3`, `P1-5`, `P1-7`, `P1-9`, `P1-13`, `P1-15`) と、最新 lint 残件のうち目視判断が必要な `P2-6`, `P2-7`, `P2-8`, `P2-12` について、許容・修正・対象外の判断が PowerPoint 書き出し evidence とともに記録されている |
+
+### LINT-007 evidence schema 方針
+
+目的:
+
+- lint finding を単なる警告文ではなく、修正判断に使える evidence として
+  残す。
+- `low_contrast` / `contrast_ratio` だけでなく、全チェックで
+  「なぜ検出したか」「自動修正してよいか」「何をどう直す候補があるか」を
+  追跡できるようにする。
+- deck 固有のレビューと、汎用 lint / fix 実装を分離し、
+  一回限りの置換スクリプトに依存しない。
+
+共通 schema に入れる項目:
+
+- `check`, `severity`, `priority`, `review_status`
+- `slide_index`, `slide_id`, `shape_id`, `shape_name`, `shape_kind`
+- `text_excerpt` または対象要素の説明
+- `bbox_pt`, `actual_bbox_pt`, `rendered_bbox_px`
+- `measured_value`, `threshold`, `delta`, `unit`
+- `evidence_source`: `pptx_xml` / `rendered_image` / `structure_json` /
+  `manual_review`
+- `evidence_confidence`: `high` / `medium` / `low`
+- `fixability`: `auto_fix_candidate` / `manual_required` /
+  `not_applicable` / `decorative_review`
+- `candidate_values`: guideline token、hex、pt、座標などの候補と
+  各候補の検証値
+- `recommended_value` と、その採用理由
+- `group_key`: 同一テンプレート由来・同一原因の finding を束ねるキー
+- `artifact_refs`: rendered PNG、annotation PNG、structure JSON などの
+  ローカル evidence パス
+
+作業:
+
+- [x] 既存 `Finding.detail` の項目を棚卸しし、チェック別に不足項目を表にする。
+- [x] `doc/slide-guideline-v1.yml` に evidence schema と
+      check 別必須 evidence を定義する。
+- [ ] `pptx_lint.py` の finding 出力を共通 schema に寄せる。
+- [ ] `pptx_review_priorities.py` が共通 schema から priority evidence を
+      作るようにする。
+- [ ] `pptx_fix.py` の auto-fix 候補判定が `fixability` と
+      `candidate_values` を参照できるようにする。
+- [ ] `low_contrast` / `contrast_ratio` では、rendered image の
+      foreground/background、元 run 色、候補 token、再計算 ratio を残す。
+- [ ] `object_overlap`, `alignment_drift`, `inner_padding_imbalance`,
+      `safe_*`, `font_*`, `geometry_rounding` でも、修正候補または
+      manual_required 理由を残す。
+- [ ] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを
+      検証する。
+
+完了条件:
+
+- `pptx_lint.py --json` の全 finding が共通 schema 必須項目を持つ。
+- `--rendered-image-dir` を使う check は、画像 evidence と測定信頼度を
+  JSON に残す。
+- auto-fix 可能な finding と手動判断が必要な finding が JSON だけで
+  区別できる。
+- `REV-017` の判断に必要な contrast evidence が、annotation 画像だけでなく
+  JSON からも追える。
+
+REV-017 準備済み artifact:
+
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/index.html`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-manual-review-checklist.tsv`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-lint-focus.tsv`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-rendered-contrast-lint.json`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-rendered-contrast-priorities.json`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-rendered-contrast-focus.tsv`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-rendered-contrast-annotated/index.html`
+- `tmp/review/260329-seminar-curriculum-proposal/rev-017-manual-review/rev-017-rendered-contrast-annotated/contrast-overview.png`
 
 ## Done
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
+| REV-016 | done | P0 | 既存 artifact/evidence から観点別レビュー判定表を復元する | `P0-*` / `P1-*` / `P2-1`〜`P2-13` / `P3-1` ごとに、最新 lint 件数、目視確認、判断、根拠 artifact、対応 REV が一覧化され、採用済み・不採用・要再確認が区別されている |
 | LINT-005 | done | P2 | オブジェクト間の位置関係チェックを設計・実装する | 単一PPTX内で text box / shape / image / table の重なり、近接不足、揃い崩れ、カード内余白の不均衡を検出する方針が YAML に定義され、チェックまたは明示的な手動レビュー手順と回帰テストが追加されている |
 | LINT-006 | done | P2 | テキストボックス内の収まり・余白バランスチェックを設計・実装する | 単一PPTX内で font size / line height / text box height / internal margin / vertical anchor の組み合わせを評価し、フォントサイズ変更とテキストボックスサイズ変更を一方が他方に内包されない対等な変更対象としてセットで判断する方針が YAML に定義され、文字が収まっていても上下余白や視覚中心が不自然なケースを検出するチェックまたは明示的な手動レビュー手順と回帰テストが追加されている |
 | PRI-001 | done | P0 | P0-P3 判定体系をレビュー観点から棚卸しする | `rules.lint.priorities` と `rules.lint.priority_catalog` に Pn 規範、既存 lint ID、未実装候補の分類を定義し、`pptx_review_priorities.py` が catalog を参照する |

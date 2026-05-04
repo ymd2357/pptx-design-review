@@ -1,0 +1,109 @@
+#!/usr/bin/env python3
+"""Focused tests for pptx_fix evidence-schema fixability consumption."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+HERE = Path(__file__).parent
+sys.path.insert(0, str(HERE))
+
+import pptx_fix  # noqa: E402
+
+
+def _action() -> pptx_fix.FixAction:
+    return pptx_fix.FixAction(
+        rule="geometry",
+        slide_index=2,
+        slide_id=256,
+        shape_id=42,
+        shape_name="drift-box",
+        before={"left": 81.05},
+        after={"left": 81.0},
+    )
+
+
+def _finding(detail: dict) -> SimpleNamespace:
+    return SimpleNamespace(
+        check="geometry_rounding",
+        slide_index=2,
+        slide_id=256,
+        shape_id=42,
+        shape_name="drift-box",
+        detail=detail,
+    )
+
+
+def main() -> int:
+    failures: list[str] = []
+
+    auto_fixable = pptx_fix._apply_matching_finding_fixability(
+        _action(),
+        [
+            _finding(
+                {
+                    "fixability": "auto_fix_candidate",
+                    "candidate_values": [{"field": "left", "value_pt": 81.0}],
+                }
+            )
+        ],
+    )
+    if auto_fixable.status != "apply":
+        failures.append(
+            f"auto_fix_candidate with candidates should apply; got {auto_fixable.status}"
+        )
+
+    manual = pptx_fix._apply_matching_finding_fixability(
+        _action(),
+        [
+            _finding(
+                {
+                    "fixability": "manual_required",
+                    "manual_required_reason": "intentional_half_pt_grid",
+                }
+            )
+        ],
+    )
+    if manual.status != "manual_required":
+        failures.append(
+            f"manual_required finding should block apply; got {manual.status}"
+        )
+    if "intentional_half_pt_grid" not in manual.reasons:
+        failures.append(f"manual_required reason was not preserved: {manual.reasons}")
+
+    missing_candidates = pptx_fix._apply_matching_finding_fixability(
+        _action(),
+        [_finding({"fixability": "auto_fix_candidate"})],
+    )
+    if missing_candidates.status != "manual_required":
+        failures.append(
+            "auto_fix_candidate without candidate_values should require manual review"
+        )
+    if "missing_candidate_values" not in missing_candidates.reasons:
+        failures.append(
+            f"missing candidate_values reason was not preserved: {missing_candidates.reasons}"
+        )
+
+    legacy = pptx_fix._apply_matching_finding_fixability(
+        _action(),
+        [_finding({"measured_value": 81.05, "threshold": "integer_pt"})],
+    )
+    if legacy.status != "apply" or legacy.reasons:
+        failures.append(
+            f"legacy finding should fall back to detector decision; got {legacy.status} {legacy.reasons}"
+        )
+
+    if failures:
+        print("FAIL:")
+        for line in failures:
+            print(f"- {line}")
+        return 1
+
+    print("OK: pptx_fix consumes evidence-schema fixability with legacy fallback")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
