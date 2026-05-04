@@ -4,7 +4,7 @@ The canonical task ledger is `doc/tasks.md`.
 
 This file exists for repository initialization tooling and pre-commit discovery.
 
-## Active
+## Recently Completed
 
 ### LINT-007: lint finding の evidence schema を全チェック横断で設計・実装する
 
@@ -31,15 +31,15 @@ This file exists for repository initialization tooling and pre-commit discovery.
 - [x] 既存 `Finding.detail` の項目を棚卸しし、チェック別に不足項目を表にする。
 - [x] `doc/slide-guideline-v1.yml` に evidence schema と
       check 別必須 evidence を定義する。
-- [ ] `pptx_lint.py` の finding 出力を共通 schema に寄せる。
-- [ ] `pptx_review_priorities.py` が共通 schema から priority evidence を
+- [x] `pptx_lint.py` の finding 出力を共通 schema に寄せる。
+- [x] `pptx_review_priorities.py` が共通 schema から priority evidence を
       作るようにする。
-- [ ] `pptx_fix.py` の auto-fix 候補判定が `fixability` と
+- [x] `pptx_fix.py` の auto-fix 候補判定が `fixability` と
       `candidate_values` を参照できるようにする。
-- [ ] `low_contrast` / `contrast_ratio` では、rendered image の
+- [x] `low_contrast` / `contrast_ratio` では、rendered image の
       foreground/background、元 run 色、候補 token、再計算 ratio を残す。
-- [ ] その他の主要 check でも、修正候補または manual_required 理由を残す。
-- [ ] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを
+- [x] その他の主要 check でも、修正候補または manual_required 理由を残す。
+- [x] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを
       検証する。
 
 完了条件:

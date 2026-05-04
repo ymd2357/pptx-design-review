@@ -284,7 +284,6 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
-| LINT-007 | todo | P0 | lint finding の evidence schema を全チェック横断で設計・実装する | 各 finding が、検出理由、対象要素、値、閾値、根拠画像、修正可否、候補値、レビュー判断状態を共通 schema で出力し、auto-fix や目視レビューに使える粒度で JSON に残る |
 | REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点だけを目視判定する | 機械検出した `P0-3`, `P1-4` のコントラスト残件と、`not_recorded` の手動観点 (`P1-3`, `P1-5`, `P1-7`, `P1-9`, `P1-13`, `P1-15`) と、最新 lint 残件のうち目視判断が必要な `P2-6`, `P2-7`, `P2-8`, `P2-12` について、許容・修正・対象外の判断が PowerPoint 書き出し evidence とともに記録されている |
 
 ### LINT-007 evidence schema 方針
@@ -323,17 +322,17 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 - [x] 既存 `Finding.detail` の項目を棚卸しし、チェック別に不足項目を表にする。
 - [x] `doc/slide-guideline-v1.yml` に evidence schema と
       check 別必須 evidence を定義する。
-- [ ] `pptx_lint.py` の finding 出力を共通 schema に寄せる。
-- [ ] `pptx_review_priorities.py` が共通 schema から priority evidence を
+- [x] `pptx_lint.py` の finding 出力を共通 schema に寄せる。
+- [x] `pptx_review_priorities.py` が共通 schema から priority evidence を
       作るようにする。
-- [ ] `pptx_fix.py` の auto-fix 候補判定が `fixability` と
+- [x] `pptx_fix.py` の auto-fix 候補判定が `fixability` と
       `candidate_values` を参照できるようにする。
-- [ ] `low_contrast` / `contrast_ratio` では、rendered image の
+- [x] `low_contrast` / `contrast_ratio` では、rendered image の
       foreground/background、元 run 色、候補 token、再計算 ratio を残す。
-- [ ] `object_overlap`, `alignment_drift`, `inner_padding_imbalance`,
+- [x] `object_overlap`, `alignment_drift`, `inner_padding_imbalance`,
       `safe_*`, `font_*`, `geometry_rounding` でも、修正候補または
       manual_required 理由を残す。
-- [ ] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを
+- [x] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを
       検証する。
 
 完了条件:
@@ -361,6 +360,7 @@ REV-017 準備済み artifact:
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
+| LINT-007 | done | P0 | lint finding の evidence schema を全チェック横断で設計・実装する | 各 finding が、検出理由、対象要素、値、閾値、根拠画像、修正可否、候補値、レビュー判断状態を共通 schema で出力し、auto-fix や目視レビューに使える粒度で JSON に残る |
 | REV-016 | done | P0 | 既存 artifact/evidence から観点別レビュー判定表を復元する | `P0-*` / `P1-*` / `P2-1`〜`P2-13` / `P3-1` ごとに、最新 lint 件数、目視確認、判断、根拠 artifact、対応 REV が一覧化され、採用済み・不採用・要再確認が区別されている |
 | LINT-005 | done | P2 | オブジェクト間の位置関係チェックを設計・実装する | 単一PPTX内で text box / shape / image / table の重なり、近接不足、揃い崩れ、カード内余白の不均衡を検出する方針が YAML に定義され、チェックまたは明示的な手動レビュー手順と回帰テストが追加されている |
 | LINT-006 | done | P2 | テキストボックス内の収まり・余白バランスチェックを設計・実装する | 単一PPTX内で font size / line height / text box height / internal margin / vertical anchor の組み合わせを評価し、フォントサイズ変更とテキストボックスサイズ変更を一方が他方に内包されない対等な変更対象としてセットで判断する方針が YAML に定義され、文字が収まっていても上下余白や視覚中心が不自然なケースを検出するチェックまたは明示的な手動レビュー手順と回帰テストが追加されている |
