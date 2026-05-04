@@ -194,10 +194,39 @@ Pn は finding 数ではなく、納品物への影響度で決める。
   (b) `alignment_drift` 再発系の根本原因 (マスター/スタイル) を直すかの
   どちらかが候補。
 
+### 既存 artifact / evidence 復元メモ
+
+`tmp/review/260329-seminar-curriculum-proposal/` 配下の既存 artifact は、
+過去の `p2-N` 接頭辞を含む。これは現在の Pn 観点Noとは一致しない。
+新規 artifact ではこの接頭辞を増やさず、既存分は下表で採用状態を読む。
+
+| REV | 既存 artifact / evidence | 採用状態 | メモ |
+| --- | --- | --- | --- |
+| `REV-000` | `p0-fixed.pptx`, `p0-review-images/` | superseded | 初期 fix。後続 REV の入力系列に吸収済み。 |
+| `REV-002` | `p0-p2-2-fixed.pptx`, `p2-2-review-images/` | superseded | 目視レビュー回。対応 check は未整理。 |
+| `REV-003` | `p0-p2-3-fixed.pptx`, `p2-3-review-images/` | superseded | 目視レビュー回。対応 check は未整理。 |
+| `REV-004` | `p0-p2-4-fixed.pptx`, `p2-4-review-images/` | superseded | 目視レビュー回。対応 check は未整理。 |
+| `REV-005` | `p0-p2-5-sample-fixed.pptx`, `p2-5-sample-images/` | sample | `p2-5-review-images/` も存在。採用判断は未整理。 |
+| `REV-006` | `p0-p2-6-line-height-only-fixed.pptx`, `p0-p2-6-fixed.pptx` | superseded | `p2-6-powerpoint-review-images/` が主確認 evidence。sample 系画像も存在。 |
+| `REV-007` | `p0-p2-7-font-family-fixed.pptx`, `p2-7-powerpoint-review-images/` | superseded | `font_family` (`P2-3`) 修正回。 |
+| `REV-008` | `p0-p2-8-font-size-fixed.pptx`, `p2-8-powerpoint-review-images/` | superseded | `font_size_scale` (`P2-4`) 修正回。2026-04-29 残件表の基準。 |
+| `REV-009` | `p2-9-evaluation-{lint,priorities,structure}.json`, `p2-9-evaluation-images/` | rule_evidence | PPTX 正本更新ではなく `object_overlap` (`P1-10`) ルール評価。 |
+| `REV-010` | `p2-10-evaluation-{lint,priorities}.json` | rule_evidence | `overflow_images` (`P1-11`) ルール評価。PPTX 正本更新なし。 |
+| `REV-011` | `p2-11-after-{lint,priorities}.json`, `p2-11-evaluation-{lint,priorities}.json` | eval_only | 評価のみ。採用 deck を進めた回ではない。 |
+| `REV-012` | `p0-p2-12-object-gap-fixed.pptx`, `p2-12-review-images/` | superseded | `object_gap_too_small` (`P2-1`) 修正。後続 REV に吸収済み。 |
+| `REV-013` | `p0-p2-13-left-align-fixed.pptx`, `p2-13-review-images/` | adopted_then_superseded | `alignment_left_top` (`P2-11`) 修正。`p2-13-review-images-corrected/` も存在。 |
+| `REV-014` | `p2-14-after-{lint,priorities}.json` | rule_evidence | `text_vertical_balance` (`P2-13`) ルール評価。`p2-14-after-lint.json` は `alignment_left_top` 2 件を含むため、正本系列の採用状態としては使わない。 |
+| `REV-015` | `p0-p2-15-geometry-fixed.pptx`, `p2-15-after-{lint,priorities}.json` | current_candidate | 現在の正本候補。`p0-p2-13-left-align-fixed.pptx` へ geometry fix を適用した系列。 |
+| `REV-015` | `p2-15-powerpoint-review-images/`, `p2-15-diff-stats.json` | visual_evidence | PowerPoint 書き出し DIFF。最大差分は slide 10 の 0.0712%。 |
+| n/a | `_invalid-do-not-use/` | rejected | 旧生成物。判断材料として使わない。 |
+| n/a | `review-images/`, `before.txt`, `after.txt`, `priorities-after.md` | legacy_evidence | 初期確認ログ。観点別採用判断へ復元するときの補助材料。 |
+| n/a | `powerpoint-test/`, `.pptx.bak`, `.DS_Store` | local_noise | 採用判断の根拠にしない。 |
+
 ## Next
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
+| REV-016 | todo | P0 | 既存 artifact/evidence から観点別レビュー判定表を復元する | `P0-*` / `P1-*` / `P2-1`〜`P2-13` / `P3-1` ごとに、最新 lint 件数、目視確認、判断、根拠 artifact、対応 REV が一覧化され、採用済み・不採用・要再確認が区別されている |
 
 ## Done
 
