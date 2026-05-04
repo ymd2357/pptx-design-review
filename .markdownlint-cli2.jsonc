@@ -273,9 +273,9 @@
       "prohibited_texts": ["click here", "here", "link", "more"]
     },
 
-    // MD060/table-column-style — any（デフォルト、スタイル制約なし）
+    // MD060/table-column-style — 既存表は padded 形式で統一する
     "MD060": {
-      "style": "any"
+      "style": "padded"
     }
   }
 }
