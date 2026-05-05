@@ -20,6 +20,7 @@ import tempfile
 from pathlib import Path
 
 from pptx import Presentation
+from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_AUTO_SIZE
 from pptx.util import Emu, Pt
 
@@ -70,6 +71,21 @@ def _build_manual_font_size_fixture(out: Path) -> None:
     run.text = "Cover label"
     run.font.name = "Noto Sans JP"
     run.font.size = Pt(22.5)
+    prs.save(str(out))
+
+
+def _build_contrast_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(300), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Low contrast"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    run.font.color.rgb = RGBColor.from_string("999999")
     prs.save(str(out))
 
 
@@ -136,6 +152,45 @@ def main() -> int:
             failures.append("dry-run produced no actions on bad.pptx")
         if bad2.stat().st_mtime_ns != before_mtime:
             failures.append("dry-run modified the file on disk")
+
+        # --- contrast fix consumes lint candidate_values explicitly ---
+        contrast = tmp_dir / "contrast.pptx"
+        _build_contrast_fixture(contrast)
+        contrast_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(contrast)
+        ]
+        low_contrast = [
+            f
+            for f in contrast_findings
+            if f["check"] == "low_contrast"
+        ]
+        if not low_contrast:
+            failures.append("contrast fixture did not trigger low_contrast")
+        elif low_contrast[0]["detail"].get("fixability_rule") != "contrast":
+            failures.append(
+                "low_contrast did not expose contrast fixability: "
+                f"{low_contrast[0]['detail']}"
+            )
+        actions = pptx_fix.fix_pptx(
+            contrast,
+            apply=True,
+            rules=("contrast",),
+            findings=contrast_findings,
+        )
+        if not any(a.rule == "contrast" and a.status == "apply" for a in actions):
+            failures.append("contrast fixer did not apply lint candidate color")
+        prs = Presentation(str(contrast))
+        fixed_color = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.color.rgb
+        if str(fixed_color).upper() != "707070":
+            failures.append(f"contrast fixture expected #707070; got #{fixed_color}")
+        residual = pptx_fix.verify_pptx(
+            contrast,
+            rules=("contrast",),
+            findings=contrast_findings,
+        )
+        if residual:
+            failures.append(f"contrast verify reported residual: {len(residual)}")
 
         # --- backup must preserve the oldest saved state ---
         backup_deck = tmp_dir / "backup.pptx"

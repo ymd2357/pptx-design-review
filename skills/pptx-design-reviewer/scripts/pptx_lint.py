@@ -2268,6 +2268,21 @@ def _geometry_auto_fixable(evidence: dict) -> bool:
     return all(abs(value - round(value)) < 0.1 for value in drifted.values())
 
 
+def _contrast_auto_fixable(check: str, evidence: dict) -> bool:
+    if check not in {"contrast_ratio", "low_contrast"}:
+        return False
+    if evidence.get("affected_slides"):
+        return False
+    if evidence.get("background_complexity") == "complex":
+        return False
+    foreground = evidence.get("foreground_hex") or evidence.get("text_hex")
+    background = evidence.get("background_hex")
+    required = evidence.get("required_ratio")
+    if not foreground or not background or not required:
+        return False
+    return _contrast_candidate(foreground, background, required) is not None
+
+
 def _fixability_for_json(check: str, evidence: dict) -> dict:
     if check == "text_autofit_disabled":
         return {
@@ -2286,6 +2301,24 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
         return {
             "fixability": "manual_required",
             "fixability_rule": "geometry",
+            "fixability_reason": reason,
+            "manual_required_reason": reason,
+        }
+    if _contrast_auto_fixable(check, evidence):
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "contrast",
+            "fixability_reason": "nearest allowed foreground color passes the required contrast ratio",
+        }
+    if check in {"contrast_ratio", "low_contrast"}:
+        reason = MANUAL_REQUIRED_REASONS.get(check, "contrast repair requires visual review")
+        if evidence.get("affected_slides"):
+            reason = "recurring contrast finding must be expanded with --no-consolidate before auto-fix"
+        elif evidence.get("background_complexity") == "complex":
+            reason = "complex background requires local-contrast review before auto-fix"
+        return {
+            "fixability": "manual_required",
+            "fixability_rule": "contrast",
             "fixability_reason": reason,
             "manual_required_reason": reason,
         }

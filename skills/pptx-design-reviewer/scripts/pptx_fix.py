@@ -6,6 +6,8 @@ Fixes (mechanical, no semantic decisions):
 - geometry  shape left/top/width/height in EMU rounded to nearest 1pt,
             but only when the current value is within 0.1pt of an integer
             (catches float drift; preserves intentional sub-pt placements)
+- contrast  text run color replaced with the lint-provided candidate color
+            only when --rules contrast and --findings-json are supplied
 - font_size text run size snapped to the nearest allowed scale size only when
             the feature flag is enabled, explicitly requested, and all safety
             checks pass; otherwise reported as manual_required
@@ -25,6 +27,7 @@ Usage
     python3 pptx_fix.py DECK.pptx --apply             # write in-place
     python3 pptx_fix.py DECK.pptx --apply --backup    # write DECK.pptx.bak if absent
     python3 pptx_fix.py DECK.pptx --apply --rules autofit
+    python3 pptx_fix.py DECK.pptx --apply --rules contrast --findings-json lint.json
     python3 pptx_fix.py DECK.pptx --rules font_size
     python3 pptx_fix.py DECK.pptx --json
 
@@ -45,6 +48,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, List, Optional, Sequence
 
 from pptx import Presentation
+from pptx.dml.color import MSO_COLOR_TYPE, RGBColor
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_AUTO_SIZE
 from pptx.util import Pt
@@ -59,11 +63,13 @@ FONT_SIZE_FIX_DELTA_MAX_PT = 1.0
 FONT_SIZE_FIXER_ENABLED = False
 
 DEFAULT_RULES = ("autofit", "geometry")
-ALL_RULES = ("autofit", "geometry", "font_size")
+ALL_RULES = ("autofit", "geometry", "font_size", "contrast")
 CHECK_TO_RULE = {
     "text_autofit_disabled": "autofit",
     "geometry_rounding": "geometry",
     "font_size_scale": "font_size",
+    "low_contrast": "contrast",
+    "contrast_ratio": "contrast",
 }
 
 
@@ -240,6 +246,36 @@ def _non_empty_paragraphs(text_frame) -> list:
     ]
 
 
+def _normalize_hex(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip().upper()
+    if not raw:
+        return None
+    if not raw.startswith("#"):
+        raw = "#" + raw
+    if len(raw) != 7:
+        return None
+    try:
+        int(raw[1:], 16)
+    except ValueError:
+        return None
+    return raw
+
+
+def _run_rgb_hex(run) -> Optional[str]:
+    try:
+        color = run.font.color
+        if color.type != MSO_COLOR_TYPE.RGB:
+            return None
+        rgb = color.rgb
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if rgb is None:
+        return None
+    return f"#{str(rgb).upper()}"
+
+
 def _detect_font_size(shape, slide_idx, slide_id, slide=None) -> Optional[FixAction]:
     if slide is None or (not getattr(shape, "has_text_frame", False) and not getattr(shape, "has_table", False)):
         return None
@@ -364,6 +400,157 @@ def _detect_font_size(shape, slide_idx, slide_id, slide=None) -> Optional[FixAct
     )
 
 
+def _contrast_candidate_hex(finding: Any) -> Optional[str]:
+    detail = _finding_detail(finding)
+    candidates = detail.get("candidate_values")
+    if not isinstance(candidates, dict):
+        return None
+    return (
+        _normalize_hex(candidates.get("foreground_hex"))
+        or _normalize_hex(candidates.get("color_hex"))
+    )
+
+
+def _contrast_original_hexes(finding: Any) -> set[str]:
+    detail = _finding_detail(finding)
+    originals: set[str] = set()
+    for key in ("foreground_hex", "text_hex", "original_run_color_hex"):
+        normalized = _normalize_hex(detail.get(key))
+        if normalized:
+            originals.add(normalized)
+
+    raw_colors = detail.get("original_run_colors_hex")
+    if isinstance(raw_colors, str):
+        raw_colors = [raw_colors]
+    if isinstance(raw_colors, Sequence) and not isinstance(raw_colors, (str, bytes)):
+        for value in raw_colors:
+            normalized = _normalize_hex(value)
+            if normalized:
+                originals.add(normalized)
+    return originals
+
+
+def _contrast_finding_rejection(finding: Any) -> Optional[str]:
+    detail = _finding_detail(finding)
+    fixability = detail.get("fixability")
+    if fixability == "auto_fix_candidate":
+        if _contrast_candidate_hex(finding):
+            return None
+        return "missing_contrast_candidate_values"
+    if fixability is None:
+        if _contrast_candidate_hex(finding):
+            return None
+        return "missing_contrast_candidate_values"
+    return detail.get("manual_required_reason") or detail.get("fixability_reason") or str(fixability)
+
+
+def _matching_contrast_findings(
+    shape,
+    slide_idx: int,
+    findings: Optional[Sequence[Any]],
+) -> list[Any]:
+    if not findings:
+        return []
+    shape_id = getattr(shape, "shape_id", None)
+    shape_name = getattr(shape, "name", None)
+    matched: list[Any] = []
+    for finding in findings:
+        if _finding_rule(finding) != "contrast":
+            continue
+        finding_slide = _finding_field(finding, "slide_index")
+        if finding_slide is not None and finding_slide != slide_idx:
+            continue
+        finding_shape_id = _finding_field(finding, "shape_id")
+        if finding_shape_id is not None and shape_id is not None:
+            if finding_shape_id != shape_id:
+                continue
+        else:
+            finding_shape_name = _finding_field(finding, "shape_name")
+            if finding_shape_name is not None and shape_name is not None:
+                if finding_shape_name != shape_name:
+                    continue
+        matched.append(finding)
+    return matched
+
+
+def _detect_contrast(
+    shape,
+    slide_idx,
+    slide_id,
+    slide=None,
+    *,
+    findings: Optional[Sequence[Any]] = None,
+) -> Optional[FixAction]:
+    matched_findings = _matching_contrast_findings(shape, slide_idx, findings)
+    if not matched_findings:
+        return None
+
+    reasons: list[str] = []
+    updates: list[dict] = []
+    seen: set[tuple] = set()
+
+    for finding in matched_findings:
+        rejection = _contrast_finding_rejection(finding)
+        if rejection:
+            reasons.append(rejection)
+            continue
+
+        target_hex = _contrast_candidate_hex(finding)
+        originals = _contrast_original_hexes(finding)
+        if not target_hex or not originals:
+            reasons.append("missing_contrast_original_or_candidate")
+            continue
+
+        for container in _text_containers(shape):
+            for p_idx, para in enumerate(container["text_frame"].paragraphs, start=1):
+                for r_idx, run in enumerate(para.runs, start=1):
+                    before_hex = _run_rgb_hex(run)
+                    if before_hex is None or before_hex not in originals:
+                        continue
+                    if before_hex == target_hex:
+                        continue
+                    key = (
+                        container["kind"],
+                        container.get("row"),
+                        container.get("col"),
+                        p_idx,
+                        r_idx,
+                        before_hex,
+                        target_hex,
+                    )
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    update = {
+                        "kind": container["kind"],
+                        "paragraph": p_idx,
+                        "run": r_idx,
+                        "before_hex": before_hex,
+                        "after_hex": target_hex,
+                        "text": run.text[:80],
+                        "check": _finding_field(finding, "check"),
+                    }
+                    if container["kind"] == "table_cell":
+                        update["row"] = container["row"]
+                        update["col"] = container["col"]
+                    updates.append(update)
+
+    if not updates and not reasons:
+        return None
+
+    return FixAction(
+        rule="contrast",
+        slide_index=slide_idx,
+        slide_id=slide_id,
+        shape_id=getattr(shape, "shape_id", None),
+        shape_name=getattr(shape, "name", None),
+        status="manual_required" if reasons and not updates else "apply",
+        reasons=sorted(set(reasons)),
+        before={"runs": [{"color_hex": u["before_hex"], "text": u["text"]} for u in updates]},
+        after={"runs": [{"color_hex": u["after_hex"], "text": u["text"]} for u in updates], "updates": updates},
+    )
+
+
 DETECTORS: dict = {
     "autofit": _detect_autofit,
     "geometry": _detect_geometry,
@@ -374,6 +561,7 @@ RULE_ENABLED: dict[str, bool] = {
     "autofit": True,
     "geometry": True,
     "font_size": FONT_SIZE_FIXER_ENABLED,
+    "contrast": True,
 }
 
 
@@ -530,6 +718,14 @@ def _apply_action(shape, action: FixAction) -> None:
                 tf = shape.table.cell(update["row"] - 1, update["col"] - 1).text_frame
             run = tf.paragraphs[update["paragraph"] - 1].runs[update["run"] - 1]
             run.font.size = Pt(update["after_size_pt"])
+    elif action.rule == "contrast":
+        for update in action.after.get("updates", []):
+            if update["kind"] == "shape":
+                tf = shape.text_frame
+            else:
+                tf = shape.table.cell(update["row"] - 1, update["col"] - 1).text_frame
+            run = tf.paragraphs[update["paragraph"] - 1].runs[update["run"] - 1]
+            run.font.color.rgb = RGBColor.from_string(update["after_hex"].lstrip("#"))
 
 
 # ---- Driver ----------------------------------------------------------------
@@ -549,13 +745,17 @@ def fix_pptx(
 
     for shape, idx, sid, slide in _walk(prs):
         for rule in active_rules:
-            det: Optional[Callable] = DETECTORS.get(rule)
-            if det is None:
-                continue
-            action = det(shape, idx, sid, slide)
+            if rule == "contrast":
+                action = _detect_contrast(shape, idx, sid, slide, findings=findings)
+            else:
+                det: Optional[Callable] = DETECTORS.get(rule)
+                if det is None:
+                    continue
+                action = det(shape, idx, sid, slide)
             if action is None:
                 continue
-            action = _apply_matching_finding_fixability(action, findings)
+            if rule != "contrast":
+                action = _apply_matching_finding_fixability(action, findings)
             actions.append(action)
             if action.status == "apply":
                 _apply_action(shape, action)
@@ -586,12 +786,16 @@ def verify_pptx(
     active_rules = _enabled_rules(rules)
     for shape, idx, sid, slide in _walk(prs):
         for rule in active_rules:
-            det = DETECTORS.get(rule)
-            if det is None:
-                continue
-            action = det(shape, idx, sid, slide)
+            if rule == "contrast":
+                action = _detect_contrast(shape, idx, sid, slide, findings=findings)
+            else:
+                det = DETECTORS.get(rule)
+                if det is None:
+                    continue
+                action = det(shape, idx, sid, slide)
             if action is not None:
-                action = _apply_matching_finding_fixability(action, findings)
+                if rule != "contrast":
+                    action = _apply_matching_finding_fixability(action, findings)
             if action is not None and action.status == "apply":
                 residual.append(action)
     return residual
@@ -646,6 +850,14 @@ def format_actions(actions: List[FixAction], applied: bool) -> str:
                 if len(a.after.get("updates", [])) > 2:
                     diff += f", ... {len(a.after.get('updates', []))} run(s)"
                 lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
+            elif rule == "contrast":
+                examples = a.after.get("updates", [])[:2]
+                diff = ", ".join(
+                    f"{r['before_hex']}->{r['after_hex']}" for r in examples
+                )
+                if len(a.after.get("updates", [])) > 2:
+                    diff += f", ... {len(a.after.get('updates', []))} run(s)"
+                lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
         lines.append("")
     return "\n".join(lines)
 
@@ -668,6 +880,17 @@ def format_residual(residual: List[FixAction]) -> str:
         lines.append(f"  ... and {len(residual) - 5} more")
     lines.append("")
     return "\n".join(lines)
+
+
+def load_findings_json(path: Path) -> list[Any]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        findings = payload.get("findings")
+        if isinstance(findings, list):
+            return findings
+    raise ValueError("findings JSON must be a lint JSON array or an object with findings[]")
 
 
 # ---- CLI -------------------------------------------------------------------
@@ -695,6 +918,14 @@ def main(argv: List[str]) -> int:
         ),
     )
     ap.add_argument("--json", action="store_true", help="emit actions as JSON")
+    ap.add_argument(
+        "--findings-json",
+        type=Path,
+        help=(
+            "lint JSON to consume for evidence-schema fixability and candidate values; "
+            "required for --rules contrast"
+        ),
+    )
     args = ap.parse_args(argv)
 
     if not args.pptx.exists():
@@ -713,11 +944,29 @@ def main(argv: List[str]) -> int:
     if args.backup and not args.apply:
         print("note: --backup has no effect without --apply", file=sys.stderr)
 
-    actions = fix_pptx(args.pptx, apply=args.apply, backup=args.backup, rules=rules)
+    findings: Optional[list[Any]] = None
+    if args.findings_json:
+        try:
+            findings = load_findings_json(args.findings_json)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(f"failed to load --findings-json: {exc}", file=sys.stderr)
+            return 1
+
+    if "contrast" in rules and findings is None:
+        print("--rules contrast requires --findings-json from pptx_lint.py --json --no-consolidate", file=sys.stderr)
+        return 1
+
+    actions = fix_pptx(
+        args.pptx,
+        apply=args.apply,
+        backup=args.backup,
+        rules=rules,
+        findings=findings,
+    )
 
     residual: List[FixAction] = []
     if args.apply and actions:
-        residual = verify_pptx(args.pptx, rules=rules)
+        residual = verify_pptx(args.pptx, rules=rules, findings=findings)
 
     if args.json:
         payload = {
