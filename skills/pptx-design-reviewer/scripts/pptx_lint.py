@@ -187,6 +187,10 @@ RENDERED_CONTRAST_PALETTE_COLORS = 16
 RENDERED_CONTRAST_MIN_FOREGROUND_PIXELS = 8
 RENDERED_CONTRAST_MIN_FOREGROUND_RATIO = 0.001
 RENDERED_CONTRAST_MAX_SAMPLE_PX = 240
+RENDERED_CONTRAST_MAX_RAW_SAMPLE_PIXELS = 1_000_000
+RENDERED_CONTRAST_EXPECTED_COLOR_DISTANCE_MAX = 18
+RENDERED_CONTRAST_BACKGROUND_UNIFORM_DISTANCE_MAX = 12
+RENDERED_CONTRAST_BACKGROUND_UNIFORMITY_MIN = 0.70
 
 TEXT_COLOR_TOKEN_BY_HEX = {
     "#000000": "brand.utility.black",
@@ -718,29 +722,118 @@ def _rendered_crop_for_bbox(ctx: LintContext, image: Image.Image, bbox_pt: tuple
     return image.crop((left, top, right, bottom)).convert("RGB")
 
 
-def _dominant_rendered_contrast(crop: Image.Image) -> Optional[dict]:
-    sample = crop.copy()
-    sample.thumbnail(
-        (RENDERED_CONTRAST_MAX_SAMPLE_PX, RENDERED_CONTRAST_MAX_SAMPLE_PX),
-        Image.Resampling.LANCZOS,
+def _sample_rendered_pixels(crop: Image.Image) -> tuple[Counter, int]:
+    if crop.width <= 0 or crop.height <= 0:
+        return Counter(), 0
+
+    total_pixels = crop.width * crop.height
+    if total_pixels <= RENDERED_CONTRAST_MAX_RAW_SAMPLE_PIXELS:
+        pixels = crop.get_flattened_data()
+        return Counter(pixels), total_pixels
+
+    stride = int((total_pixels / RENDERED_CONTRAST_MAX_RAW_SAMPLE_PIXELS) ** 0.5) + 1
+    pixels = [
+        crop.getpixel((x, y))
+        for y in range(0, crop.height, stride)
+        for x in range(0, crop.width, stride)
+    ]
+    return Counter(pixels), len(pixels)
+
+
+def _background_uniformity(
+    counts: Counter,
+    background_rgb: tuple[int, int, int],
+    total: int,
+) -> float:
+    if total <= 0:
+        return 0.0
+    matching = sum(
+        count
+        for rgb, count in counts.items()
+        if _rgb_distance(rgb, background_rgb) <= RENDERED_CONTRAST_BACKGROUND_UNIFORM_DISTANCE_MAX
     )
-    if sample.width <= 0 or sample.height <= 0:
+    return matching / total
+
+
+def _background_model_detail(
+    counts: Counter,
+    background_rgb: tuple[int, int, int],
+    total: int,
+) -> dict:
+    uniformity = _background_uniformity(counts, background_rgb, total)
+    return {
+        "background_model": "dominant_raw_color",
+        "background_uniformity": round(uniformity, 4),
+        "background_complexity": (
+            "uniform"
+            if uniformity >= RENDERED_CONTRAST_BACKGROUND_UNIFORMITY_MIN
+            else "complex"
+        ),
+        "background_uniformity_min": RENDERED_CONTRAST_BACKGROUND_UNIFORMITY_MIN,
+    }
+
+
+def _dominant_rendered_contrast(
+    crop: Image.Image,
+    expected_foreground_hexes: Optional[Iterable[str]] = None,
+) -> Optional[dict]:
+    counts, total = _sample_rendered_pixels(crop)
+    if total <= 0 or len(counts) < 2:
         return None
 
-    quantized = sample.quantize(
-        colors=RENDERED_CONTRAST_PALETTE_COLORS,
-        method=Image.Quantize.MEDIANCUT,
-    ).convert("RGB")
-    counts = Counter(quantized.get_flattened_data())
-    if len(counts) < 2:
-        return None
-
-    total = sample.width * sample.height
     background_rgb, background_count = counts.most_common(1)[0]
     min_pixels = max(
         RENDERED_CONTRAST_MIN_FOREGROUND_PIXELS,
         int(total * RENDERED_CONTRAST_MIN_FOREGROUND_RATIO),
     )
+
+    expected: list[tuple[str, tuple[int, int, int]]] = []
+    for hex_color in expected_foreground_hexes or []:
+        try:
+            expected.append((hex_color.upper(), _hex_to_rgb(hex_color)))
+        except Exception:
+            continue
+
+    expected_candidates: list[tuple[str, int, float]] = []
+    for hex_color, expected_rgb in expected:
+        matched = sum(
+            count
+            for rgb, count in counts.items()
+            if _rgb_distance(rgb, expected_rgb) <= RENDERED_CONTRAST_EXPECTED_COLOR_DISTANCE_MAX
+        )
+        if matched >= min_pixels and _rgb_distance(expected_rgb, background_rgb) >= 4:
+            expected_candidates.append((hex_color, matched, _rgb_distance(expected_rgb, background_rgb)))
+
+    if expected_candidates:
+        foreground_hex, foreground_count, _ = max(
+            expected_candidates,
+            key=lambda item: item[2],
+        )
+        foreground_rgb = _hex_to_rgb(foreground_hex)
+        background_counts = Counter(
+            {
+                rgb: count
+                for rgb, count in counts.items()
+                if _rgb_distance(rgb, foreground_rgb) > RENDERED_CONTRAST_EXPECTED_COLOR_DISTANCE_MAX
+            }
+        )
+        if background_counts:
+            background_rgb, background_count = background_counts.most_common(1)[0]
+            background_total = sum(background_counts.values())
+        else:
+            background_total = total
+        background_hex = _rgb_tuple_to_hex(background_rgb)
+        return {
+            "text_hex": foreground_hex,
+            "background_hex": background_hex,
+            "contrast_ratio": round(_contrast_ratio(foreground_hex, background_hex), 2),
+            "foreground_pixels": foreground_count,
+            "background_pixels": background_count,
+            "sample_pixels": total,
+            "foreground_detection": "expected_run_color",
+            **_background_model_detail(background_counts or counts, background_rgb, background_total),
+        }
+
     candidates = [
         (rgb, count)
         for rgb, count in counts.items()
@@ -764,6 +857,8 @@ def _dominant_rendered_contrast(crop: Image.Image) -> Optional[dict]:
         "foreground_pixels": foreground_count,
         "background_pixels": background_count,
         "sample_pixels": total,
+        "foreground_detection": "raw_pixel_distance",
+        **_background_model_detail(counts, background_rgb, total),
     }
 
 
@@ -1476,7 +1571,11 @@ def check_rendered_contrast(
     crop = _rendered_crop_for_bbox(ctx, image, record.actual_bbox_pt)
     if crop is None:
         return
-    measured = _dominant_rendered_contrast(crop)
+    original_run_colors = _text_frame_explicit_run_colors(shape.text_frame)
+    measured = _dominant_rendered_contrast(
+        crop,
+        expected_foreground_hexes=original_run_colors,
+    )
     if measured is None:
         return
 
@@ -1508,7 +1607,7 @@ def check_rendered_contrast(
         "measurement": "rendered_image",
         "rendered_image_path": str(image_path),
         "foreground_hex": measured["text_hex"],
-        "original_run_colors_hex": _text_frame_explicit_run_colors(shape.text_frame),
+        "original_run_colors_hex": original_run_colors,
         "required_ratio": threshold,
         "low_contrast_threshold": LOW_CONTRAST_RATIO_MAX,
         "text_class": text_class,
@@ -2079,8 +2178,10 @@ def consolidate_recurring(findings: List[Finding], min_slides: int = 3) -> List[
                         f"(recurring on {len(slides)} slides: {_slide_range(slides)})"
                     ),
                     detail={
+                        **(example.detail or {}),
                         "affected_slides": slides,
                         "occurrences": len(group),
+                        "example_slide_index": example.slide_index,
                         "example_shape_id": example.shape_id,
                     },
                 )
@@ -2250,19 +2351,27 @@ def _measurement_confidence_for_json(evidence: dict) -> Optional[dict]:
     sample_pixels = evidence.get("sample_pixels") or 0
     foreground_pixels = evidence.get("foreground_pixels") or 0
     foreground_ratio = foreground_pixels / sample_pixels if sample_pixels else 0
-    if foreground_pixels >= 50 and foreground_ratio >= 0.005:
+    background_complexity = evidence.get("background_complexity")
+    if background_complexity == "complex":
+        level = "low"
+    elif foreground_pixels >= 50 and foreground_ratio >= 0.005:
         level = "medium"
     else:
         level = "low"
     return {
         "level": level,
-        "method": "dominant_rendered_crop_palette",
+        "method": evidence.get("foreground_detection", "raw_pixel_distance"),
+        "background_model": evidence.get("background_model"),
+        "background_uniformity": evidence.get("background_uniformity"),
+        "background_complexity": background_complexity,
         "foreground_pixels": foreground_pixels,
         "background_pixels": evidence.get("background_pixels"),
         "sample_pixels": sample_pixels,
         "foreground_ratio": round(foreground_ratio, 4),
-        "palette_colors": RENDERED_CONTRAST_PALETTE_COLORS,
-        "limitations": "dominant colors are measured from the rendered text bbox crop",
+        "limitations": (
+            "foreground is measured from raw rendered pixels; background is a dominant "
+            "raw color model and complex backgrounds require local-contrast follow-up"
+        ),
     }
 
 

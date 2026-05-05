@@ -659,6 +659,77 @@ def main() -> int:
             failures.append(
                 "rendered-low-contrast.pptx did not trigger rendered-image low_contrast"
             )
+        thin_text_crop = Image.new("RGB", (1764, 54), "white")
+        draw = ImageDraw.Draw(thin_text_crop)
+        for x in range(0, 1764, 14):
+            draw.rectangle((x, 18, x + 2, 36), fill="#707070")
+            draw.rectangle((x + 3, 18, x + 4, 36), fill="#A8A8A8")
+        thin_text_measurement = pptx_lint._dominant_rendered_contrast(
+            thin_text_crop,
+            expected_foreground_hexes=["#707070"],
+        )
+        if not thin_text_measurement or thin_text_measurement.get("text_hex") != "#707070":
+            failures.append(
+                "rendered contrast foreground detection should prefer observed run color "
+                f"over antialias pixels; got {thin_text_measurement}"
+            )
+        elif thin_text_measurement.get("contrast_ratio", 0) < 4.5:
+            failures.append(
+                "rendered contrast foreground detection used an antialias color instead of "
+                f"#707070: {thin_text_measurement}"
+            )
+        elif thin_text_measurement.get("background_complexity") != "uniform":
+            failures.append(
+                "rendered contrast should mark plain white crop background as uniform: "
+                f"{thin_text_measurement}"
+            )
+
+        complex_background_crop = Image.new("RGB", (240, 80), "white")
+        complex_draw = ImageDraw.Draw(complex_background_crop)
+        for x in range(240):
+            shade = 40 + int(190 * x / 239)
+            complex_draw.line((x, 0, x, 79), fill=(shade, shade, shade))
+        complex_draw.rectangle((80, 30, 160, 42), fill="#707070")
+        complex_measurement = pptx_lint._dominant_rendered_contrast(
+            complex_background_crop,
+            expected_foreground_hexes=["#707070"],
+        )
+        if not complex_measurement or complex_measurement.get("background_complexity") != "complex":
+            failures.append(
+                "rendered contrast should expose complex background evidence for gradients: "
+                f"{complex_measurement}"
+            )
+        recurring_rendered_findings = [
+            pptx_lint.Finding(
+                severity="error",
+                check="low_contrast",
+                slide_index=idx,
+                slide_id=idx,
+                shape_id=idx + 100,
+                shape_name=f"Text {idx}",
+                message="rendered text/background contrast ratio 2.50:1 is below unreadable threshold 3.0:1 for normal_text",
+                detail={
+                    "measurement": "rendered_image",
+                    "rendered_image_path": f"slide-{idx:02d}.png",
+                    "foreground_hex": "#A3A3A3",
+                    "background_hex": "#FFFFFF",
+                    "contrast_ratio": 2.5,
+                    "required_ratio": 4.5,
+                    "low_contrast_threshold": 3.0,
+                    "bbox_pt": [10, 20, 100, 30],
+                },
+            )
+            for idx in (1, 2, 3)
+        ]
+        consolidated_rendered = pptx_lint.consolidate_recurring(recurring_rendered_findings)
+        if not consolidated_rendered or consolidated_rendered[0].detail.get("measurement") != "rendered_image":
+            failures.append(
+                "recurring rendered-image contrast consolidation dropped measurement evidence"
+            )
+        if not consolidated_rendered or "contrast_ratio" not in consolidated_rendered[0].detail:
+            failures.append(
+                "recurring rendered-image contrast consolidation dropped contrast evidence"
+            )
 
         allowed_latin_font_findings = [
             f
