@@ -131,6 +131,8 @@ class FixEvidenceRow:
     after_count: int
     applied_actions: int
     manual_actions: int
+    outcome: str
+    outcome_reason: str
     render_status: str
     diff_nonempty_slides: int
     work_dir: str
@@ -656,6 +658,56 @@ def _fix_rules_for_check(check: str) -> tuple[str, ...]:
     return (rule,) if rule else ()
 
 
+def _fixability_counts_for_findings(findings_json: list[dict]) -> Counter:
+    counts: Counter = Counter()
+    for finding in findings_json:
+        detail = finding.get("detail") or {}
+        fixability = detail.get("fixability")
+        if fixability:
+            counts[fixability] += 1
+    return counts
+
+
+def _fixture_fix_outcome(
+    *,
+    before_count: int,
+    after_count: int,
+    rules: tuple[str, ...],
+    applied: int,
+    manual: int,
+    findings_json: list[dict],
+    render_status: str,
+) -> tuple[str, str]:
+    if render_status != "ok":
+        return "render_failed", "before/after render failed; visual evidence is incomplete"
+    if before_count == 0:
+        return "fixture_not_detected", "intentional bad fixture did not trigger the expected check"
+    if applied and after_count == 0:
+        return "autofixed", "fixer applied a mechanical rule and the check count dropped to zero"
+    if applied and after_count > 0:
+        return "fixer_incomplete_for_mechanical_candidate", "fixer applied an action but the check still remains"
+
+    fixability = _fixability_counts_for_findings(findings_json)
+    if fixability["auto_fix_candidate"] > 0:
+        if manual:
+            return (
+                "fixer_blocked_for_mechanical_candidate",
+                "lint marked this as auto-fixable, but fixer returned manual_required",
+            )
+        return (
+            "fixer_missing_for_mechanical_candidate",
+            "lint marked this as auto-fixable, but no fixer action was applied",
+        )
+    if fixability["manual_required"] > 0 or not rules:
+        return (
+            "tested_manual_decision_required",
+            "fixture, lint, render, and diff were tested; source repair requires semantic or layout judgment",
+        )
+    if manual:
+        return "tested_manual_decision_required", "fixer reported manual_required after safety checks"
+    return "no_autofix_rule", "no mechanical auto-fix rule is declared for this check"
+
+
 def _run(cmd: list[str]) -> tuple[bool, str]:
     try:
         completed = subprocess.run(
@@ -702,17 +754,6 @@ def _diff_renders(before_dir: Path, after_dir: Path, diff_dir: Path) -> int:
 def _write_fixture_evidence_html(path: Path, rows: list[FixEvidenceRow], outdir: Path) -> None:
     html_dir = path.parent
 
-    def fix_outcome(row: FixEvidenceRow) -> str:
-        if row.applied_actions:
-            return "autofixed"
-        if row.manual_actions:
-            return "manual_required"
-        if row.before_count and row.after_count == row.before_count:
-            return "no_autofix_rule"
-        if row.before_count == 0:
-            return "fixture_not_detected"
-        return "no_change"
-
     lines = [
         "<!doctype html>",
         '<html lang="ja">',
@@ -725,16 +766,17 @@ def _write_fixture_evidence_html(path: Path, rows: list[FixEvidenceRow], outdir:
         "h1{font-size:24px;margin:0 0 16px} h2{font-size:18px;margin:28px 0 8px}",
         "table{border-collapse:collapse;width:100%;background:white}td,th{border:1px solid #ddd;padding:6px 8px;text-align:left;font-size:13px}",
         ".grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:8px 0 24px}.panel{background:white;border:1px solid #ddd;padding:8px}",
-        "img{width:100%;height:auto;display:block}.muted{color:#666}.fail{color:#b00020}.ok{color:#0b6b2b}",
+        "img{width:100%;height:auto;display:block}.muted{color:#666}.fail{color:#b00020}.ok{color:#0b6b2b}.warn{color:#8a4b00}",
         "</style>",
         "</head><body>",
         "<h1>Pn-n Fixture Fix Evidence</h1>",
         "<p class='muted'>各Pn-nの intentionally bad fixture を生成し、現在実装済みの pptx_fix auto-fix だけを check 単位で適用した前後を vscode-pptx-viewer でレンダリングしています。after は「完全修正後」ではなく「現時点の auto-fix 実行後」です。LibreOfficeは未使用です。</p>",
-        "<table><thead><tr><th>Pn</th><th>check</th><th>fixture</th><th>before</th><th>after autofix</th><th>applied</th><th>manual</th><th>outcome</th><th>render</th><th>diff slides</th></tr></thead><tbody>",
+        "<p class='muted'>outcome は `autofixed`、`tested_manual_decision_required`、`fixer_missing_for_mechanical_candidate` などに分けています。manual 系も fixture/lint/render/diff はテスト済みです。</p>",
+        "<table><thead><tr><th>Pn</th><th>check</th><th>fixture</th><th>before</th><th>after autofix</th><th>applied</th><th>manual</th><th>outcome</th><th>reason</th><th>render</th><th>diff slides</th></tr></thead><tbody>",
     ]
     for row in rows:
         cls = "ok" if row.render_status == "ok" else "fail"
-        outcome = fix_outcome(row)
+        outcome_cls = "fail" if "mechanical_candidate" in row.outcome else "ok" if row.outcome == "autofixed" else "warn"
         lines.append(
             "<tr>"
             f"<td>{html.escape(row.pn)}</td>"
@@ -742,7 +784,8 @@ def _write_fixture_evidence_html(path: Path, rows: list[FixEvidenceRow], outdir:
             f"<td>{html.escape(row.fixture)}</td>"
             f"<td>{row.before_count}</td><td>{row.after_count}</td>"
             f"<td>{row.applied_actions}</td><td>{row.manual_actions}</td>"
-            f"<td>{html.escape(outcome)}</td>"
+            f"<td class='{outcome_cls}'>{html.escape(row.outcome)}</td>"
+            f"<td>{html.escape(row.outcome_reason)}</td>"
             f"<td class='{cls}'>{html.escape(row.render_status)}</td>"
             f"<td>{row.diff_nonempty_slides}</td>"
             "</tr>"
@@ -756,8 +799,9 @@ def _write_fixture_evidence_html(path: Path, rows: list[FixEvidenceRow], outdir:
             f"<p class='muted'>fixture={html.escape(row.fixture)} / "
             f"before={row.before_count}, after={row.after_count}, "
             f"applied={row.applied_actions}, manual={row.manual_actions}, "
-            f"outcome={html.escape(fix_outcome(row))}, render={html.escape(row.render_status)}</p>"
+            f"outcome={html.escape(row.outcome)}, render={html.escape(row.render_status)}</p>"
         )
+        lines.append(f"<p class='muted'>classification: {html.escape(row.outcome_reason)}</p>")
         before_img = work / "before" / "slide-01.png"
         after_img = work / "after" / "slide-01.png"
         diff_img = work / "diff" / "slide-01.png"
@@ -798,6 +842,8 @@ def write_fixture_fix_evidence(outdir: Path, catalog: list[CatalogItem]) -> list
                     after_count=0,
                     applied_actions=0,
                     manual_actions=0,
+                    outcome="fixture_not_detected",
+                    outcome_reason="no intentional bad fixture is registered for this check",
                     render_status="missing_fixture",
                     diff_nonempty_slides=0,
                     work_dir=str(work),
@@ -843,6 +889,15 @@ def write_fixture_fix_evidence(outdir: Path, catalog: list[CatalogItem]) -> list
         else:
             diff_nonempty = 0
             render_status = "render_failed"
+        outcome, outcome_reason = _fixture_fix_outcome(
+            before_count=before_count,
+            after_count=after_count,
+            rules=rules,
+            applied=applied,
+            manual=manual,
+            findings_json=before_findings_json,
+            render_status=render_status,
+        )
 
         rows.append(
             FixEvidenceRow(
@@ -855,6 +910,8 @@ def write_fixture_fix_evidence(outdir: Path, catalog: list[CatalogItem]) -> list
                 after_count=after_count,
                 applied_actions=applied,
                 manual_actions=manual,
+                outcome=outcome,
+                outcome_reason=outcome_reason,
                 render_status=render_status,
                 diff_nonempty_slides=diff_nonempty,
                 work_dir=str(work),
