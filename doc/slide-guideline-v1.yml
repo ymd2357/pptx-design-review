@@ -2600,23 +2600,6 @@ rules:
             - "threshold"
             - "unit"
           manual_required_reason: "Non-left or non-top alignment may be intentional for headings or labels."
-        alignment_drift:
-          evidence_source: "structure_json"
-          evidence_confidence: "medium"
-          fixability: "manual_required"
-          required_target_fields:
-            - "shape_a"
-            - "shape_b"
-          required_measurement_fields:
-            - "drifted"
-            - "group_tolerance_pt"
-            - "drift_tolerance_pt"
-            - "measured_value"
-            - "threshold"
-            - "delta"
-            - "unit"
-          candidate_values: "Align left, top, center_x, or center_y to the nearest peer baseline."
-          manual_required_reason: "Small intentional offsets and visual hierarchy need review."
         text_color_allowlist:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -2753,16 +2736,21 @@ rules:
           candidate_values: "Text/background color token pairs with recomputed contrast ratios."
           manual_required_reason: "Color choice must preserve readability, emphasis, and brand intent."
         color_only_meaning:
-          evidence_source: "manual_review"
+          evidence_source: "structure_json"
           evidence_confidence: "low"
           fixability: "manual_required"
           required_target_fields:
             - "slide_index"
-            - "target_description"
+            - "group"
           required_measurement_fields:
-            - "meaning_encoded_by_color"
+            - "colors"
             - "non_color_cue_present"
-          manual_required_reason: "Requires semantic judgment that automation cannot infer reliably."
+            - "triggered_rules"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Non-color cue choice requires semantic design decision."
         alt_text_required:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -2780,17 +2768,93 @@ rules:
             - "unit"
           manual_required_reason: "Need to decide whether the picture is meaningful or decorative."
         reading_order:
-          evidence_source: "manual_review"
-          evidence_confidence: "low"
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
           fixability: "manual_required"
           required_target_fields:
             - "slide_index"
-            - "target_description"
           required_measurement_fields:
             - "visual_order"
-            - "selection_pane_order"
-            - "expected_template_order"
-          manual_required_reason: "Requires comparing visual reading flow with semantic order."
+            - "source_order"
+            - "inversions"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Order repair requires logical content decision."
+        heading_hierarchy_broken:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "title_candidate"
+            - "largest_body_candidate"
+          required_measurement_fields:
+            - "title_candidate_count"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Hierarchy repair requires template/content intent review."
+        key_area_cropped:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_id"
+            - "shape_name"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "measurement"
+            - "crop_ratio"
+            - "horizontal_total_crop_ratio"
+            - "vertical_total_crop_ratio"
+            - "max_side_crop_ratio"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Crop repair requires important-area decision."
+        missing_required_element:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "missing_element"
+            - "top_text_candidates"
+          required_measurement_fields:
+            - "text_shape_count"
+            - "required_zone_pt"
+            - "required_font_size_pt_min"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Missing element repair requires content/template decision."
+        wrap_break_changes_meaning:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "text_excerpt"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "line_count"
+            - "triggered_rules"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Line break repair requires copy/layout decision."
         geometry_rounding:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -2825,6 +2889,22 @@ rules:
             - "unit"
           candidate_values: "Container resize, child movement, margin change, or font-size alternatives."
           manual_required_reason: "Readable repair requires balancing container geometry and text layout."
+        card_grid_consistency:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "row_containers"
+            - "inconsistent_containers"
+          required_measurement_fields:
+            - "group_medians"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Normalize repeated card container size, row position, padding, and first-child placement as a group."
+          manual_required_reason: "Repeated-card repair requires template grouping intent review."
         text_vertical_balance:
           evidence_source: "pptx_xml"
           evidence_confidence: "medium"
@@ -2907,9 +2987,9 @@ rules:
         issue_title: "意味を持つ画像に代替テキストがない"
         action: "画像の機能や内容を説明する代替テキストを入れる。"
       color_only_meaning:
-        status: "manual_defined"
+        status: "implemented_lint"
         priority: "P1"
-        detection: "manual_review"
+        detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
         issue_title: "色だけで意味を伝えている"
@@ -2923,9 +3003,9 @@ rules:
         issue_title: "コントラスト不足で可読性にリスクがある"
         action: "最終レンダリングの色を測定し、閾値を満たす配色へ直す。"
       heading_hierarchy_broken:
-        status: "planned"
+        status: "implemented_lint"
         priority: "P1"
-        detection: "manual_review"
+        detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
         issue_title: "見出し階層が崩れて理解順を追いにくい"
@@ -2939,9 +3019,9 @@ rules:
         issue_title: "画像の縦横比が崩れて内容や品質を損なう"
         action: "画像を元比率で再配置し、必要ならトリミングを見直す。"
       key_area_cropped:
-        status: "planned"
+        status: "implemented_lint"
         priority: "P1"
-        detection: "manual_review"
+        detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
         issue_title: "画像の重要部が切れて理解を阻害する"
@@ -2955,7 +3035,7 @@ rules:
         issue_title: "行間が読みやすさを損なう可能性がある"
         action: "本文量、行間、テキスト枠高さをセットで見直す。"
       missing_required_element:
-        status: "planned"
+        status: "implemented_lint"
         priority: "P1"
         detection: "automated"
         fix_policy: "manual_review"
@@ -3001,9 +3081,9 @@ rules:
         issue_title: "図形がスライド外にはみ出し、構造を損なう可能性がある"
         action: "図形の役割を確認し、情報要素なら画面内に戻す。"
       reading_order:
-        status: "manual_defined"
+        status: "implemented_lint"
         priority: "P1"
-        detection: "manual_review"
+        detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
         issue_title: "読み順が視覚順やテンプレート順と合っていない"
@@ -3017,9 +3097,9 @@ rules:
         issue_title: "自動縮小で文字が読みにくくなるリスクがある"
         action: "自動縮小を無効化し、枠サイズと文字量を目視で調整する。"
       wrap_break_changes_meaning:
-        status: "planned"
+        status: "implemented_lint"
         priority: "P1"
-        detection: "manual_review"
+        detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
         issue_title: "折返しで意味が変わっている"
@@ -3067,6 +3147,17 @@ rules:
         impact_axis: "brand_template_divergence"
         issue_title: "テキストボックス内余白バランスが不自然"
         action: "内余白、縦位置、枠高さ、文字サイズをセットで整える。"
+      card_grid_consistency:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "同種カード群のサイズ・内側配置・同格テキスト位置が不統一"
+        action: "同一行のカードをグループとして見直し、カード幅・高さ・上端・内余白・主要子要素と同格テキストボックスの相対位置を揃える。"
       safe_margins:
         status: "implemented_lint"
         priority: "P2"
@@ -3108,17 +3199,6 @@ rules:
         impact_axis: "brand_template_divergence"
         issue_title: "文字揃えがテンプレート基準から外れている"
         action: "中央揃えなど意図した表現でなければ左上基準へ戻す。"
-      alignment_drift:
-        status: "implemented_lint"
-        priority: "P2"
-        axes:
-          - "brand_template_divergence"
-          - "micro_fix_impact"
-        detection: "automated"
-        fix_policy: "manual_review"
-        impact_axis: "brand_template_divergence"
-        issue_title: "近接する要素の揃いがわずかに崩れている"
-        action: "意図した段差でなければ left / top / center の基準線へ揃える。"
       geometry_rounding:
         status: "implemented_lint"
         priority: "P3"
@@ -3175,6 +3255,7 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.safe_margins"
+        exception: "Cover-slide brand marks in the upper-left cover area and template/decorative rasters are excluded from normal content safe-margin checks."
       object_gap_too_small:
         severity: "warning"
         automation: "automated"
@@ -3186,6 +3267,7 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.safe_text_area_text"
+        detection: "Apply content safe text area to body text. Exclude cover and section divider slide types, template header titles, footers/page numbers, and approved full-width template subtitle text."
       font_family:
         severity: "warning"
         automation: "automated"
@@ -3210,14 +3292,6 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.alignment_left_top"
-      alignment_drift:
-        severity: "warning"
-        automation: "automated"
-        priority_catalog: "rules.lint.priority_catalog.alignment_drift"
-        detection: "Detect left/top/center pairs within a 24pt near-alignment group whose drift exceeds 2pt."
-        thresholds:
-          group_tolerance_pt: 24
-          drift_tolerance_pt: 2
       text_color_allowlist:
         severity: "warning"
         automation: "automated"
@@ -3248,9 +3322,24 @@ rules:
         detection: "With --rendered-image-dir, measure final PowerPoint-rendered pixels inside text bboxes and warn below rules.accessibility.contrast_ratio_min. Without rendered images, fall back to explicit RGB text color against solid fills or white slide background; unknown/image/gradient backgrounds remain manual review."
       color_only_meaning:
         severity: "warning"
-        automation: "manual_review"
+        automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.color_only_meaning"
-        reason: "Requires semantic judgment of whether state, correctness, priority, series identity, or trend direction is encoded by color alone."
+        detection: "Detect nearby same-size unlabeled shapes whose only machine-visible differentiator is fill color; emit a risk finding requiring non-color cue repair."
+      heading_hierarchy_broken:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.heading_hierarchy_broken"
+        detection: "Compare title-zone text candidates against body candidates using normalized geometry and dominant font size; warn when body text outranks title hierarchy or title ordering is inconsistent."
+      key_area_cropped:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.key_area_cropped"
+        detection: "Read picture crop metadata and warn when non-decorative image crop exceeds conservative side or axis-total thresholds."
+      missing_required_element:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.missing_required_element"
+        detection: "For non-empty slides, detect absence of a title/header candidate in the normalized top title zone."
       alt_text_required:
         severity: "warning"
         automation: "automated"
@@ -3258,9 +3347,14 @@ rules:
         detection: "Check picture objects for non-empty PowerPoint alt text title or description; decorative exceptions require manual confirmation."
       reading_order:
         severity: "warning"
-        automation: "manual_review"
+        automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.reading_order"
-        reason: "Requires comparison between PowerPoint selection pane order, visible logical order, and selected layout template slots."
+        detection: "Compare text shape source order with normalized top-left visual order and warn when inversion count exceeds threshold."
+      wrap_break_changes_meaning:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.wrap_break_changes_meaning"
+        detection: "Inspect explicit authored line breaks and warn when they split Latin words, numbers and units, bracket punctuation, or short fragments."
       geometry_rounding:
         severity: "warning"
         automation: "automated"
@@ -3275,6 +3369,19 @@ rules:
           padding_ratio_min: 0.5
           padding_ratio_max: 2.0
           side_padding_pt_min: 4
+      card_grid_consistency:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.card_grid_consistency"
+        detection: "Detect repeated card containers in the same row whose container size, top position, padding, first-child relative placement, or same-role child text placement differs from the row median beyond tolerance."
+        thresholds:
+          group_min: 2
+          child_count_min: 2
+          row_center_tolerance_pt: 36
+          top_tolerance_pt: 4
+          size_tolerance_pt: 6
+          padding_tolerance_pt: 8
+          first_child_relative_tolerance_pt: 14
       text_vertical_balance:
         severity: "warning"
         automation: "automated"

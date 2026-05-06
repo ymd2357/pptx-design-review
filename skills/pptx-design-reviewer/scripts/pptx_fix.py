@@ -9,11 +9,16 @@ Fixes (mechanical, no semantic decisions):
 - contrast  text run color replaced with the lint-provided candidate color
             only when --rules contrast and --findings-json are supplied
 - font_size text run size snapped to the nearest allowed scale size only when
-            the feature flag is enabled, explicitly requested, and all safety
-            checks pass; otherwise reported as manual_required
+            explicitly requested and all safety checks pass; otherwise reported
+            as manual_required
+- line_height fixed paragraph line height snapped to the nearest allowed scale
+            only when explicitly requested and fit checks pass
+- alignment  paragraph alignment set to LEFT and text-frame vertical anchor set
+            to TOP when explicitly requested
 
 Out of fixer scope (require human judgment):
-- font_family, overflow, safe_text_area, animation_present, slide_size
+- font_family, overflow, safe_text_area, animation_present, slide_size,
+  alt_text_required, reading_order, semantic color cues, card-grid composition
 
 After --apply, the script re-reads the saved file and re-detects pending
 actions; any residual means the change was not durable on disk. Known
@@ -25,10 +30,12 @@ a warning and exit code becomes 2.
 Usage
     python3 pptx_fix.py DECK.pptx                     # dry-run, prints plan
     python3 pptx_fix.py DECK.pptx --apply             # write in-place
+    python3 pptx_fix.py DECK.pptx --auto --apply      # apply every lint-declared auto-fix candidate
     python3 pptx_fix.py DECK.pptx --apply --backup    # write DECK.pptx.bak if absent
     python3 pptx_fix.py DECK.pptx --apply --rules autofit
     python3 pptx_fix.py DECK.pptx --apply --rules contrast --findings-json lint.json
     python3 pptx_fix.py DECK.pptx --rules font_size
+    python3 pptx_fix.py DECK.pptx --rules line_height,alignment
     python3 pptx_fix.py DECK.pptx --json
 
 Exit code
@@ -50,7 +57,7 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence
 from pptx import Presentation
 from pptx.dml.color import MSO_COLOR_TYPE, RGBColor
 from pptx.enum.shapes import MSO_SHAPE_TYPE
-from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
 from pptx.util import Pt
 
 
@@ -59,15 +66,19 @@ GEOMETRY_ROUND_TOL_PT = 0.1  # only fix when drift is well below half-pt
 SLIDE_W_PT = 1440
 SLIDE_H_PT = 810
 ALLOWED_FONT_SIZES_PT = {80, 64, 56, 48, 40, 36, 32, 28, 24, 22, 20}
+ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
 FONT_SIZE_FIX_DELTA_MAX_PT = 1.0
-FONT_SIZE_FIXER_ENABLED = False
+LINE_HEIGHT_FIX_DELTA_MAX_PT = 4.0
+FONT_SIZE_FIXER_ENABLED = True
 
 DEFAULT_RULES = ("autofit", "geometry")
-ALL_RULES = ("autofit", "geometry", "font_size", "contrast")
+ALL_RULES = ("autofit", "geometry", "font_size", "line_height", "alignment", "contrast")
 CHECK_TO_RULE = {
     "text_autofit_disabled": "autofit",
     "geometry_rounding": "geometry",
     "font_size_scale": "font_size",
+    "line_height": "line_height",
+    "alignment_left_top": "alignment",
     "low_contrast": "contrast",
     "contrast_ratio": "contrast",
 }
@@ -163,6 +174,10 @@ def _detect_geometry(shape, slide_idx, slide_id, slide=None) -> Optional[FixActi
 
 def _nearest_allowed_font_size(size_pt: float) -> int:
     return min(ALLOWED_FONT_SIZES_PT, key=lambda allowed: abs(size_pt - allowed))
+
+
+def _nearest_allowed_line_height(size_pt: float) -> int:
+    return min(ALLOWED_LINE_HEIGHTS_PT, key=lambda allowed: abs(size_pt - allowed))
 
 
 def _slide_scale(slide) -> float:
@@ -400,6 +415,137 @@ def _detect_font_size(shape, slide_idx, slide_id, slide=None) -> Optional[FixAct
     )
 
 
+def _detect_line_height(shape, slide_idx, slide_id, slide=None) -> Optional[FixAction]:
+    if slide is None or not getattr(shape, "has_text_frame", False):
+        return None
+
+    scale = _slide_scale(slide)
+    updates: list[dict] = []
+    reasons: list[str] = []
+    paragraph_count = 0
+    text = shape.text_frame.text.strip()
+
+    for p_idx, para in enumerate(shape.text_frame.paragraphs, start=1):
+        if not para.text.strip():
+            continue
+        paragraph_count += 1
+        line_spacing = para.line_spacing
+        if line_spacing is None:
+            continue
+        if isinstance(line_spacing, float):
+            reasons.append("relative_line_spacing_requires_review")
+            continue
+        actual = line_spacing.pt
+        normalized = actual * scale
+        target_normalized = _nearest_allowed_line_height(normalized)
+        if abs(normalized - target_normalized) <= 2.0:
+            continue
+        target_actual = target_normalized / scale
+        updates.append(
+            {
+                "paragraph": p_idx,
+                "before_line_height_pt": round(actual, 4),
+                "after_line_height_pt": round(target_actual, 4),
+                "normalized_line_height_pt": round(normalized, 4),
+                "target_normalized_line_height_pt": target_normalized,
+                "text": para.text[:80],
+            }
+        )
+
+    if not updates:
+        return None
+
+    max_delta = max(abs(u["after_line_height_pt"] - u["before_line_height_pt"]) for u in updates)
+    if max_delta > LINE_HEIGHT_FIX_DELTA_MAX_PT:
+        reasons.append("line_height_delta_too_large")
+
+    target_lines = paragraph_count or len(updates)
+    target_line_height = max(u["after_line_height_pt"] for u in updates)
+    required_height = target_lines * target_line_height
+    if required_height > (shape.height / EMU_PER_PT) * 0.9:
+        reasons.append("insufficient_box_height")
+    if "\n" in text or "\v" in text:
+        reasons.append("multi_line_text_requires_review")
+
+    return FixAction(
+        rule="line_height",
+        slide_index=slide_idx,
+        slide_id=slide_id,
+        shape_id=getattr(shape, "shape_id", None),
+        shape_name=getattr(shape, "name", None),
+        status="manual_required" if reasons else "apply",
+        reasons=sorted(set(reasons)),
+        before={
+            "paragraphs": [
+                {
+                    "line_height_pt": u["before_line_height_pt"],
+                    "normalized_line_height_pt": u["normalized_line_height_pt"],
+                    "text": u["text"],
+                }
+                for u in updates
+            ],
+            "scale": round(scale, 4),
+        },
+        after={
+            "paragraphs": [
+                {
+                    "line_height_pt": u["after_line_height_pt"],
+                    "normalized_line_height_pt": u["target_normalized_line_height_pt"],
+                    "text": u["text"],
+                }
+                for u in updates
+            ],
+            "updates": updates,
+        },
+    )
+
+
+def _detect_alignment(shape, slide_idx, slide_id, slide=None) -> Optional[FixAction]:
+    if not getattr(shape, "has_text_frame", False):
+        return None
+    if not shape.text_frame.text.strip():
+        return None
+
+    updates: list[dict] = []
+    if shape.text_frame.vertical_anchor not in (None, MSO_VERTICAL_ANCHOR.TOP):
+        updates.append(
+            {
+                "target": "text_frame",
+                "property": "vertical_anchor",
+                "before": str(shape.text_frame.vertical_anchor),
+                "after": "TOP",
+            }
+        )
+
+    for p_idx, para in enumerate(shape.text_frame.paragraphs, start=1):
+        if not para.text.strip():
+            continue
+        if para.alignment is not None and para.alignment != PP_ALIGN.LEFT:
+            updates.append(
+                {
+                    "target": "paragraph",
+                    "paragraph": p_idx,
+                    "property": "alignment",
+                    "before": str(para.alignment),
+                    "after": "LEFT",
+                    "text": para.text[:80],
+                }
+            )
+
+    if not updates:
+        return None
+
+    return FixAction(
+        rule="alignment",
+        slide_index=slide_idx,
+        slide_id=slide_id,
+        shape_id=getattr(shape, "shape_id", None),
+        shape_name=getattr(shape, "name", None),
+        before={"updates": [{k: v for k, v in update.items() if k != "after"} for update in updates]},
+        after={"updates": updates},
+    )
+
+
 def _contrast_candidate_hex(finding: Any) -> Optional[str]:
     detail = _finding_detail(finding)
     candidates = detail.get("candidate_values")
@@ -555,6 +701,8 @@ DETECTORS: dict = {
     "autofit": _detect_autofit,
     "geometry": _detect_geometry,
     "font_size": _detect_font_size,
+    "line_height": _detect_line_height,
+    "alignment": _detect_alignment,
 }
 
 RULE_ENABLED: dict[str, bool] = {
@@ -718,6 +866,17 @@ def _apply_action(shape, action: FixAction) -> None:
                 tf = shape.table.cell(update["row"] - 1, update["col"] - 1).text_frame
             run = tf.paragraphs[update["paragraph"] - 1].runs[update["run"] - 1]
             run.font.size = Pt(update["after_size_pt"])
+    elif action.rule == "line_height":
+        for update in action.after.get("updates", []):
+            para = shape.text_frame.paragraphs[update["paragraph"] - 1]
+            para.line_spacing = Pt(update["after_line_height_pt"])
+    elif action.rule == "alignment":
+        for update in action.after.get("updates", []):
+            if update["property"] == "vertical_anchor":
+                shape.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.TOP
+            elif update["property"] == "alignment":
+                para = shape.text_frame.paragraphs[update["paragraph"] - 1]
+                para.alignment = PP_ALIGN.LEFT
     elif action.rule == "contrast":
         for update in action.after.get("updates", []):
             if update["kind"] == "shape":
@@ -850,6 +1009,26 @@ def format_actions(actions: List[FixAction], applied: bool) -> str:
                 if len(a.after.get("updates", [])) > 2:
                     diff += f", ... {len(a.after.get('updates', []))} run(s)"
                 lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
+            elif rule == "line_height":
+                examples = a.after.get("updates", [])[:2]
+                diff = ", ".join(
+                    (
+                        f"{r['before_line_height_pt']:g}->{r['after_line_height_pt']:g}pt "
+                        f"({r['normalized_line_height_pt']:g}->{r['target_normalized_line_height_pt']:g}pt normalized)"
+                    )
+                    for r in examples
+                )
+                if len(a.after.get("updates", [])) > 2:
+                    diff += f", ... {len(a.after.get('updates', []))} paragraph(s)"
+                lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
+            elif rule == "alignment":
+                examples = a.after.get("updates", [])[:2]
+                diff = ", ".join(
+                    f"{r['property']}: {r['before']}->{r['after']}" for r in examples
+                )
+                if len(a.after.get("updates", [])) > 2:
+                    diff += f", ... {len(a.after.get('updates', []))} update(s)"
+                lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
             elif rule == "contrast":
                 examples = a.after.get("updates", [])[:2]
                 diff = ", ".join(
@@ -893,6 +1072,25 @@ def load_findings_json(path: Path) -> list[Any]:
     raise ValueError("findings JSON must be a lint JSON array or an object with findings[]")
 
 
+def auto_rules_from_findings(findings: Sequence[Any]) -> tuple[str, ...]:
+    """Return fixer rules needed for lint-declared auto-fix candidates.
+
+    This intentionally follows the evidence schema. A rule is selected only
+    when the finding declares `fixability=auto_fix_candidate`; manual-required
+    findings stay out of automatic mutation even when a low-level detector
+    could technically produce an action.
+    """
+    selected: set[str] = set()
+    for finding in findings:
+        detail = _finding_detail(finding)
+        if detail.get("fixability") != "auto_fix_candidate":
+            continue
+        rule = detail.get("fixability_rule") or _finding_rule(finding)
+        if rule in ALL_RULES and RULE_ENABLED.get(rule, True):
+            selected.add(rule)
+    return tuple(rule for rule in ALL_RULES if rule in selected)
+
+
 # ---- CLI -------------------------------------------------------------------
 
 
@@ -916,6 +1114,25 @@ def main(argv: List[str]) -> int:
             f"comma-separated subset of {{{','.join(ALL_RULES)}}} "
             f"(default: {','.join(DEFAULT_RULES)})"
         ),
+    )
+    ap.add_argument(
+        "--auto",
+        action="store_true",
+        help=(
+            "derive rules and candidate values from lint evidence and process every "
+            "fixability=auto_fix_candidate finding"
+        ),
+    )
+    ap.add_argument(
+        "--profile",
+        choices=["default", "strict"],
+        default="default",
+        help="lint policy profile used with --auto (default: default)",
+    )
+    ap.add_argument(
+        "--rendered-image-dir",
+        type=Path,
+        help="rendered slide PNG directory passed to lint when using --auto",
     )
     ap.add_argument("--json", action="store_true", help="emit actions as JSON")
     ap.add_argument(
@@ -952,8 +1169,23 @@ def main(argv: List[str]) -> int:
             print(f"failed to load --findings-json: {exc}", file=sys.stderr)
             return 1
 
+    if args.auto:
+        if findings is None:
+            try:
+                import pptx_lint  # type: ignore
+            except ImportError as exc:
+                print(f"failed to import pptx_lint for --auto: {exc}", file=sys.stderr)
+                return 1
+            raw_findings = pptx_lint.lint_pptx(
+                args.pptx,
+                profile=args.profile,
+                rendered_image_dir=args.rendered_image_dir,
+            )
+            findings = [pptx_lint.finding_to_json_dict(finding) for finding in raw_findings]
+        rules = list(auto_rules_from_findings(findings))
+
     if "contrast" in rules and findings is None:
-        print("--rules contrast requires --findings-json from pptx_lint.py --json --no-consolidate", file=sys.stderr)
+        print("--rules contrast requires --findings-json from pptx_lint.py --json --no-consolidate, or use --auto", file=sys.stderr)
         return 1
 
     actions = fix_pptx(

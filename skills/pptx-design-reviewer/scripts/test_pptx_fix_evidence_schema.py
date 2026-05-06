@@ -95,6 +95,27 @@ def main() -> int:
             f"legacy finding should fall back to detector decision; got {legacy.status} {legacy.reasons}"
         )
 
+    auto_rules = pptx_fix.auto_rules_from_findings(
+        [
+            _finding(
+                {
+                    "fixability": "auto_fix_candidate",
+                    "fixability_rule": "geometry",
+                    "candidate_values": {"rounded_values_pt": {"x": 81}},
+                }
+            ),
+            _finding(
+                {
+                    "fixability": "manual_required",
+                    "fixability_rule": "contrast",
+                    "manual_required_reason": "complex_background",
+                }
+            ),
+        ]
+    )
+    if auto_rules != ("geometry",):
+        failures.append(f"auto_rules_from_findings selected wrong rules: {auto_rules}")
+
     if failures:
         print("FAIL:")
         for line in failures:

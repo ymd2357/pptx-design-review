@@ -21,7 +21,7 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
-from pptx.enum.text import MSO_AUTO_SIZE
+from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Pt
 
 HERE = Path(__file__).parent
@@ -74,6 +74,39 @@ def _build_manual_font_size_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_line_height_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40), Pt(40), Pt(420), Pt(90))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    para = box.text_frame.paragraphs[0]
+    para.line_spacing = Pt(16.4)
+    run = para.add_run()
+    run.text = "Line height fixture"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _build_alignment_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(40), Pt(40), Pt(300), Pt(80))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+    para = box.text_frame.paragraphs[0]
+    para.alignment = PP_ALIGN.CENTER
+    run = para.add_run()
+    run.text = "Alignment fixture"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
 def _build_contrast_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -86,6 +119,13 @@ def _build_contrast_fixture(out: Path) -> None:
     run.font.name = "Noto Sans JP"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("999999")
+    box = slide.shapes.add_textbox(Pt(120), Pt(210), Pt(300), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Moderate contrast"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    run.font.color.rgb = RGBColor.from_string("858585")
     prs.save(str(out))
 
 
@@ -172,21 +212,28 @@ def main() -> int:
                 "low_contrast did not expose contrast fixability: "
                 f"{low_contrast[0]['detail']}"
             )
+        auto_rules = pptx_fix.auto_rules_from_findings(contrast_findings)
+        if "contrast" not in auto_rules:
+            failures.append(f"auto rules did not include contrast: {auto_rules}")
         actions = pptx_fix.fix_pptx(
             contrast,
             apply=True,
-            rules=("contrast",),
+            rules=auto_rules,
             findings=contrast_findings,
         )
-        if not any(a.rule == "contrast" and a.status == "apply" for a in actions):
+        contrast_actions = [a for a in actions if a.rule == "contrast" and a.status == "apply"]
+        if len(contrast_actions) != 2:
             failures.append("contrast fixer did not apply lint candidate color")
         prs = Presentation(str(contrast))
         fixed_color = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.color.rgb
         if str(fixed_color).upper() != "707070":
             failures.append(f"contrast fixture expected #707070; got #{fixed_color}")
+        fixed_color = prs.slides[0].shapes[1].text_frame.paragraphs[0].runs[0].font.color.rgb
+        if str(fixed_color).upper() != "707070":
+            failures.append(f"moderate contrast fixture expected #707070; got #{fixed_color}")
         residual = pptx_fix.verify_pptx(
             contrast,
-            rules=("contrast",),
+            rules=auto_rules,
             findings=contrast_findings,
         )
         if residual:
@@ -202,39 +249,49 @@ def main() -> int:
         if backup_path.read_bytes() != sentinel:
             failures.append("--backup overwrote an existing .bak file")
 
-        # --- font_size is behind an explicit feature flag ---
+        # --- font_size applies only when fit checks pass ---
         safe_font = tmp_dir / "safe-font.pptx"
         _build_safe_font_size_fixture(safe_font)
         actions = pptx_fix.fix_pptx(safe_font, apply=True, rules=("font_size",))
-        if actions:
-            failures.append("font_size fixer should be disabled by default")
+        if not any(a.rule == "font_size" and a.status == "apply" for a in actions):
+            failures.append("font_size fixer did not report an apply action for safe fixture")
         prs = Presentation(str(safe_font))
+        fixed_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
+        if abs(fixed_size - 14.0) > 1e-6:
+            failures.append(f"font_size safe fixture expected 14pt; got {fixed_size}")
+
+        manual_font = tmp_dir / "manual-font.pptx"
+        _build_manual_font_size_fixture(manual_font)
+        actions = pptx_fix.fix_pptx(manual_font, apply=True, rules=("font_size",))
+        if not any(a.rule == "font_size" and a.status == "manual_required" for a in actions):
+            failures.append("font_size fixer did not report manual_required for unsafe fixture")
+        prs = Presentation(str(manual_font))
         unchanged_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
-        if abs(unchanged_size - 14.75) > 1e-6:
-            failures.append(f"disabled font_size fixer should leave 14.75pt; got {unchanged_size}")
+        if abs(unchanged_size - 22.5) > 1e-6:
+            failures.append(f"font_size manual fixture should remain 22.5pt; got {unchanged_size}")
 
-        old_font_size_enabled = pptx_fix.RULE_ENABLED["font_size"]
-        pptx_fix.RULE_ENABLED["font_size"] = True
-        try:
-            actions = pptx_fix.fix_pptx(safe_font, apply=True, rules=("font_size",))
-            if not any(a.rule == "font_size" and a.status == "apply" for a in actions):
-                failures.append("font_size fixer did not report an apply action for safe fixture")
-            prs = Presentation(str(safe_font))
-            fixed_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
-            if abs(fixed_size - 14.0) > 1e-6:
-                failures.append(f"font_size safe fixture expected 14pt; got {fixed_size}")
+        # --- line_height and alignment safe mechanical fixes ---
+        line_height = tmp_dir / "line-height.pptx"
+        _build_line_height_fixture(line_height)
+        actions = pptx_fix.fix_pptx(line_height, apply=True, rules=("line_height",))
+        if not any(a.rule == "line_height" and a.status == "apply" for a in actions):
+            failures.append("line_height fixer did not report an apply action")
+        prs = Presentation(str(line_height))
+        fixed_line_height = prs.slides[0].shapes[0].text_frame.paragraphs[0].line_spacing.pt
+        if abs(fixed_line_height - 15.0) > 1e-6:
+            failures.append(f"line_height fixture expected 15pt; got {fixed_line_height}")
 
-            manual_font = tmp_dir / "manual-font.pptx"
-            _build_manual_font_size_fixture(manual_font)
-            actions = pptx_fix.fix_pptx(manual_font, apply=True, rules=("font_size",))
-            if not any(a.rule == "font_size" and a.status == "manual_required" for a in actions):
-                failures.append("font_size fixer did not report manual_required for unsafe fixture")
-            prs = Presentation(str(manual_font))
-            unchanged_size = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.size.pt
-            if abs(unchanged_size - 22.5) > 1e-6:
-                failures.append(f"font_size manual fixture should remain 22.5pt; got {unchanged_size}")
-        finally:
-            pptx_fix.RULE_ENABLED["font_size"] = old_font_size_enabled
+        alignment = tmp_dir / "alignment.pptx"
+        _build_alignment_fixture(alignment)
+        actions = pptx_fix.fix_pptx(alignment, apply=True, rules=("alignment",))
+        if not any(a.rule == "alignment" and a.status == "apply" for a in actions):
+            failures.append("alignment fixer did not report an apply action")
+        prs = Presentation(str(alignment))
+        box = prs.slides[0].shapes[0]
+        if box.text_frame.vertical_anchor != MSO_VERTICAL_ANCHOR.TOP:
+            failures.append(f"alignment fixture expected TOP anchor; got {box.text_frame.vertical_anchor}")
+        if box.text_frame.paragraphs[0].alignment != PP_ALIGN.LEFT:
+            failures.append(f"alignment fixture expected LEFT paragraph; got {box.text_frame.paragraphs[0].alignment}")
 
         # --- self-check (verify_pptx) reports no residual on fixed file ---
         bad3 = tmp_dir / "bad3.pptx"

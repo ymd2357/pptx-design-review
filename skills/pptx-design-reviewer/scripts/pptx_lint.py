@@ -20,12 +20,18 @@ Checks
 - background_color_palette (warning) explicit shape/table cell fill color not in palette
 - contrast_ratio      (warning) explicit text/background colors fail contrast threshold
 - low_contrast        (error)   explicit text/background colors are unreadably low contrast
+- color_only_meaning (warning) similar unlabeled colored shapes rely on color alone
+- heading_hierarchy_broken (warning) title/body hierarchy is structurally inconsistent
+- key_area_cropped   (warning) picture crop metadata suggests important content may be clipped
+- missing_required_element (warning) slide content has no machine-detected title/header
+- reading_order      (warning) source order diverges from visual top-left order
+- wrap_break_changes_meaning (warning) explicit line break splits a semantic unit
 - text_overlap       (error)   text frames overlap each other
 - object_overlap     (error)   non-text object bboxes overlap, excluding
                                 structural containment
 - object_gap_too_small (warning) adjacent object gap is below minimum spacing
-- alignment_drift    (warning) nearby left/top/center alignment differs
 - inner_padding_imbalance (warning) child objects are unbalanced inside a container
+- card_grid_consistency (warning) repeated card containers have inconsistent sizing or internal layout
 - text_vertical_balance (warning) text fits but vertical padding/center balance is unnatural
 - animation_present    (error)   slide contains <p:transition> or <p:timing>
 
@@ -48,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass, field
@@ -86,17 +93,59 @@ LINE_HEIGHT_TOL_PT = 2.0
 OBJECT_OVERLAP_AREA_PT2_MIN = 1.0
 STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN = 0.9
 OBJECT_GAP_MIN_PT = 8.0
-ALIGNMENT_GROUP_TOL_PT = 24.0
-ALIGNMENT_DRIFT_TOL_PT = 2.0
 INNER_PADDING_RATIO_MIN = 0.5
 INNER_PADDING_RATIO_MAX = 2.0
 INNER_PADDING_SIDE_MIN_PT = 4.0
+CARD_GRID_GROUP_MIN = 2
+CARD_GRID_CHILD_COUNT_MIN = 2
+CARD_GRID_ROW_CENTER_TOL_PT = 36.0
+CARD_GRID_TOP_TOL_PT = 4.0
+CARD_GRID_SIZE_TOL_PT = 6.0
+CARD_GRID_PADDING_TOL_PT = 8.0
+CARD_GRID_CHILD_RELATIVE_TOL_PT = 14.0
+COVER_BRAND_MARK_MAX_W_PT = 420.0
+COVER_BRAND_MARK_MAX_H_PT = 150.0
+COVER_BRAND_MARK_MAX_X_PT = 100.0
+COVER_BRAND_MARK_MAX_Y_PT = 120.0
 TEXT_VERTICAL_BALANCE_DEAD_SPACE_RATIO_MAX = 0.40
 TEXT_VERTICAL_BALANCE_DEAD_SPACE_PT_MAX = 60.0
 TEXT_VERTICAL_BALANCE_MIDDLE_MARGIN_ASYMMETRY_PT_MAX = 12.0
 TEXT_VERTICAL_BALANCE_CENTER_OFFSET_RATIO_MAX = 0.20
 TEXT_VERTICAL_BALANCE_MIN_BOX_HEIGHT_PT = 30.0
 DEFAULT_LINE_HEIGHT_MULTIPLIER = 1.2
+TITLE_ZONE_BOTTOM_PT = 150.0
+TITLE_FONT_SIZE_MIN_PT = 28.0
+PROMINENT_TITLE_FONT_SIZE_MIN_PT = 40.0
+SECTION_DIVIDER_TEXT_COUNT_MAX = 2
+SECTION_DIVIDER_TITLE_Y_MIN_PT = 220.0
+SECTION_DIVIDER_TITLE_Y_MAX_PT = 520.0
+SECTION_DIVIDER_TITLE_WIDTH_MIN_PT = 600.0
+SECTION_DIVIDER_TITLE_CENTER_TOL_PT = 140.0
+SECTION_DIVIDER_NON_TEXT_COUNT_MAX = 2
+COVER_TEXT_COUNT_MIN = 3
+COVER_TITLE_Y_MIN_PT = 160.0
+COVER_TITLE_Y_MAX_PT = 620.0
+COVER_TITLE_WIDTH_MIN_PT = 600.0
+HEADING_BODY_FONT_DELTA_PT = 4.0
+READING_ORDER_TOP_BUCKET_PT = 24.0
+READING_ORDER_INVERSION_MIN = 2
+READING_ORDER_UNIT_VERTICAL_GAP_PT = 150.0
+READING_ORDER_UNIT_CENTER_X_MAX_PT = 220.0
+READING_ORDER_UNIT_CENTER_X_RATIO = 0.35
+READING_ORDER_UNIT_EDGE_X_TOL_PT = 60.0
+READING_ORDER_FOOTER_Y_MIN_PT = 720.0
+READING_ORDER_FULL_WIDTH_TEXT_PT = 900.0
+SAFE_TEXT_HEADER_Y_MAX_PT = 45.0
+SAFE_TEXT_FOOTER_Y_MIN_PT = 720.0
+SAFE_TEXT_FULL_WIDTH_MIN_PT = 1200.0
+SAFE_TEXT_FULL_WIDTH_X_MAX_PT = 140.0
+SAFE_TEXT_FULL_WIDTH_RIGHT_OVERFLOW_MAX_PT = 80.0
+SAFE_TEXT_PAGE_NUMBER_MAX_W_PT = 80.0
+SAFE_TEXT_PAGE_NUMBER_MAX_H_PT = 40.0
+IMAGE_CROP_SIDE_RATIO_MAX = 0.18
+IMAGE_CROP_AXIS_TOTAL_RATIO_MAX = 0.30
+COLOR_ONLY_GROUP_GAP_PT = 18.0
+COLOR_ONLY_SIZE_TOL_PT = 12.0
 MAX_IMAGE_UPSCALE_RATIO = 1.0
 MAX_IMAGE_ASPECT_DELTA_RATIO = 0.05
 DECORATIVE_RASTER_KEYWORDS = (
@@ -283,6 +332,7 @@ class ShapeRecord:
     actual_bbox_pt: tuple
     bbox_pt: tuple
     kind: str
+    source_order_index: int = 0
 
 
 @dataclass(frozen=True)
@@ -398,6 +448,31 @@ def _text_frame_dominant_font_size_pt(ctx: LintContext, text_frame) -> Optional[
     if size_weights:
         return max(size_weights.items(), key=lambda item: item[1])[0]
     return first_size_pt
+
+
+def _shape_text(shape) -> str:
+    if not getattr(shape, "has_text_frame", False):
+        return ""
+    return (shape.text_frame.text or "").strip()
+
+
+def _text_excerpt(shape, limit: int = 80) -> str:
+    text = " ".join(_shape_text(shape).split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
+
+def _text_frame_lines(text_frame) -> list[str]:
+    lines: list[str] = []
+    for para in text_frame.paragraphs:
+        para_lines: list[str] = []
+        for run in para.runs:
+            para_lines.extend(str(run.text or "").splitlines())
+        if not para_lines:
+            para_lines = [para.text or ""]
+        lines.extend(para_lines)
+    return lines
 
 
 def _paragraph_line_height_pt(ctx: LintContext, para, font_size_pt: float) -> float:
@@ -534,6 +609,7 @@ def _shape_record_detail(record: ShapeRecord) -> dict:
         "shape_id": getattr(record.shape, "shape_id", None),
         "shape_name": getattr(record.shape, "name", None),
         "kind": record.kind,
+        "source_order_index": record.source_order_index,
         "bbox_pt": [round(v, 2) for v in record.bbox_pt],
     }
 
@@ -994,6 +1070,29 @@ def _decorative_template_raster_reason(shape) -> Optional[str]:
     return None
 
 
+def _picture_crop_ratios(shape) -> Optional[dict[str, float]]:
+    if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+        return None
+    try:
+        matches = shape._element.xpath(".//a:srcRect")
+    except (AttributeError, TypeError, ValueError):
+        matches = []
+    if not matches:
+        return None
+    src_rect = matches[0]
+    ratios: dict[str, float] = {}
+    for side in ("l", "t", "r", "b"):
+        raw = src_rect.get(side)
+        if raw is None:
+            ratios[side] = 0.0
+            continue
+        try:
+            ratios[side] = max(0.0, float(raw) / 100000.0)
+        except ValueError:
+            ratios[side] = 0.0
+    return ratios
+
+
 def shape_bbox_pt(shape) -> Optional[tuple]:
     if shape.left is None or shape.top is None or shape.width is None or shape.height is None:
         return None
@@ -1090,11 +1189,50 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     )
 
 
-def check_safe_text_area(ctx, slide_idx, slide_id, shape, bbox, findings):
+def _is_page_number_text(shape, bbox_pt: tuple) -> bool:
+    text = _shape_text(shape)
+    if not text or not re.fullmatch(r"\d{1,3}", text):
+        return False
+    x, y, w, h = bbox_pt
+    return (
+        y >= SAFE_TEXT_FOOTER_Y_MIN_PT
+        and w <= SAFE_TEXT_PAGE_NUMBER_MAX_W_PT
+        and h <= SAFE_TEXT_PAGE_NUMBER_MAX_H_PT
+    )
+
+
+def _safe_text_area_exemption(ctx: LintContext, record: ShapeRecord, slide_type: dict | None) -> Optional[str]:
+    shape = record.shape
+    if slide_type and slide_type.get("slide_type") in {"cover", "section_divider"}:
+        return f"slide_type:{slide_type.get('slide_type')}"
+    x, y, w, h = record.bbox_pt
+    if y <= SAFE_TEXT_HEADER_Y_MAX_PT:
+        return "template_header_title"
+    if y >= SAFE_TEXT_FOOTER_Y_MIN_PT:
+        return "template_footer"
+    if _is_page_number_text(shape, record.bbox_pt):
+        return "page_number"
+    sx, _, sw, _ = SAFE_TEXT_AREA_PT
+    right_overflow = max(0.0, (x + w) - (sx + sw))
+    if (
+        x <= SAFE_TEXT_FULL_WIDTH_X_MAX_PT
+        and w >= SAFE_TEXT_FULL_WIDTH_MIN_PT
+        and 0 < right_overflow <= SAFE_TEXT_FULL_WIDTH_RIGHT_OVERFLOW_MAX_PT
+    ):
+        return "template_full_width_text"
+    return None
+
+
+def check_safe_text_area(ctx, slide_idx, slide_id, record: ShapeRecord, findings, slide_type: dict | None = None):
+    shape = record.shape
     if not shape.has_text_frame:
         return
     if not shape.text_frame.text.strip():
         return
+    exemption = _safe_text_area_exemption(ctx, record, slide_type)
+    if exemption:
+        return
+    bbox = record.actual_bbox_pt
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized
     sx, sy, sw, sh = SAFE_TEXT_AREA_PT
@@ -1123,10 +1261,26 @@ def check_safe_text_area(ctx, slide_idx, slide_id, shape, bbox, findings):
     )
 
 
-def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings):
+def _is_cover_brand_mark(ctx: LintContext, shape, bbox: tuple, slide_type: dict | None) -> bool:
+    if not slide_type or slide_type.get("slide_type") != "cover":
+        return False
+    if shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+        return False
+    x, y, w, h = normalize_bbox(ctx, bbox)
+    return (
+        x <= COVER_BRAND_MARK_MAX_X_PT
+        and y <= COVER_BRAND_MARK_MAX_Y_PT
+        and w <= COVER_BRAND_MARK_MAX_W_PT
+        and h <= COVER_BRAND_MARK_MAX_H_PT
+    )
+
+
+def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings, slide_type: dict | None = None):
     if shape.has_text_frame and shape.text_frame.text.strip():
         return
     if shape.shape_type == MSO_SHAPE_TYPE.PICTURE and _decorative_template_raster_reason(shape):
+        return
+    if _is_cover_brand_mark(ctx, shape, bbox, slide_type):
         return
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized
@@ -1240,6 +1394,53 @@ def check_image_upscale(ctx, slide_idx, slide_id, shape, bbox, findings):
                 "source_aspect": round(source_aspect, 4),
                 "display_aspect": round(display_aspect, 4),
                 "aspect_delta_ratio": round(aspect_delta_ratio, 4),
+            },
+        )
+    )
+
+
+def check_key_area_cropped(ctx, slide_idx, slide_id, shape, bbox, findings):
+    crop = _picture_crop_ratios(shape)
+    if crop is None:
+        return
+    decorative_reason = _decorative_template_raster_reason(shape)
+    if decorative_reason:
+        return
+    horizontal_total = crop["l"] + crop["r"]
+    vertical_total = crop["t"] + crop["b"]
+    max_side = max(crop.values())
+    triggered_rules: list[str] = []
+    if max_side > IMAGE_CROP_SIDE_RATIO_MAX:
+        triggered_rules.append("single_side_crop")
+    if horizontal_total > IMAGE_CROP_AXIS_TOTAL_RATIO_MAX:
+        triggered_rules.append("horizontal_total_crop")
+    if vertical_total > IMAGE_CROP_AXIS_TOTAL_RATIO_MAX:
+        triggered_rules.append("vertical_total_crop")
+    if not triggered_rules:
+        return
+    normalized = normalize_bbox(ctx, bbox)
+    findings.append(
+        make_finding(
+            "warning", "key_area_cropped", slide_idx, slide_id, shape,
+            (
+                "picture crop may remove important content: "
+                + ", ".join(triggered_rules)
+            ),
+            {
+                "evidence_source": "pptx_xml",
+                "evidence_confidence": "medium",
+                "measurement": "image_crop_metadata",
+                "crop_ratio": {side: round(value, 4) for side, value in crop.items()},
+                "horizontal_total_crop_ratio": round(horizontal_total, 4),
+                "vertical_total_crop_ratio": round(vertical_total, 4),
+                "max_side_crop_ratio": round(max_side, 4),
+                "triggered_rules": triggered_rules,
+                "thresholds": {
+                    "side_ratio_max": IMAGE_CROP_SIDE_RATIO_MAX,
+                    "axis_total_ratio_max": IMAGE_CROP_AXIS_TOTAL_RATIO_MAX,
+                },
+                "bbox_pt": [round(v, 2) for v in normalized],
+                "actual_bbox_pt": [round(v, 2) for v in bbox],
             },
         )
     )
@@ -1406,6 +1607,66 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
                 {"alignment": alignment, "paragraphs": count},
             )
         )
+
+
+def check_wrap_break_changes_meaning(ctx, slide_idx, slide_id, shape, bbox, findings):
+    if not getattr(shape, "has_text_frame", False):
+        return
+    if not shape.text_frame.text.strip():
+        return
+    lines = _text_frame_lines(shape.text_frame)
+    if len(lines) < 2:
+        return
+
+    triggered: list[dict[str, Any]] = []
+    for idx, (left_raw, right_raw) in enumerate(zip(lines, lines[1:]), start=1):
+        left = left_raw.strip()
+        right = right_raw.strip()
+        if not left or not right:
+            continue
+        rule = None
+        if re.search(r"[A-Za-z]$", left) and re.search(r"^[a-z]", right):
+            rule = "latin_word_split"
+        elif re.search(r"\d$", left) and re.search(r"^(%|pt|px|mm|cm|kg|g|円|年|月|日)", right):
+            rule = "number_unit_split"
+        elif left[-1] in "([{/" or right[0] in ")]},、。":
+            rule = "punctuation_or_bracket_orphan"
+        elif len(left) <= 2 or len(right) <= 2:
+            rule = "short_fragment_orphan"
+        if rule is None:
+            continue
+        triggered.append(
+            {
+                "line_index": idx,
+                "rule": rule,
+                "left": left[-24:],
+                "right": right[:24],
+            }
+        )
+    if not triggered:
+        return
+
+    normalized = normalize_bbox(ctx, bbox)
+    findings.append(
+        make_finding(
+            "warning", "wrap_break_changes_meaning", slide_idx, slide_id, shape,
+            "explicit line break may split a semantic unit: "
+            + ", ".join(item["rule"] for item in triggered),
+            {
+                "evidence_source": "pptx_xml",
+                "evidence_confidence": "medium",
+                "text_excerpt": _text_excerpt(shape),
+                "line_count": len(lines),
+                "triggered_rules": triggered,
+                "bbox_pt": [round(v, 2) for v in normalized],
+                "actual_bbox_pt": [round(v, 2) for v in bbox],
+                "measured_value": len(triggered),
+                "threshold": 1,
+                "delta": len(triggered),
+                "unit": "line_break_risks",
+            },
+        )
+    )
 
 
 def check_color(
@@ -1706,52 +1967,6 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
                     )
                 )
 
-            x_metrics = {
-                "left": (first.bbox_pt[0], second.bbox_pt[0]),
-                "center_x": (
-                    first.bbox_pt[0] + first.bbox_pt[2] / 2,
-                    second.bbox_pt[0] + second.bbox_pt[2] / 2,
-                ),
-            }
-            y_metrics = {
-                "top": (first.bbox_pt[1], second.bbox_pt[1]),
-                "center_y": (
-                    first.bbox_pt[1] + first.bbox_pt[3] / 2,
-                    second.bbox_pt[1] + second.bbox_pt[3] / 2,
-                ),
-            }
-
-            def axis_drift(metrics: dict[str, tuple[float, float]]) -> dict[str, float]:
-                deltas = {name: abs(a - b) for name, (a, b) in metrics.items()}
-                if any(delta <= ALIGNMENT_DRIFT_TOL_PT for delta in deltas.values()):
-                    return {}
-                return {
-                    name: round(delta, 2)
-                    for name, delta in deltas.items()
-                    if ALIGNMENT_DRIFT_TOL_PT < delta <= ALIGNMENT_GROUP_TOL_PT
-                }
-
-            drifted = axis_drift(x_metrics) | axis_drift(y_metrics)
-            if drifted:
-                findings.append(
-                    make_finding(
-                        "warning", "alignment_drift", slide_idx, slide_id, first.shape,
-                        (
-                            "near-aligned objects drift beyond "
-                            f"{ALIGNMENT_DRIFT_TOL_PT:g}pt within "
-                            f"{ALIGNMENT_GROUP_TOL_PT:g}pt group: "
-                            + ", ".join(f"{name}+{delta:g}pt" for name, delta in drifted.items())
-                        ),
-                        {
-                            "shape_a": _shape_record_detail(first),
-                            "shape_b": _shape_record_detail(second),
-                            "drifted": drifted,
-                            "group_tolerance_pt": ALIGNMENT_GROUP_TOL_PT,
-                            "drift_tolerance_pt": ALIGNMENT_DRIFT_TOL_PT,
-                        },
-                    )
-                )
-
 
 def _is_container_candidate(record: ShapeRecord) -> bool:
     if record.kind in {"text", "image", "table"}:
@@ -1830,6 +2045,655 @@ def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord
                 },
             )
         )
+
+
+def _container_children(records: list[ShapeRecord]) -> dict[int, list[ShapeRecord]]:
+    children_by_container: dict[int, list[ShapeRecord]] = defaultdict(list)
+    for relation in extract_structure_relations(records):
+        if _is_container_candidate(relation.container):
+            children_by_container[id(relation.container)].append(relation.child)
+    return children_by_container
+
+
+def _container_padding(container: ShapeRecord, children: list[ShapeRecord]) -> dict[str, float]:
+    child_left = min(child.bbox_pt[0] for child in children)
+    child_top = min(child.bbox_pt[1] for child in children)
+    child_right = max(child.bbox_pt[0] + child.bbox_pt[2] for child in children)
+    child_bottom = max(child.bbox_pt[1] + child.bbox_pt[3] for child in children)
+    container_left, container_top, container_right, container_bottom = _bbox_edges(container.bbox_pt)
+    return {
+        "left": child_left - container_left,
+        "right": container_right - child_right,
+        "top": child_top - container_top,
+        "bottom": container_bottom - child_bottom,
+    }
+
+
+def _median(values: list[float]) -> float:
+    ordered = sorted(values)
+    mid = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2
+
+
+def _card_row_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
+    rows: list[list[ShapeRecord]] = []
+    for card in sorted(cards, key=lambda item: (_bbox_center(item.bbox_pt)[1], item.bbox_pt[0])):
+        _, cy = _bbox_center(card.bbox_pt)
+        target: list[ShapeRecord] | None = None
+        for row in rows:
+            row_center = _median([_bbox_center(existing.bbox_pt)[1] for existing in row])
+            if abs(cy - row_center) <= CARD_GRID_ROW_CENTER_TOL_PT:
+                target = row
+                break
+        if target is None:
+            rows.append([card])
+        else:
+            target.append(card)
+    return [
+        sorted(row, key=lambda item: item.bbox_pt[0])
+        for row in rows
+        if len(row) >= CARD_GRID_GROUP_MIN
+    ]
+
+
+def _first_child_relative_bbox(container: ShapeRecord, children: list[ShapeRecord]) -> Optional[list[float]]:
+    if not children:
+        return None
+    child = sorted(children, key=lambda item: (item.bbox_pt[1], item.bbox_pt[0]))[0]
+    cx, cy, _, _ = container.bbox_pt
+    x, y, w, h = child.bbox_pt
+    return [x - cx, y - cy, w, h]
+
+
+def check_card_grid_consistency(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    children_by_container = _container_children(records)
+    cards = [
+        record
+        for record in records
+        if _is_container_candidate(record)
+        and len(children_by_container.get(id(record), [])) >= CARD_GRID_CHILD_COUNT_MIN
+    ]
+    for row in _card_row_groups(cards):
+        row_metrics: list[dict] = []
+        for card in row:
+            children = children_by_container[id(card)]
+            padding = _container_padding(card, children)
+            first_child = _first_child_relative_bbox(card, children)
+            row_metrics.append(
+                {
+                    "container": card,
+                    "children": children,
+                    "padding": padding,
+                    "first_child_relative_bbox_pt": first_child,
+                }
+            )
+
+        medians = {
+            "top": _median([item["container"].bbox_pt[1] for item in row_metrics]),
+            "width": _median([item["container"].bbox_pt[2] for item in row_metrics]),
+            "height": _median([item["container"].bbox_pt[3] for item in row_metrics]),
+            "padding_left": _median([item["padding"]["left"] for item in row_metrics]),
+            "padding_right": _median([item["padding"]["right"] for item in row_metrics]),
+            "padding_top": _median([item["padding"]["top"] for item in row_metrics]),
+            "padding_bottom": _median([item["padding"]["bottom"] for item in row_metrics]),
+        }
+        child_relatives = [
+            item["first_child_relative_bbox_pt"]
+            for item in row_metrics
+            if item["first_child_relative_bbox_pt"] is not None
+        ]
+        child_medians = None
+        if len(child_relatives) == len(row_metrics):
+            child_medians = [
+                _median([relative[idx] for relative in child_relatives])
+                for idx in range(4)
+            ]
+
+        inconsistent: list[dict] = []
+        for item in row_metrics:
+            card = item["container"]
+            x, y, w, h = card.bbox_pt
+            deltas = {
+                "top": round(abs(y - medians["top"]), 2),
+                "width": round(abs(w - medians["width"]), 2),
+                "height": round(abs(h - medians["height"]), 2),
+                "padding_left": round(abs(item["padding"]["left"] - medians["padding_left"]), 2),
+                "padding_right": round(abs(item["padding"]["right"] - medians["padding_right"]), 2),
+                "padding_top": round(abs(item["padding"]["top"] - medians["padding_top"]), 2),
+                "padding_bottom": round(abs(item["padding"]["bottom"] - medians["padding_bottom"]), 2),
+            }
+            triggered = [
+                key
+                for key, delta in deltas.items()
+                if (
+                    key == "top" and delta > CARD_GRID_TOP_TOL_PT
+                    or key in {"width", "height"} and delta > CARD_GRID_SIZE_TOL_PT
+                    or key.startswith("padding_") and delta > CARD_GRID_PADDING_TOL_PT
+                )
+            ]
+            child_delta = None
+            if child_medians is not None and item["first_child_relative_bbox_pt"] is not None:
+                child_delta = [
+                    round(abs(value - child_medians[idx]), 2)
+                    for idx, value in enumerate(item["first_child_relative_bbox_pt"])
+                ]
+                if any(delta > CARD_GRID_CHILD_RELATIVE_TOL_PT for delta in child_delta):
+                    triggered.append("first_child_relative_bbox")
+            if triggered:
+                inconsistent.append(
+                    {
+                        "container": _shape_record_detail(card),
+                        "children": [_shape_record_detail(child) for child in item["children"]],
+                        "padding_pt": {side: round(value, 2) for side, value in item["padding"].items()},
+                        "deltas_from_group_median_pt": deltas,
+                        "first_child_relative_bbox_pt": (
+                            [round(v, 2) for v in item["first_child_relative_bbox_pt"]]
+                            if item["first_child_relative_bbox_pt"] is not None
+                            else None
+                        ),
+                        "first_child_relative_delta_pt": child_delta,
+                        "triggered_rules": triggered,
+                    }
+                )
+
+        if not inconsistent:
+            continue
+        max_delta = max(
+            delta
+            for item in inconsistent
+            for delta in item["deltas_from_group_median_pt"].values()
+        )
+        findings.append(
+            make_finding(
+                "warning", "card_grid_consistency", slide_idx, slide_id, row[0].shape,
+                (
+                    f"{len(row)} repeated card containers in the same row are not visually consistent"
+                ),
+                {
+                    "evidence_source": "structure_json",
+                    "evidence_confidence": "medium",
+                    "row_containers": [_shape_record_detail(card) for card in row],
+                    "group_medians": {key: round(value, 2) for key, value in medians.items()},
+                    "inconsistent_containers": inconsistent,
+                    "thresholds": {
+                        "group_min": CARD_GRID_GROUP_MIN,
+                        "child_count_min": CARD_GRID_CHILD_COUNT_MIN,
+                        "row_center_tolerance_pt": CARD_GRID_ROW_CENTER_TOL_PT,
+                        "top_tolerance_pt": CARD_GRID_TOP_TOL_PT,
+                        "size_tolerance_pt": CARD_GRID_SIZE_TOL_PT,
+                        "padding_tolerance_pt": CARD_GRID_PADDING_TOL_PT,
+                        "first_child_relative_tolerance_pt": CARD_GRID_CHILD_RELATIVE_TOL_PT,
+                    },
+                    "measured_value": round(max_delta, 2),
+                    "threshold": CARD_GRID_PADDING_TOL_PT,
+                    "delta": round(max(0.0, max_delta - CARD_GRID_PADDING_TOL_PT), 2),
+                    "unit": "pt",
+                },
+            )
+        )
+
+
+def _text_records(records: list[ShapeRecord]) -> list[ShapeRecord]:
+    return [
+        record
+        for record in records
+        if record.kind == "text" and _shape_text(record.shape)
+    ]
+
+
+def _font_size_for_record(ctx: LintContext, record: ShapeRecord) -> Optional[float]:
+    if not getattr(record.shape, "has_text_frame", False):
+        return None
+    return _text_frame_dominant_font_size_pt(ctx, record.shape.text_frame)
+
+
+def _title_candidates(ctx: LintContext, records: list[ShapeRecord]) -> list[tuple[ShapeRecord, float]]:
+    candidates: list[tuple[ShapeRecord, float]] = []
+    text_records = _text_records(records)
+    if not text_records:
+        return candidates
+    font_sizes = [
+        size
+        for record in text_records
+        if (size := _font_size_for_record(ctx, record)) is not None
+    ]
+    max_font_size = max(font_sizes) if font_sizes else None
+    for record in text_records:
+        size = _font_size_for_record(ctx, record)
+        if size is None:
+            continue
+        _, y, _, _ = record.bbox_pt
+        if y <= TITLE_ZONE_BOTTOM_PT and (
+            size >= TITLE_FONT_SIZE_MIN_PT
+            or (max_font_size is not None and abs(size - max_font_size) <= TOL_PT)
+        ):
+            candidates.append((record, size))
+    return candidates
+
+
+def _prominent_title_candidates(ctx: LintContext, records: list[ShapeRecord]) -> list[tuple[ShapeRecord, float]]:
+    candidates: list[tuple[ShapeRecord, float]] = []
+    text_records = _text_records(records)
+    if not text_records:
+        return candidates
+    font_sizes = [
+        size
+        for record in text_records
+        if (size := _font_size_for_record(ctx, record)) is not None
+    ]
+    max_font_size = max(font_sizes) if font_sizes else None
+    for record in text_records:
+        size = _font_size_for_record(ctx, record)
+        if size is None:
+            continue
+        _, y, w, _ = record.bbox_pt
+        if (
+            y <= COVER_TITLE_Y_MAX_PT
+            and w >= SECTION_DIVIDER_TITLE_WIDTH_MIN_PT
+            and size >= PROMINENT_TITLE_FONT_SIZE_MIN_PT
+            and (max_font_size is None or abs(size - max_font_size) <= TOL_PT)
+        ):
+            candidates.append((record, size))
+    return candidates
+
+
+def _slide_type_detail(ctx: LintContext, records: list[ShapeRecord]) -> dict:
+    text_records = _text_records(records)
+    title_candidates = _title_candidates(ctx, records)
+    prominent = _prominent_title_candidates(ctx, records)
+    non_text_records = [
+        record
+        for record in records
+        if record.kind != "text"
+    ]
+    detail = {
+        "slide_type": "content",
+        "reason": "default_content_slide",
+        "required_element_record": None,
+        "top_title_candidates": [
+            {
+                "shape": _shape_record_detail(record),
+                "font_size_pt": size,
+                "text_excerpt": _text_excerpt(record.shape),
+            }
+            for record, size in title_candidates
+        ],
+        "prominent_title_candidates": [
+            {
+                "shape": _shape_record_detail(record),
+                "font_size_pt": size,
+                "text_excerpt": _text_excerpt(record.shape),
+            }
+            for record, size in prominent
+        ],
+        "text_shape_count": len(text_records),
+        "non_text_shape_count": len(non_text_records),
+    }
+    if title_candidates:
+        record, size = max(title_candidates, key=lambda item: item[1])
+        detail.update(
+            {
+                "required_element_record": {
+                    "shape": _shape_record_detail(record),
+                    "font_size_pt": size,
+                    "text_excerpt": _text_excerpt(record.shape),
+                },
+                "reason": "top_title_candidate_found",
+            }
+        )
+        return detail
+
+    if prominent:
+        record, size = max(prominent, key=lambda item: item[1])
+        x, y, w, h = record.bbox_pt
+        center_y = y + h / 2
+        centered_in_slide = abs(center_y - SLIDE_H_PT / 2) <= SECTION_DIVIDER_TITLE_CENTER_TOL_PT
+        if (
+            len(text_records) <= SECTION_DIVIDER_TEXT_COUNT_MAX
+            and len(non_text_records) <= SECTION_DIVIDER_NON_TEXT_COUNT_MAX
+            and SECTION_DIVIDER_TITLE_Y_MIN_PT <= y <= SECTION_DIVIDER_TITLE_Y_MAX_PT
+            and w >= SECTION_DIVIDER_TITLE_WIDTH_MIN_PT
+            and centered_in_slide
+        ):
+            detail.update(
+                {
+                    "slide_type": "section_divider",
+                    "reason": "single_prominent_center_title",
+                    "required_element_record": {
+                        "shape": _shape_record_detail(record),
+                        "font_size_pt": size,
+                        "text_excerpt": _text_excerpt(record.shape),
+                    },
+                }
+            )
+            return detail
+        if (
+            len(text_records) >= COVER_TEXT_COUNT_MIN
+            and COVER_TITLE_Y_MIN_PT <= y <= COVER_TITLE_Y_MAX_PT
+            and w >= COVER_TITLE_WIDTH_MIN_PT
+        ):
+            detail.update(
+                {
+                    "slide_type": "cover",
+                    "reason": "cover_prominent_title_with_metadata_text",
+                    "required_element_record": {
+                        "shape": _shape_record_detail(record),
+                        "font_size_pt": size,
+                        "text_excerpt": _text_excerpt(record.shape),
+                    },
+                }
+            )
+            return detail
+
+    return detail
+
+
+def check_missing_required_element(ctx, slide_idx, slide_id, records: list[ShapeRecord], findings):
+    text_records = _text_records(records)
+    if not text_records:
+        return
+    slide_type = _slide_type_detail(ctx, records)
+    if slide_type.get("required_element_record"):
+        return
+    top_texts = [
+        {
+            "shape": _shape_record_detail(record),
+            "font_size_pt": _font_size_for_record(ctx, record),
+            "text_excerpt": _text_excerpt(record.shape),
+        }
+        for record in text_records
+        if record.bbox_pt[1] <= TITLE_ZONE_BOTTOM_PT
+    ]
+    findings.append(
+        make_finding(
+            "warning", "missing_required_element", slide_idx, slide_id, None,
+            "slide has content but no machine-detected title/header text",
+            {
+                "evidence_source": "structure_json",
+                "evidence_confidence": "medium",
+                "missing_element": "title",
+                "slide_type": slide_type["slide_type"],
+                "slide_type_reason": slide_type["reason"],
+                "text_shape_count": len(text_records),
+                "top_text_candidates": top_texts,
+                "prominent_title_candidates": slide_type["prominent_title_candidates"],
+                "required_zone_pt": {
+                    "top": 0,
+                    "bottom": TITLE_ZONE_BOTTOM_PT,
+                },
+                "required_font_size_pt_min": TITLE_FONT_SIZE_MIN_PT,
+                "prominent_title_font_size_pt_min": PROMINENT_TITLE_FONT_SIZE_MIN_PT,
+                "measured_value": 0,
+                "threshold": 1,
+                "delta": 1,
+                "unit": "title_candidate_count",
+            },
+        )
+    )
+
+
+def check_heading_hierarchy(ctx, slide_idx, slide_id, records: list[ShapeRecord], findings):
+    text_records = _text_records(records)
+    if len(text_records) < 2:
+        return
+    title_candidates = _title_candidates(ctx, records)
+    if not title_candidates:
+        return
+    title_record, title_size = max(title_candidates, key=lambda item: item[1])
+    body_candidates: list[tuple[ShapeRecord, float]] = []
+    for record in text_records:
+        if record is title_record:
+            continue
+        size = _font_size_for_record(ctx, record)
+        if size is None:
+            continue
+        body_candidates.append((record, size))
+    if not body_candidates:
+        return
+
+    largest_body, body_size = max(body_candidates, key=lambda item: item[1])
+    triggered_rules: list[str] = []
+    if body_size >= title_size + HEADING_BODY_FONT_DELTA_PT:
+        triggered_rules.append("body_larger_than_title")
+    if title_record.bbox_pt[1] > min(record.bbox_pt[1] for record, _ in body_candidates) + TOL_PT:
+        triggered_rules.append("title_after_body")
+    if len(title_candidates) > 1:
+        triggered_rules.append("multiple_title_candidates")
+    if not triggered_rules:
+        return
+
+    findings.append(
+        make_finding(
+            "warning", "heading_hierarchy_broken", slide_idx, slide_id, title_record.shape,
+            "machine-detected heading hierarchy risk: " + ", ".join(triggered_rules),
+            {
+                "evidence_source": "structure_json",
+                "evidence_confidence": "medium",
+                "title_candidate": {
+                    **_shape_record_detail(title_record),
+                    "font_size_pt": round(title_size, 2),
+                    "text_excerpt": _text_excerpt(title_record.shape),
+                },
+                "largest_body_candidate": {
+                    **_shape_record_detail(largest_body),
+                    "font_size_pt": round(body_size, 2),
+                    "text_excerpt": _text_excerpt(largest_body.shape),
+                },
+                "title_candidate_count": len(title_candidates),
+                "triggered_rules": triggered_rules,
+                "thresholds": {
+                    "body_title_font_delta_pt": HEADING_BODY_FONT_DELTA_PT,
+                    "title_zone_bottom_pt": TITLE_ZONE_BOTTOM_PT,
+                },
+                "measured_value": round(body_size - title_size, 2),
+                "threshold": HEADING_BODY_FONT_DELTA_PT,
+                "delta": round(max(0.0, body_size - title_size - HEADING_BODY_FONT_DELTA_PT), 2),
+                "unit": "pt",
+            },
+        )
+    )
+
+
+def _visual_reading_key(record: ShapeRecord) -> tuple[int, float, float]:
+    x, y, _, _ = record.bbox_pt
+    return (round(y / READING_ORDER_TOP_BUCKET_PT), x, y)
+
+
+def _reading_unit_related(first: ShapeRecord, second: ShapeRecord) -> bool:
+    ax, ay, aw, ah = first.bbox_pt
+    bx, by, bw, bh = second.bbox_pt
+    if aw >= READING_ORDER_FULL_WIDTH_TEXT_PT or bw >= READING_ORDER_FULL_WIDTH_TEXT_PT:
+        return False
+    if min(ay, by) < TITLE_ZONE_BOTTOM_PT:
+        return False
+    if min(ay, by) >= READING_ORDER_FOOTER_Y_MIN_PT:
+        return False
+    ax1, ay1, ax2, ay2 = _bbox_edges(first.bbox_pt)
+    bx1, by1, bx2, by2 = _bbox_edges(second.bbox_pt)
+    vertical_gap = _axis_gap(ay1, ay2, by1, by2)
+    if vertical_gap > READING_ORDER_UNIT_VERTICAL_GAP_PT:
+        return False
+    acx, _ = _bbox_center(first.bbox_pt)
+    bcx, _ = _bbox_center(second.bbox_pt)
+    center_threshold = min(
+        READING_ORDER_UNIT_CENTER_X_MAX_PT,
+        max(aw, bw) * READING_ORDER_UNIT_CENTER_X_RATIO,
+    )
+    center_aligned = abs(acx - bcx) <= center_threshold
+    edge_aligned = (
+        abs(ax1 - bx1) <= READING_ORDER_UNIT_EDGE_X_TOL_PT
+        or abs(ax2 - bx2) <= READING_ORDER_UNIT_EDGE_X_TOL_PT
+    )
+    return center_aligned or edge_aligned
+
+
+def _reading_units(records: list[ShapeRecord]) -> list[list[ShapeRecord]]:
+    units: list[list[ShapeRecord]] = []
+    for record in sorted(records, key=_visual_reading_key):
+        target: list[ShapeRecord] | None = None
+        for unit in units:
+            if any(_reading_unit_related(record, existing) for existing in unit):
+                target = unit
+                break
+        if target is None:
+            units.append([record])
+        else:
+            target.append(record)
+    return units
+
+
+def _unit_bbox(unit: list[ShapeRecord]) -> tuple[float, float, float, float]:
+    x1 = min(record.bbox_pt[0] for record in unit)
+    y1 = min(record.bbox_pt[1] for record in unit)
+    x2 = max(record.bbox_pt[0] + record.bbox_pt[2] for record in unit)
+    y2 = max(record.bbox_pt[1] + record.bbox_pt[3] for record in unit)
+    return (x1, y1, x2 - x1, y2 - y1)
+
+
+def _unit_reading_key(unit: list[ShapeRecord]) -> tuple[int, float, float]:
+    x, y, _, _ = _unit_bbox(unit)
+    return (round(y / READING_ORDER_TOP_BUCKET_PT), x, y)
+
+
+def _grouped_visual_reading_order(records: list[ShapeRecord]) -> tuple[list[ShapeRecord], list[list[ShapeRecord]]]:
+    units = _reading_units(records)
+    ordered_units = sorted(units, key=_unit_reading_key)
+    ordered_records: list[ShapeRecord] = []
+    for unit in ordered_units:
+        ordered_records.extend(sorted(unit, key=_visual_reading_key))
+    return ordered_records, ordered_units
+
+
+def _reading_order_inversions(ordered_records: list[ShapeRecord]) -> list[dict]:
+    inversions: list[dict] = []
+    for idx, first in enumerate(ordered_records):
+        for second in ordered_records[idx + 1:]:
+            if first.source_order_index > second.source_order_index:
+                inversions.append(
+                    {
+                        "visual_first": _shape_record_detail(first),
+                        "visual_second": _shape_record_detail(second),
+                    }
+                )
+            if len(inversions) >= READING_ORDER_INVERSION_MIN:
+                break
+        if len(inversions) >= READING_ORDER_INVERSION_MIN:
+            break
+    return inversions
+
+
+def check_reading_order(ctx, slide_idx, slide_id, records: list[ShapeRecord], findings):
+    text_records = _text_records(records)
+    if len(text_records) < 3:
+        return
+    slide_type = _slide_type_detail(ctx, records)
+    if slide_type.get("slide_type") in {"cover", "section_divider"}:
+        return
+    visual_order, reading_units = _grouped_visual_reading_order(text_records)
+    inversions = _reading_order_inversions(visual_order)
+    if len(inversions) < READING_ORDER_INVERSION_MIN:
+        return
+    findings.append(
+        make_finding(
+            "warning", "reading_order", slide_idx, slide_id, visual_order[0].shape,
+            (
+                f"selection/source order disagrees with visual top-left order "
+                f"({len(inversions)} inversion(s))"
+            ),
+            {
+                "evidence_source": "structure_json",
+                "evidence_confidence": "medium",
+                "visual_order": [_shape_record_detail(record) for record in visual_order],
+                "reading_units": [
+                    {
+                        "bbox_pt": [round(v, 2) for v in _unit_bbox(unit)],
+                        "records": [_shape_record_detail(record) for record in sorted(unit, key=_visual_reading_key)],
+                    }
+                    for unit in sorted(reading_units, key=_unit_reading_key)
+                ],
+                "source_order": [
+                    _shape_record_detail(record)
+                    for record in sorted(text_records, key=lambda item: item.source_order_index)
+                ],
+                "inversions": inversions,
+                "measured_value": len(inversions),
+                "threshold": READING_ORDER_INVERSION_MIN,
+                "delta": len(inversions) - READING_ORDER_INVERSION_MIN + 1,
+                "unit": "inversions",
+            },
+        )
+    )
+
+
+def check_color_only_meaning(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    shape_records = [
+        record
+        for record in records
+        if record.kind == "shape"
+        and _solid_shape_fill_rgb_hex(record.shape)
+        and not _shape_text(record.shape)
+        and _bbox_area(record.bbox_pt) > 0
+    ]
+    for idx, first in enumerate(shape_records):
+        group = [first]
+        first_w = first.bbox_pt[2]
+        first_h = first.bbox_pt[3]
+        for second in shape_records[idx + 1:]:
+            if abs(second.bbox_pt[2] - first_w) > COLOR_ONLY_SIZE_TOL_PT:
+                continue
+            if abs(second.bbox_pt[3] - first_h) > COLOR_ONLY_SIZE_TOL_PT:
+                continue
+            ax1, ay1, ax2, ay2 = _bbox_edges(first.bbox_pt)
+            bx1, by1, bx2, by2 = _bbox_edges(second.bbox_pt)
+            gap = min(
+                _axis_gap(ax1, ax2, bx1, bx2),
+                _axis_gap(ay1, ay2, by1, by2),
+            )
+            if gap <= COLOR_ONLY_GROUP_GAP_PT:
+                group.append(second)
+        if len(group) < 2:
+            continue
+        colors = sorted({
+            color
+            for record in group
+            if (color := _solid_shape_fill_rgb_hex(record.shape))
+        })
+        if len(colors) < 2:
+            continue
+        findings.append(
+            make_finding(
+                "warning", "color_only_meaning", slide_idx, slide_id, first.shape,
+                (
+                    "similar unlabeled shapes differ only by color; "
+                    "add text, icon, pattern, or shape cue"
+                ),
+                {
+                    "evidence_source": "structure_json",
+                    "evidence_confidence": "low",
+                    "group": [
+                        {
+                            **_shape_record_detail(record),
+                            "fill_hex": _solid_shape_fill_rgb_hex(record.shape),
+                        }
+                        for record in group
+                    ],
+                    "colors": colors,
+                    "non_color_cue_present": False,
+                    "triggered_rules": ["unlabeled_similar_shapes_distinct_colors"],
+                    "thresholds": {
+                        "group_gap_pt": COLOR_ONLY_GROUP_GAP_PT,
+                        "size_tolerance_pt": COLOR_ONLY_SIZE_TOL_PT,
+                    },
+                    "measured_value": len(colors),
+                    "threshold": 2,
+                    "delta": len(colors) - 1,
+                    "unit": "distinct_colors",
+                },
+            )
+        )
+        return
 
 
 def check_text_vertical_balance(ctx, slide_idx, slide_id, shape, bbox, findings):
@@ -2016,7 +2880,7 @@ def lint_pptx(
                 )
             )
         records: list[ShapeRecord] = []
-        for shape in iter_shapes(slide.shapes):
+        for source_order_index, shape in enumerate(iter_shapes(slide.shapes), start=1):
             bbox = shape_bbox_pt(shape)
             if bbox is None:
                 continue
@@ -2026,25 +2890,34 @@ def lint_pptx(
                     actual_bbox_pt=bbox,
                     bbox_pt=normalize_bbox(ctx, bbox),
                     kind=_shape_kind(shape),
+                    source_order_index=source_order_index,
                 )
             )
+        slide_type = _slide_type_detail(ctx, records)
         check_object_relationships(idx, slide_id, records, findings)
         check_inner_padding_imbalance(idx, slide_id, records, findings)
+        check_card_grid_consistency(idx, slide_id, records, findings)
+        check_missing_required_element(ctx, idx, slide_id, records, findings)
+        check_heading_hierarchy(ctx, idx, slide_id, records, findings)
+        check_reading_order(ctx, idx, slide_id, records, findings)
+        check_color_only_meaning(idx, slide_id, records, findings)
         for record in records:
             shape = record.shape
             bbox = record.actual_bbox_pt
             before_overflow_count = len(findings)
             check_overflow(ctx, idx, slide_id, shape, bbox, findings)
             overflowed = any(f.check == "overflow_text" for f in findings[before_overflow_count:])
-            check_safe_text_area(ctx, idx, slide_id, shape, bbox, findings)
-            check_safe_margins(ctx, idx, slide_id, shape, bbox, findings)
+            check_safe_text_area(ctx, idx, slide_id, record, findings, slide_type)
+            check_safe_margins(ctx, idx, slide_id, shape, bbox, findings, slide_type)
             check_geometry_rounding(ctx, idx, slide_id, shape, bbox, findings)
             check_image_upscale(ctx, idx, slide_id, shape, bbox, findings)
+            check_key_area_cropped(ctx, idx, slide_id, shape, bbox, findings)
             check_alt_text(idx, slide_id, shape, findings)
             check_autofit(idx, slide_id, shape, findings)
             check_font(ctx, idx, slide_id, shape, findings)
             check_line_height(ctx, idx, slide_id, shape, findings)
             check_alignment(ctx, idx, slide_id, shape, findings)
+            check_wrap_break_changes_meaning(ctx, idx, slide_id, shape, bbox, findings)
             check_color(
                 ctx,
                 idx,
@@ -2091,7 +2964,7 @@ def extract_pptx_structure(
     for idx, slide in enumerate(prs.slides, start=1):
         slide_id = getattr(slide, "slide_id", None)
         records: list[ShapeRecord] = []
-        for shape in iter_shapes(slide.shapes):
+        for source_order_index, shape in enumerate(iter_shapes(slide.shapes), start=1):
             bbox = shape_bbox_pt(shape)
             if bbox is None:
                 continue
@@ -2101,6 +2974,7 @@ def extract_pptx_structure(
                     actual_bbox_pt=bbox,
                     bbox_pt=normalize_bbox(ctx, bbox),
                     kind=_shape_kind(shape),
+                    source_order_index=source_order_index,
                 )
             )
         for relation in extract_structure_relations(records):
@@ -2250,11 +3124,17 @@ MANUAL_REQUIRED_REASONS = {
     "background_color_palette": "fill color substitution requires brand review",
     "contrast_ratio": "contrast repair requires foreground/background design decision",
     "low_contrast": "unreadable contrast requires visual design decision",
+    "color_only_meaning": "non-color cue choice requires semantic design decision",
+    "heading_hierarchy_broken": "hierarchy repair requires template/content intent review",
+    "key_area_cropped": "crop repair requires important-area decision",
+    "missing_required_element": "missing element repair requires content/template decision",
+    "reading_order": "order repair requires logical content decision",
+    "wrap_break_changes_meaning": "line break repair requires copy/layout decision",
     "text_overlap": "overlap repair requires layout decision",
     "object_overlap": "overlap repair requires layout decision",
     "object_gap_too_small": "spacing repair requires layout decision",
-    "alignment_drift": "alignment repair requires grouping intent review",
     "inner_padding_imbalance": "container padding repair requires composition review",
+    "card_grid_consistency": "repeated card repair requires template grouping intent review",
     "text_vertical_balance": "vertical balance repair requires visual review",
 }
 
@@ -2303,6 +3183,24 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
             "fixability_rule": "geometry",
             "fixability_reason": reason,
             "manual_required_reason": reason,
+        }
+    if check == "font_size_scale":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "font_size",
+            "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+        }
+    if check == "line_height":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "line_height",
+            "fixability_reason": "nearest allowed fixed line height can be applied when pptx_fix fit checks pass",
+        }
+    if check == "alignment_left_top":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "alignment",
+            "fixability_reason": "mechanical paragraph LEFT and text-frame TOP alignment change",
         }
     if _contrast_auto_fixable(check, evidence):
         return {

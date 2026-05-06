@@ -54,19 +54,19 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P0-4 | `overflow_text` | implemented_lint | automated | manual_review | テキストが切れて読めない |
 | P1-1 | `animation_present` | implemented_lint | automated | manual_review | 静的配布で失われる情報 |
 | P1-2 | `alt_text_required` | implemented_lint | automated | manual_review | 意味を持つ画像の代替テキスト欠落 |
-| P1-3 | `color_only_meaning` | manual_defined | manual_review | manual_review | 色だけで意味を伝えている |
+| P1-3 | `color_only_meaning` | implemented_lint | automated | manual_review | 色だけで意味を伝えている |
 | P1-4 | `contrast_ratio` | implemented_lint | automated | manual_review | コントラスト不足 |
-| P1-5 | `heading_hierarchy_broken` | planned | manual_review | manual_review | 見出し階層崩れ |
+| P1-5 | `heading_hierarchy_broken` | implemented_lint | automated | manual_review | 見出し階層崩れ |
 | P1-6 | `image_aspect_distortion` | implemented_lint | automated | manual_review | 画像の縦横比崩れ |
-| P1-7 | `key_area_cropped` | planned | manual_review | manual_review | 画像重要部の欠け |
+| P1-7 | `key_area_cropped` | implemented_lint | automated | manual_review | 画像重要部の欠け |
 | P1-8 | `line_height` | implemented_lint | automated | manual_review | 行間が読みやすさを損なう |
-| P1-9 | `missing_required_element` | planned | automated | manual_review | 必須要素欠落 |
+| P1-9 | `missing_required_element` | implemented_lint | automated | manual_review | 必須要素欠落 |
 | P1-10 | `object_overlap` | implemented_lint | automated | manual_review | オブジェクト重なり |
 | P1-11 | `overflow_images` | implemented_lint | automated | manual_review | 画像のスライド外はみ出し |
 | P1-12 | `overflow_shapes` | implemented_lint | automated | manual_review | 図形のスライド外はみ出し |
-| P1-13 | `reading_order` | manual_defined | manual_review | manual_review | 読み順不整合 |
+| P1-13 | `reading_order` | implemented_lint | automated | manual_review | 読み順不整合 |
 | P1-14 | `text_autofit_disabled` | implemented_lint | automated | auto_fix | 自動縮小による可読性リスク |
-| P1-15 | `wrap_break_changes_meaning` | planned | manual_review | manual_review | 折返しで意味が変わる |
+| P1-15 | `wrap_break_changes_meaning` | implemented_lint | automated | manual_review | 折返しで意味が変わる |
 | P2-1 | `object_gap_too_small` | implemented_lint | automated | manual_review | 隣接オブジェクト間隔が狭い |
 | P2-2 | `background_color_palette` | implemented_lint | automated | manual_review | 背景・塗り色がパレット外 |
 | P2-3 | `font_family` | implemented_lint | automated | manual_review | 書体がテンプレート外 |
@@ -78,7 +78,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-9 | `slide_size` | implemented_lint | automated | manual_review | スライドサイズが基準比率外 |
 | P2-10 | `text_color_allowlist` | implemented_lint | automated | manual_review | 文字色が許可リスト外 |
 | P2-11 | `alignment_left_top` | implemented_lint | automated | manual_review | 文字揃えがテンプレート基準外 |
-| P2-12 | `alignment_drift` | implemented_lint | automated | manual_review | 近接要素の揃いズレ |
+| P2-12 | `card_grid_consistency` | implemented_lint | automated | manual_review | 同種カード群のサイズ・内側配置が不統一 |
 | P2-13 | `text_vertical_balance` | implemented_lint | automated | manual_review | テキストボックス内の縦余白バランス不自然 |
 | P3-1 | `geometry_rounding` | implemented_lint | automated | auto_fix | 座標の微小な丸めズレ |
 
@@ -182,8 +182,8 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 - `alignment_left_top` 2 件 → `REV-013` (`p2-13`) の left-align fix で解消
 - `geometry_rounding` 138 → 129
   (`REV-015` / `p2-15` で浮動小数点誤差由来 54 件を解消)
-- 残 lint: `geometry_rounding` 129, `alignment_drift` 89,
-  `safe_text_area_text` 27, `inner_padding_imbalance` 17, `safe_margins` 1
+- 残 lint: `geometry_rounding` 129, `safe_text_area_text` 27,
+  `inner_padding_imbalance` 17, `safe_margins` 1
 - 残 `geometry_rounding` 129 件はすべて `.25/.5/.75pt` 単位で、
   グリッド計算上の意図的な値の可能性が高い。auto-fix で integer に丸めると
   レイアウトが壊れるため対象外。
@@ -191,7 +191,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
   新規 artifact 接頭辞は `rev-016-*` を使う。
   候補は
   (a) PowerPoint 書き出しで目視 DIFF を取り finalize するか、
-  (b) `alignment_drift` 再発系の根本原因 (マスター/スタイル) を直すかの
+  (b) 同種カード群の内側配置を `card_grid_consistency` として確認するかの
   どちらかが候補。
 
 ### 既存 artifact / evidence 復元メモ
@@ -240,7 +240,8 @@ Pn は finding 数ではなく、納品物への影響度で決める。
   evidence が復元できていない。
 - `not_applicable`: この deck の確認対象外。
 
-最新 lint 件数は `REV-015` の `p2-15-after-lint.json` を基準にする。
+最新 lint 件数は `REV-017` の
+`rev-017-rendered-contrast-lint.json` を基準にする。
 `REV-014` の `p2-14-after-lint.json` は `alignment_left_top` 2 件を含むため、
 正本系列の採用状態としては使わない。
 
@@ -252,19 +253,19 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P0-4 | `overflow_text` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-1 | `animation_present` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-2 | `alt_text_required` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P1-3 | `color_only_meaning` | not_recorded | n/a | not_recorded | n/a | manual_defined 観点。色以外の手掛かり確認は未記録。 |
+| P1-3 | `color_only_meaning` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P1-4 | `contrast_ratio` | remaining | 9 | rendered_automated | `REV-017` | `rev-017-rendered-contrast-lint.json` で PowerPoint 書き出し画像から `contrast_ratio` を機械検出。 |
-| P1-5 | `heading_hierarchy_broken` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。階層の目視判定は未記録。 |
+| P1-5 | `heading_hierarchy_broken` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P1-6 | `image_aspect_distortion` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P1-7 | `key_area_cropped` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。重要部トリミングの個別判定は未記録。 |
+| P1-7 | `key_area_cropped` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P1-8 | `line_height` | done | 0 | visual_done | `REV-006` | `p0-p2-6-*.pptx` と `p2-6-powerpoint-review-images/`。 |
-| P1-9 | `missing_required_element` | not_recorded | n/a | not_recorded | n/a | planned 観点。必須要素の deck 別判定は未記録。 |
+| P1-9 | `missing_required_element` | remaining | 1 | automated_only | `REV-017` | `rev-017-rendered-contrast-lint.json` で 3 スライド (1, 4, 15) に title/header 候補欠落を機械検出。 |
 | P1-10 | `object_overlap` | done | 0 | automated_only | `REV-009` | `p2-9-evaluation-structure.json` で構造メタ化。最新 lint で未検出。 |
 | P1-11 | `overflow_images` | done | 0 | automated_only | `REV-010` | 装飾ラスター除外ルールで解消。最新 lint で未検出。 |
 | P1-12 | `overflow_shapes` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P1-13 | `reading_order` | not_recorded | n/a | not_recorded | n/a | manual_defined 観点。Selection Pane 順序の evidence は未記録。 |
+| P1-13 | `reading_order` | remaining | 1 | automated_only | `REV-017` | `rev-017-rendered-contrast-lint.json` で 5 スライド (2, 7, 10, 12, 13) に source order と visual order の inversion を機械検出。 |
 | P1-14 | `text_autofit_disabled` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P1-15 | `wrap_break_changes_meaning` | not_recorded | n/a | not_recorded | n/a | planned/manual 観点。意味が変わる折返しの目視判定は未記録。 |
+| P1-15 | `wrap_break_changes_meaning` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P2-1 | `object_gap_too_small` | done | 0 | visual_done | `REV-012` | `p0-p2-12-object-gap-fixed.pptx` と `p2-12-review-images/`。 |
 | P2-2 | `background_color_palette` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-3 | `font_family` | done | 0 | visual_done | `REV-007` | `p0-p2-7-font-family-fixed.pptx` と PowerPoint review images。 |
@@ -276,7 +277,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-9 | `slide_size` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-10 | `text_color_allowlist` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-11 | `alignment_left_top` | done | 0 | visual_done | `REV-013` | `p0-p2-13-left-align-fixed.pptx`。`REV-014` の 2 件残りは正本系列に採用しない。 |
-| P2-12 | `alignment_drift` | remaining | 89 | needs_visual_judgment | `REV-015` | 最新 lint 残件。マスター/スタイル起因か許容差かを確認する。 |
+| P2-12 | `card_grid_consistency` | remaining | 4 | needs_visual_judgment | `REV-028` | 旧 `alignment_drift` の責務を吸収。同種カード群の外枠・内余白・主要子要素の相対位置をグループとして確認する。 |
 | P2-13 | `text_vertical_balance` | done | 0 | automated_only | `REV-013`, `REV-014` | `REV-013` 系列で 0 件。`REV-014` はルール evidence のみで正本採用には使わない。 |
 | P3-1 | `geometry_rounding` | remaining | 129 | visual_done | `REV-015` | 残件は `.25/.5/.75pt` 単位。auto-fix 対象外として defer。 |
 
@@ -284,7 +285,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
-| REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点だけを目視判定する | 機械検出した `P0-3`, `P1-4` のコントラスト残件と、`not_recorded` の手動観点 (`P1-3`, `P1-5`, `P1-7`, `P1-9`, `P1-13`, `P1-15`) と、最新 lint 残件のうち目視判断が必要な `P2-6`, `P2-7`, `P2-8`, `P2-12` について、許容・修正・対象外の判断が PowerPoint 書き出し evidence とともに記録されている |
+| REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点を確定する | 機械検出済みの `P0-3`, `P1-4` コントラスト残件と、新規機械 lint 化した `P1-3`, `P1-5`, `P1-7`, `P1-9`, `P1-13`, `P1-15` と、最新 lint 残件の `P2-6`, `P2-7`, `P2-8`, `P2-12` について、修正・許容・対象外の判断が PowerPoint 書き出し evidence と JSON finding とともに記録されている |
 
 ### LINT-007 evidence schema 方針
 
@@ -329,7 +330,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
       `candidate_values` を参照できるようにする。
 - [x] `low_contrast` / `contrast_ratio` では、rendered image の
       foreground/background、元 run 色、候補 token、再計算 ratio を残す。
-- [x] `object_overlap`, `alignment_drift`, `inner_padding_imbalance`,
+- [x] `object_overlap`, `inner_padding_imbalance`, `card_grid_consistency`,
       `safe_*`, `font_*`, `geometry_rounding` でも、修正候補または
       manual_required 理由を残す。
 - [x] 回帰テストで、主要 check の finding が schema 必須項目を満たすことを

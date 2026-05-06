@@ -401,13 +401,34 @@ def _summarize_findings(
             )
         )
 
+    p1_semantic = {
+        "color_only_meaning",
+        "heading_hierarchy_broken",
+        "key_area_cropped",
+        "missing_required_element",
+        "reading_order",
+        "wrap_break_changes_meaning",
+    }
+    slides = _slides_for(findings, p1_semantic)
+    if slides:
+        issues.append(
+            _issue(
+                "P1",
+                "構造、順序、欠落、色依存、改行、画像トリミングが理解を阻害するリスクがある",
+                slides,
+                _evidence_for(raw_findings, p1_semantic),
+                "機械 evidence の対象要素を確認し、テンプレート構造、読む順、非色手掛かり、見出し、必須要素、改行、画像トリミングを直す。",
+                p1_semantic,
+            )
+        )
+
     p2_checks = {
         "overflow_images",
         "overflow_shapes",
         "safe_margins",
         "safe_text_area_text",
         "alignment_left_top",
-        "alignment_drift",
+        "card_grid_consistency",
         "font_size_scale",
         "font_family",
         "inner_padding_imbalance",

@@ -55,24 +55,30 @@ LINT005_CHECKS = {
     "text_overlap",
     "object_overlap",
     "object_gap_too_small",
-    "alignment_drift",
     "inner_padding_imbalance",
 }
 
 KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
+    "card_grid_consistency",
     "slide_size",
     "overflow_shapes",
     "overflow_images",
     "image_aspect_distortion",
     "text_vertical_balance",
+    "color_only_meaning",
+    "heading_hierarchy_broken",
+    "key_area_cropped",
+    "missing_required_element",
+    "reading_order",
+    "wrap_break_changes_meaning",
 } | LINT005_CHECKS
 
 LINT004_POLICY = {
     "image_upscale_ratio": "automated",
     "contrast_ratio": "automated",
-    "color_only_meaning": "manual_review",
+    "color_only_meaning": "automated",
     "alt_text_required": "automated",
-    "reading_order": "manual_review",
+    "reading_order": "automated",
 }
 
 
@@ -350,6 +356,26 @@ def _make_content_overflow_image(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_safe_text_area_template_exempt_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=45, y=13.5, width=360, text="Template header title", size=32)
+    _add_semantic_text(slide, x=90, y=153, width=1323, text="Template full width subtitle", size=24)
+    _add_semantic_text(slide, x=1400, y=762, width=24, text="12", size=20)
+    prs.save(str(out))
+
+
+def _make_safe_text_area_body_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=20, y=240, width=300, text="Body outside safe text area", size=24)
+    prs.save(str(out))
+
+
 def _add_lint005_text_box(slide, *, x: int, y: int, width: int, text: str):
     box = slide.shapes.add_textbox(Pt(x), Pt(y), Pt(width), Pt(42))
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
@@ -422,10 +448,50 @@ def _make_object_relationships_bad(out: Path) -> None:
 
     _add_lint005_rect(slide, x=120, y=300, width=100, height=60)
     _add_lint005_rect(slide, x=125, y=390, width=100, height=60)
+    _add_lint005_text_box(slide, x=300, y=520, width=260, text="Peer text one")
+    _add_lint005_text_box(slide, x=305, y=610, width=260, text="Peer text two")
 
     _add_lint005_rect(slide, x=500, y=300, width=360, height=180)
     _add_lint005_rect(slide, x=502, y=330, width=60, height=40)
     _add_lint005_rect(slide, x=580, y=360, width=60, height=40)
+    prs.save(str(out))
+
+
+def _add_card_with_text(slide, *, x: int, y: int, width: int, height: int, child_y: int = 26):
+    card = _add_lint005_rect(slide, x=x, y=y, width=width, height=height)
+    title = slide.shapes.add_textbox(Pt(x + 24), Pt(y + child_y), Pt(width - 48), Pt(42))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    title_run = title.text_frame.paragraphs[0].add_run()
+    title_run.text = "Card title"
+    title_run.font.name = "Noto Sans JP"
+    title_run.font.size = Pt(24)
+    body = slide.shapes.add_textbox(Pt(x + 24), Pt(y + child_y + 54), Pt(width - 48), Pt(56))
+    body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    body_run = body.text_frame.paragraphs[0].add_run()
+    body_run.text = "Card body text"
+    body_run.font.name = "Noto Sans JP"
+    body_run.font.size = Pt(20)
+    return card
+
+
+def _make_card_grid_consistency_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    for x in (120, 520, 920):
+        _add_card_with_text(slide, x=x, y=220, width=300, height=180)
+    prs.save(str(out))
+
+
+def _make_card_grid_consistency_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_card_with_text(slide, x=120, y=220, width=300, height=180)
+    _add_card_with_text(slide, x=520, y=220, width=300, height=180)
+    _add_card_with_text(slide, x=920, y=220, width=330, height=180, child_y=52)
     prs.save(str(out))
 
 
@@ -530,6 +596,128 @@ def _make_oversized_box_top_anchor_bad(out: Path) -> None:
     prs.save(str(out))
 
 
+def _add_semantic_text(slide, *, x: int, y: int, width: int, text: str, size: int):
+    box = slide.shapes.add_textbox(Pt(x), Pt(y), Pt(width), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = text
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(size)
+    return box
+
+
+def _make_missing_title_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=260, width=900, text="Body without a title", size=24)
+    prs.save(str(out))
+
+
+def _make_cover_slide_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    img = out.with_name("_cover_logo_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        slide.shapes.add_picture(str(img), Pt(26), Pt(25), width=Pt(158), height=Pt(44))
+    finally:
+        img.unlink(missing_ok=True)
+    _add_semantic_text(slide, x=120, y=180, width=720, text="Customer Name", size=32)
+    _add_semantic_text(slide, x=120, y=320, width=1000, text="Prominent proposal title", size=48)
+    _add_semantic_text(slide, x=120, y=650, width=520, text="2026 | SHIFT AI", size=20)
+    prs.save(str(out))
+
+
+def _make_section_divider_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=260, y=330, width=920, text="Section divider title", size=56)
+    prs.save(str(out))
+
+
+def _make_heading_hierarchy_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=50, width=900, text="Small title", size=32)
+    _add_semantic_text(slide, x=120, y=220, width=900, text="Oversized body", size=40)
+    prs.save(str(out))
+
+
+def _make_reading_order_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=340, width=900, text="Third visually", size=24)
+    _add_semantic_text(slide, x=120, y=200, width=900, text="Second visually", size=24)
+    _add_semantic_text(slide, x=120, y=50, width=900, text="First visually", size=32)
+    prs.save(str(out))
+
+
+def _make_wrap_break_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=50, width=900, text="Title", size=32)
+    box = _add_semantic_text(slide, x=120, y=180, width=900, text="", size=24)
+    run = box.text_frame.paragraphs[0].runs[0]
+    run.text = "Auto\nmation improves review speed"
+    prs.save(str(out))
+
+
+def _make_key_area_cropped_bad(out: Path, *, decorative: bool = False) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=50, width=900, text="Title", size=32)
+    img = out.with_name("_cropped_fixture.png")
+    img.write_bytes(make_examples.TINY_PNG)
+    try:
+        pic = slide.shapes.add_picture(str(img), Pt(120), Pt(180), width=Pt(320), height=Pt(180))
+        pic.crop_left = 0.25
+        if decorative:
+            c_nv_pr = pic._element.xpath(".//p:cNvPr")[0]
+            c_nv_pr.set("descr", "decorative-background.png")
+    finally:
+        img.unlink(missing_ok=True)
+    prs.save(str(out))
+
+
+def _make_color_only_bad(out: Path, *, labeled: bool = False) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_semantic_text(slide, x=120, y=50, width=900, text="Title", size=32)
+    for idx, color in enumerate(("FF5757", "039578")):
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            Pt(120 + idx * 118),
+            Pt(180),
+            Pt(100),
+            Pt(48),
+        )
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor.from_string(color)
+        if labeled:
+            shape.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+            run = shape.text_frame.paragraphs[0].add_run()
+            run.text = "NG" if idx == 0 else "OK"
+            run.font.name = "Noto Sans JP"
+            run.font.size = Pt(20)
+    prs.save(str(out))
+
+
 def main() -> int:
     failures: list = []
 
@@ -551,10 +739,14 @@ def main() -> int:
         decorative_distorted_image = tmp_dir / "decorative-distorted-image.pptx"
         decorative_overflow_image = tmp_dir / "decorative-overflow-image.pptx"
         content_overflow_image = tmp_dir / "content-overflow-image.pptx"
+        safe_text_area_template_exempt_good = tmp_dir / "safe-text-area-template-exempt-good.pptx"
+        safe_text_area_body_bad = tmp_dir / "safe-text-area-body-bad.pptx"
         object_relationships_good = tmp_dir / "object-relationships-good.pptx"
         structural_containment_good = tmp_dir / "structural-containment-good.pptx"
         structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
         object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
+        card_grid_consistency_good = tmp_dir / "card-grid-consistency-good.pptx"
+        card_grid_consistency_bad = tmp_dir / "card-grid-consistency-bad.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
         invisible_text_box_vertical_balance_good = (
             tmp_dir / "invisible-text-box-vertical-balance-good.pptx"
@@ -562,6 +754,16 @@ def main() -> int:
         top_anchor_bottom_void_bad = tmp_dir / "top-anchor-bottom-void-bad.pptx"
         middle_anchor_asymmetric_margin_bad = tmp_dir / "middle-anchor-asymmetric-margin-bad.pptx"
         oversized_box_top_anchor_bad = tmp_dir / "oversized-box-top-anchor-bad.pptx"
+        missing_title_bad = tmp_dir / "missing-title-bad.pptx"
+        cover_slide_good = tmp_dir / "cover-slide-good.pptx"
+        section_divider_good = tmp_dir / "section-divider-good.pptx"
+        heading_hierarchy_bad = tmp_dir / "heading-hierarchy-bad.pptx"
+        reading_order_bad = tmp_dir / "reading-order-bad.pptx"
+        wrap_break_bad = tmp_dir / "wrap-break-bad.pptx"
+        key_area_cropped_bad = tmp_dir / "key-area-cropped-bad.pptx"
+        key_area_cropped_decorative = tmp_dir / "key-area-cropped-decorative.pptx"
+        color_only_bad = tmp_dir / "color-only-bad.pptx"
+        color_only_labeled = tmp_dir / "color-only-labeled.pptx"
         make_examples.make_good(good)
         make_examples.make_bad(bad)
         _make_scaled_good(scaled_good)
@@ -577,15 +779,29 @@ def main() -> int:
         _make_decorative_distorted_image(decorative_distorted_image)
         _make_decorative_overflow_image(decorative_overflow_image)
         _make_content_overflow_image(content_overflow_image)
+        _make_safe_text_area_template_exempt_good(safe_text_area_template_exempt_good)
+        _make_safe_text_area_body_bad(safe_text_area_body_bad)
         _make_object_relationships_good(object_relationships_good)
         _make_structural_containment_good(structural_containment_good)
         _make_structural_containment_overflow(structural_containment_overflow)
         _make_object_relationships_bad(object_relationships_bad)
+        _make_card_grid_consistency_good(card_grid_consistency_good)
+        _make_card_grid_consistency_bad(card_grid_consistency_bad)
         _make_text_vertical_balance_good(text_vertical_balance_good)
         _make_invisible_text_box_vertical_balance_good(invisible_text_box_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
         _make_middle_anchor_asymmetric_margin_bad(middle_anchor_asymmetric_margin_bad)
         _make_oversized_box_top_anchor_bad(oversized_box_top_anchor_bad)
+        _make_missing_title_bad(missing_title_bad)
+        _make_cover_slide_good(cover_slide_good)
+        _make_section_divider_good(section_divider_good)
+        _make_heading_hierarchy_bad(heading_hierarchy_bad)
+        _make_reading_order_bad(reading_order_bad)
+        _make_wrap_break_bad(wrap_break_bad)
+        _make_key_area_cropped_bad(key_area_cropped_bad)
+        _make_key_area_cropped_bad(key_area_cropped_decorative, decorative=True)
+        _make_color_only_bad(color_only_bad)
+        _make_color_only_bad(color_only_labeled, labeled=True)
 
         good_findings = pptx_lint.lint_pptx(good)
         if good_findings:
@@ -826,6 +1042,24 @@ def main() -> int:
                 f"{sorted(content_overflow_checks)}"
             )
 
+        safe_text_area_template_findings = [
+            f
+            for f in pptx_lint.lint_pptx(safe_text_area_template_exempt_good)
+            if f.check == "safe_text_area_text"
+        ]
+        if safe_text_area_template_findings:
+            failures.append(
+                "safe-text-area-template-exempt-good.pptx triggered safe_text_area_text:\n  "
+                + "\n  ".join(f.message for f in safe_text_area_template_findings)
+            )
+        safe_text_area_body_findings = [
+            f
+            for f in pptx_lint.lint_pptx(safe_text_area_body_bad)
+            if f.check == "safe_text_area_text"
+        ]
+        if not safe_text_area_body_findings:
+            failures.append("safe-text-area-body-bad.pptx did not trigger safe_text_area_text")
+
         lint005_good_findings = [
             f for f in pptx_lint.lint_pptx(object_relationships_good) if f.check in LINT005_CHECKS
         ]
@@ -884,6 +1118,24 @@ def main() -> int:
                 f"got {sorted(lint005_bad_check_set)}"
             )
 
+        card_grid_good_findings = [
+            f
+            for f in pptx_lint.lint_pptx(card_grid_consistency_good)
+            if f.check == "card_grid_consistency"
+        ]
+        if card_grid_good_findings:
+            failures.append(
+                "card-grid-consistency-good.pptx triggered card_grid_consistency:\n  "
+                + "\n  ".join(f.message for f in card_grid_good_findings)
+            )
+        card_grid_bad_findings = [
+            f
+            for f in pptx_lint.lint_pptx(card_grid_consistency_bad)
+            if f.check == "card_grid_consistency"
+        ]
+        if not card_grid_bad_findings:
+            failures.append("card-grid-consistency-bad.pptx did not trigger card_grid_consistency")
+
         bad_findings = pptx_lint.lint_pptx(bad)
         bad_check_set = {f.check for f in bad_findings}
         missing = EXPECTED_BAD_CHECKS - bad_check_set
@@ -938,6 +1190,65 @@ def main() -> int:
             ]
             if not vertical_balance_findings:
                 failures.append(f"{label} did not trigger text_vertical_balance")
+
+        for fixture, check, label in (
+            (missing_title_bad, "missing_required_element", "missing-title-bad.pptx"),
+            (heading_hierarchy_bad, "heading_hierarchy_broken", "heading-hierarchy-bad.pptx"),
+            (reading_order_bad, "reading_order", "reading-order-bad.pptx"),
+            (wrap_break_bad, "wrap_break_changes_meaning", "wrap-break-bad.pptx"),
+            (key_area_cropped_bad, "key_area_cropped", "key-area-cropped-bad.pptx"),
+            (color_only_bad, "color_only_meaning", "color-only-bad.pptx"),
+        ):
+            findings = [f for f in pptx_lint.lint_pptx(fixture) if f.check == check]
+            if not findings:
+                failures.append(f"{label} did not trigger {check}")
+
+        for fixture, label in (
+            (cover_slide_good, "cover-slide-good.pptx"),
+            (section_divider_good, "section-divider-good.pptx"),
+        ):
+            findings = [
+                f
+                for f in pptx_lint.lint_pptx(fixture)
+                if f.check == "missing_required_element"
+            ]
+            if findings:
+                failures.append(
+                    f"{label} should satisfy missing_required_element by slide type:\n  "
+                    + "\n  ".join(f.message for f in findings)
+                )
+        cover_safe_margin_findings = [
+            f
+            for f in pptx_lint.lint_pptx(cover_slide_good)
+            if f.check == "safe_margins"
+        ]
+        if cover_safe_margin_findings:
+            failures.append(
+                "cover-slide-good.pptx triggered safe_margins for cover brand mark:\n  "
+                + "\n  ".join(f.message for f in cover_safe_margin_findings)
+            )
+
+        decorative_crop_findings = [
+            f
+            for f in pptx_lint.lint_pptx(key_area_cropped_decorative)
+            if f.check == "key_area_cropped"
+        ]
+        if decorative_crop_findings:
+            failures.append(
+                "key-area-cropped-decorative.pptx triggered key_area_cropped:\n  "
+                + "\n  ".join(f.message for f in decorative_crop_findings)
+            )
+
+        labeled_color_findings = [
+            f
+            for f in pptx_lint.lint_pptx(color_only_labeled)
+            if f.check == "color_only_meaning"
+        ]
+        if labeled_color_findings:
+            failures.append(
+                "color-only-labeled.pptx triggered color_only_meaning:\n  "
+                + "\n  ".join(f.message for f in labeled_color_findings)
+            )
 
     if failures:
         print("FAIL:")

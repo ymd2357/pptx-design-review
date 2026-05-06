@@ -191,41 +191,45 @@ manual.
 
 ```bash
 python3 scripts/pptx_fix.py path/to/DECK.pptx
+python3 scripts/pptx_fix.py path/to/DECK.pptx --auto --apply
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply --backup
 python3 scripts/pptx_fix.py path/to/DECK.pptx --apply --rules autofit
 python3 scripts/pptx_fix.py path/to/DECK.pptx --rules font_size
+python3 scripts/pptx_fix.py path/to/DECK.pptx --rules line_height,alignment
 python3 scripts/pptx_fix.py path/to/DECK.pptx --json
 ```
 
 The default mode is dry-run. `--apply` writes in-place. `--backup` writes
 `DECK.pptx.bak` if absent. By default only `autofit,geometry` run. `font_size`
-must be requested explicitly.
+`line_height`, and `alignment` must be requested explicitly.
+Use `--auto` to run lint inside the fixer, select every
+`fixability=auto_fix_candidate` finding, and apply all corresponding safe
+mechanical rules in one pass. This avoids hand-filtering a subset such as only
+`P0-3 low_contrast` while leaving `P1-4 contrast_ratio` untouched.
 
 | Rule | Action |
 | ------ | -------- |
 | `autofit` | Set `text_frame.auto_size` to `MSO_AUTO_SIZE.NONE` when it differs |
 | `geometry` | Round shape `left/top/width/height` to nearest 1pt for drift <0.1pt |
-| `font_size` | Snap text run size to nearest allowed size only when `FONT_SIZE_FIXER_ENABLED` is on, explicitly requested, and safety checks pass; otherwise report `manual_required` |
+| `font_size` | Snap text run size to nearest allowed size only when explicitly requested and safety checks pass; otherwise report `manual_required` |
+| `line_height` | Snap fixed paragraph line height to the nearest allowed value only when explicitly requested and fit checks pass |
+| `alignment` | Set paragraph alignment to LEFT and text-frame vertical anchor to TOP when explicitly requested |
 
-`font_size` is guarded and disabled by default with `FONT_SIZE_FIXER_ENABLED =
-False`. Even when enabled, it only applies when the affected text is a single
-authored line, the actual size delta is <=1pt, the estimated text still fits the
-box after resizing, the container stays within the slide, and the shape bbox
-does not overlap another shape. Otherwise the action is reported as
-`manual_required` and is not written even with `--apply`. Font size and text-box
-size are peer changes and must be reviewed as a set; neither one contains the
-other. Internal margins and vertical anchor are part of that same judgment.
+`font_size` only applies when the affected text is a single authored line, the
+actual size delta is <=1pt, the estimated text still fits the box after
+resizing, the container stays within the slide, and the shape bbox does not
+overlap another shape. Otherwise the action is reported as `manual_required`
+and is not written even with `--apply`. Font size and text-box size are peer
+changes and must be reviewed as a set; neither one contains the other. Internal
+margins and vertical anchor are part of that same judgment.
 
 Out of fixer scope (require human judgment): `font_family`, `overflow`,
-`safe_text_area`, `animation_present`, `slide_size`. Re-lint after applying to
-triage what remains.
-
-For `manual_review` items not covered by `pptx_fix.py` (`line_height`,
-`font_family`, `font_size_scale` with the flag off, `object_gap_too_small`,
-`alignment_left_top`, `inner_padding_imbalance`), write a one-shot
-python-pptx script under `tmp/review/<deck-id>/scripts/` and re-lint.
-Recipes and the keep-the-script rationale: `references/manual-fix-recipes.md`.
+`safe_text_area`, `animation_present`, `slide_size`, semantic color cues,
+alt text, reading order, and card-grid composition. Re-lint after applying to
+triage what remains. For manual repairs, write a one-shot python-pptx script
+under `tmp/review/<deck-id>/scripts/` and re-lint. Recipes and the
+keep-the-script rationale: `references/manual-fix-recipes.md`.
 
 After `--apply`, the fixer re-reads the saved file and verifies the change is
 durable on disk. If any action is still detected, it prints a

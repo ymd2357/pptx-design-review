@@ -19,21 +19,24 @@ from pptx.util import Pt  # noqa: E402
 
 
 REQUIRED_CATALOG_CHECKS = {
-    "alignment_drift",
     "alignment_left_top",
     "alt_text_required",
     "animation_present",
     "background_color_palette",
+    "card_grid_consistency",
     "color_only_meaning",
     "contrast_ratio",
     "font_family",
     "font_size_scale",
     "geometry_rounding",
+    "heading_hierarchy_broken",
     "image_aspect_distortion",
     "image_upscale_ratio",
     "inner_padding_imbalance",
+    "key_area_cropped",
     "line_height",
     "low_contrast",
+    "missing_required_element",
     "object_gap_too_small",
     "object_overlap",
     "overflow_images",
@@ -47,15 +50,8 @@ REQUIRED_CATALOG_CHECKS = {
     "text_color_allowlist",
     "text_encoding",
     "text_overlap",
-}
-
-REQUIRED_PLANNED_CHECKS = {
-    "heading_hierarchy_broken",
-    "key_area_cropped",
-    "missing_required_element",
     "wrap_break_changes_meaning",
 }
-
 
 def _make_mojibake_deck(out: Path) -> None:
     prs = Presentation()
@@ -124,15 +120,9 @@ def _make_unknown_table_cell_font_deck(out: Path) -> None:
 def main() -> int:
     failures: list[str] = []
     catalog = pptx_review_priorities.load_priority_catalog()
-    missing_catalog = (REQUIRED_CATALOG_CHECKS | REQUIRED_PLANNED_CHECKS) - catalog.keys()
+    missing_catalog = REQUIRED_CATALOG_CHECKS - catalog.keys()
     if missing_catalog:
         failures.append(f"priority_catalog is missing checks: {sorted(missing_catalog)}")
-    for check in REQUIRED_PLANNED_CHECKS:
-        rule = catalog.get(check)
-        if rule and (rule.status != "planned" or rule.priority not in {"P0", "P1", "P2"}):
-            failures.append(
-                f"priority_catalog.{check} should be planned P0-P2; got {rule.status} {rule.priority}"
-            )
     if catalog["overflow_images"].priority != "P1":
         failures.append("priority_catalog.overflow_images should be P1 delivery-quality risk")
     if catalog["geometry_rounding"].priority != "P3" or catalog["geometry_rounding"].fix_policy != "auto_fix":
