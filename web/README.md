@@ -53,3 +53,33 @@ npm run build
 ```
 
 The static output is written to `web/dist/`.
+
+## Review Artifact Snapshots
+
+Rendered slide PNGs and lint JSON live under `tmp/review/`, which is ignored.
+To make evidence available on the deployed static site, publish an explicit
+snapshot and commit it:
+
+```bash
+python3 scripts/publish_review_snapshot.py --deck 260329-seminar-curriculum-proposal --rev 017
+git add tmp/review-snapshot/260329-seminar-curriculum-proposal/rev-017
+git commit
+git push
+```
+
+The snapshot output is `tmp/review-snapshot/<deck>/rev-<NNN>/` with:
+
+- `images/slide-XX.png`
+- `lint.json`
+- `priorities.json` when a matching priorities file exists
+
+The script only copies and re-encodes existing artifacts. It does not run the
+review orchestrator, render slides, or regenerate lint.
+
+## Deploy
+
+GitHub Actions builds `web/`, copies `doc/reviews/` and the optional
+`tmp/review-snapshot/` tree into `web/dist/`, and deploys the result to GitHub
+Pages. The deploy workflow runs after pushing relevant web, review, snapshot,
+or workflow changes to the repository default branch, and can also be started
+with `workflow_dispatch`.

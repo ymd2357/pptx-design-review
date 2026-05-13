@@ -6,6 +6,7 @@ import {
   type DeviceFlowState,
 } from "./auth/device-flow";
 import { listReviewDecks, type ReviewDeck } from "./github/contents";
+import { sitePath } from "./site-path";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
 if (!appElement) throw new Error("Missing #app");
@@ -51,7 +52,8 @@ function renderDeckGrid(decks: ReviewDeck[]): HTMLElement {
     const card = document.createElement("a");
     card.className = "deck-card";
     const rev = deck.revs.at(-1) ?? "017";
-    card.href = `/review/?deck=${encodeURIComponent(deck.deck)}&rev=${encodeURIComponent(rev)}`;
+    card.href =
+      `${sitePath("review/")}?deck=${encodeURIComponent(deck.deck)}&rev=${encodeURIComponent(rev)}`;
     card.innerHTML = `
       <div class="thumb-placeholder"></div>
       <div>

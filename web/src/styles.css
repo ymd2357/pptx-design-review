@@ -60,6 +60,7 @@ textarea {
 .status-text,
 .auth-panel,
 .review-summary,
+.artifact-panel,
 .observation-card,
 .deck-card {
   background: #ffffff;
@@ -73,7 +74,8 @@ textarea {
 }
 
 .auth-panel,
-.review-summary {
+.review-summary,
+.artifact-panel {
   display: grid;
   gap: 12px;
   margin-bottom: 14px;
@@ -187,6 +189,31 @@ textarea {
 .review-summary h2 {
   font-size: 1.08rem;
   overflow-wrap: anywhere;
+}
+
+.artifact-panel h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.artifact-panel p {
+  margin: 0;
+  color: #526173;
+}
+
+.artifact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.artifact-grid img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border: 1px solid #d7dde5;
+  border-radius: 6px;
+  background: #f8fafc;
 }
 
 .message-list {

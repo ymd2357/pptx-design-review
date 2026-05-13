@@ -14,10 +14,13 @@ import {
 } from "./data/decisions-tsv";
 import {
   fetchDecisionTsv,
+  fetchReviewSnapshot,
   GitHubContentError,
   putFile,
   type PutFileResult,
+  type ReviewSnapshot,
 } from "./github/contents";
+import { sitePath } from "./site-path";
 import { renderObservationCard } from "./ui/observation-card";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
@@ -33,6 +36,7 @@ let originalRows: DecisionRow[] = [];
 let sourceSha: string | undefined;
 let filePath = `doc/reviews/${deck}/rev-${rev}-decisions.tsv`;
 let fileSource: "github" | "local" = "local";
+let snapshot: ReviewSnapshot | undefined;
 
 void renderReview();
 
@@ -47,6 +51,7 @@ async function renderReview(): Promise<void> {
     originalRows = cloneRows(parsed.rows);
     rows = cloneRows(parsed.rows);
     applyDrafts(rows);
+    snapshot = await loadSnapshot();
     renderLoaded(file.source, parsed.errors);
   } catch (error) {
     app.replaceChildren(
@@ -95,7 +100,7 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   actions.className = "sticky-actions";
   const back = document.createElement("a");
   back.className = "secondary-link";
-  back.href = "/";
+  back.href = sitePath("");
   back.textContent = "Hub";
   const download = document.createElement("button");
   download.type = "button";
@@ -118,8 +123,63 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   });
   actions.append(back, download, commit);
 
-  root.append(summary, messages, cardList, actions);
+  root.append(summary, messages, renderSnapshotPanel(), cardList, actions);
   app.replaceChildren(root);
+}
+
+async function loadSnapshot(): Promise<ReviewSnapshot | undefined> {
+  try {
+    return await fetchReviewSnapshot(deck, rev);
+  } catch (error) {
+    console.warn("Review snapshot fetch failed.", error);
+    return undefined;
+  }
+}
+
+function renderSnapshotPanel(): HTMLElement {
+  const panel = document.createElement("section");
+  panel.className = "artifact-panel";
+
+  const title = document.createElement("div");
+  const eyebrow = document.createElement("p");
+  eyebrow.className = "eyebrow";
+  eyebrow.textContent = "snapshot";
+  const heading = document.createElement("h2");
+  heading.textContent = snapshot ? "Published review artifacts" : "No published artifacts";
+  title.append(eyebrow, heading);
+
+  const meta = document.createElement("p");
+  if (!snapshot) {
+    meta.textContent = "Run the snapshot publisher and commit tmp/review-snapshot to show evidence.";
+    panel.append(title, meta);
+    return panel;
+  }
+
+  meta.textContent =
+    `${snapshot.imageUrls.length} slide images / ${lintCount(snapshot.lint)} lint findings` +
+    (snapshot.priorities ? " / priorities.json" : "");
+
+  const imageGrid = document.createElement("div");
+  imageGrid.className = "artifact-grid";
+  for (const imageUrl of snapshot.imageUrls.slice(0, 4)) {
+    const image = document.createElement("img");
+    image.src = imageUrl;
+    image.alt = "Published slide snapshot";
+    image.loading = "lazy";
+    imageGrid.append(image);
+  }
+
+  const lintLink = document.createElement("a");
+  lintLink.className = "text-link";
+  lintLink.href = `${snapshot.basePath}/lint.json`;
+  lintLink.target = "_blank";
+  lintLink.rel = "noreferrer";
+  lintLink.textContent = "lint.json";
+
+  panel.append(title, meta);
+  if (imageGrid.childElementCount > 0) panel.append(imageGrid);
+  panel.append(lintLink);
+  return panel;
 }
 
 function shell(statusText: string): HTMLElement {
@@ -376,4 +436,8 @@ function draftPrefix(): string {
 
 function cloneRows(sourceRows: DecisionRow[]): DecisionRow[] {
   return sourceRows.map((row) => ({ ...row }));
+}
+
+function lintCount(lint: unknown): number {
+  return Array.isArray(lint) ? lint.length : 0;
 }

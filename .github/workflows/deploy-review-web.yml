@@ -1,0 +1,72 @@
+name: Deploy review web
+
+on:
+  push:
+    paths:
+      - "web/**"
+      - "doc/reviews/**"
+      - "tmp/review-snapshot/**"
+      - ".github/workflows/deploy-review-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+      - name: Copy review TSV files
+        run: |
+          mkdir -p web/dist/doc
+          cp -R doc/reviews web/dist/doc/reviews
+
+      - name: Copy review snapshot files
+        run: |
+          if [ -d tmp/review-snapshot ]; then
+            mkdir -p web/dist/tmp
+            cp -R tmp/review-snapshot web/dist/tmp/review-snapshot
+          fi
+
+      - name: Disable Jekyll
+        run: touch web/dist/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
