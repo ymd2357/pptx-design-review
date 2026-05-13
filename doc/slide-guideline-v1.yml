@@ -1394,6 +1394,19 @@ rules:
       recommended_max_bullets_per_slide: 6
 
   color:
+    model:
+      principle: "Allowed color hex values are not interchangeable. Raw palette values, semantic roles, usage policies, pair policies, and repair policies must stay separate."
+      layers:
+        raw_palette: "rules.color.palette and tokens.value.color.* store color values and scale families only."
+        semantic_roles: "tokens.semantic.color.* assigns usage meaning such as text.primary, background.base, accent.magenta, state.info, and data_series."
+        usage_policy: "rules.color.allowlist defines where semantic roles may be used."
+        pair_policy: "rules.color.allowlist.text_on_background defines approved text/background combinations."
+        repair_policy: "rules.color.repair_candidates defines what automated fixes may choose for each repair context."
+      prohibited_flattening:
+        - "Do not mix accent, state, data_series, fill, and body-text roles into one generic text repair candidate list."
+        - "Do not use unrelated neutral/accent/state colors for contrast repair when a same-family palette color can pass contrast."
+        - "Do not choose contrast repair colors only by nearest RGB distance across all allowed colors."
+
     palette:
       background:
         base: "#FFFFFF"
@@ -1644,6 +1657,104 @@ rules:
             reason: "Below normal text contrast threshold."
           - role: "white_on_danger"
             reason: "Below normal text contrast threshold."
+
+    repair_candidates:
+      text:
+        hue_preserving_low_contrast:
+          purpose: "Automated repair for unreadable text. Preserve the original color family first, then choose a same-family color that passes contrast."
+          family_selection:
+            algorithm: "Find the nearest design-system palette color to the source foreground color, then use that color's family as the repair candidate family."
+          families:
+            neutral_black:
+              - token: "text.inverse"
+                hex: "#FFFFFF"
+              - token: "brand.utility.off_white"
+                hex: "#FEFEFE"
+              - token: "brand.black.b400"
+                hex: "#999999"
+              - token: "brand.black.b500"
+                hex: "#858585"
+              - token: "brand.black.b600"
+                hex: "#707070"
+              - token: "text.muted"
+                hex: "#666666"
+              - token: "brand.black.b700"
+                hex: "#5C5C5C"
+              - token: "brand.black.b800"
+                hex: "#474747"
+              - token: "text.primary"
+                hex: "#333333"
+              - token: "text.alt_dark"
+                hex: "#1E112D"
+              - token: "brand.utility.black"
+                hex: "#000000"
+            red:
+              - token: "brand.gradient.red"
+                hex: "#FF5757"
+              - token: "brand.gradient.red_deep"
+                hex: "#E6033D"
+              - token: "state.danger"
+                hex: "#D55E00"
+            magenta:
+              - token: "brand.primary.p500"
+                hex: "#C978A7"
+              - token: "brand.primary.p600"
+                hex: "#C06299"
+              - token: "brand.primary.p700"
+                hex: "#B74B8A"
+              - token: "brand.primary.p800"
+                hex: "#AE357C"
+              - token: "accent.magenta"
+                hex: "#A51E6D"
+            blue:
+              - token: "data_series.series_6"
+                hex: "#56B4E9"
+              - token: "brand.gradient.cyan"
+                hex: "#32BED2"
+              - token: "state.info"
+                hex: "#0072B2"
+            green:
+              - token: "brand.secondary.s500"
+                hex: "#68BFAE"
+              - token: "brand.secondary.s600"
+                hex: "#4FB5A1"
+              - token: "brand.secondary.s700"
+                hex: "#35AA93"
+              - token: "brand.secondary.s800"
+                hex: "#1CA086"
+              - token: "brand.secondary.s900"
+                hex: "#039578"
+              - token: "state.success"
+                hex: "#009E73"
+          selection:
+            algorithm: "Within the selected family, choose the closest color to the source foreground that meets the required contrast ratio."
+            fallback: "If no same-family color passes, fall back to the neutral_black family and choose the closest passing neutral."
+        inverse_text_low_contrast:
+          purpose: "Repair text that is intended to remain inverse text on dark/accent/status backgrounds."
+          candidate_order:
+            - role: "inverse"
+              color: "tokens.semantic.color.text.inverse"
+              token: "text.inverse"
+              hex: "#FFFFFF"
+            - role: "off_white"
+              color: "tokens.semantic.color.brand.utility"
+              token: "brand.utility.off_white"
+              hex: "#FEFEFE"
+          selection:
+            algorithm: "Use only when the background role is dark/accent/status and inverse text is semantically valid."
+        emphasis_text_low_contrast:
+          purpose: "Repair emphasized or link-like text only when the source role is already emphasis, state, or link-like."
+          candidate_order:
+            - role: "accent_magenta"
+              color: "tokens.semantic.color.accent.magenta"
+              token: "accent.magenta"
+              hex: "#A51E6D"
+            - role: "info"
+              color: "tokens.semantic.color.state.info"
+              token: "state.info"
+              hex: "#0072B2"
+          selection:
+            algorithm: "Do not use for ordinary body text. Use only when the source role or component context indicates emphasis/link/status."
 
     contrast_gate:
       enabled: true

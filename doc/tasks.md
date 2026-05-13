@@ -82,6 +82,14 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-13 | `text_vertical_balance` | implemented_lint | automated | manual_review | テキストボックス内の縦余白バランス不自然 |
 | P3-1 | `geometry_rounding` | implemented_lint | automated | auto_fix | 座標の微小な丸めズレ |
 
+## デザインシステム整備タスク
+
+| ID | 状態 | 優先度 | 内容 | 完了条件 |
+| --- | --- | --- | --- | --- |
+| DS-001 | done | P0 | 色tokenを raw palette / semantic role / usage policy / pair policy / repair policy に分離する | `low_contrast` / `contrast_ratio` の修復候補が、元色に最も近いデザインシステム色の同系色からコントラストを満たす色を選ぶ |
+| DS-002 | todo | P1 | design-system loader を作り、lint/fix のハードコード色定数を guideline YAML 参照へ移す | `pptx_lint.py` と `pptx_fix.py` が YAML の color policy を読み込んで候補選定する |
+| DS-003 | todo | P1 | design-system 自体のレビューを追加する | 色系列、用途、contrast pair、repair candidate の欠落や混線を `design_system_review` として検出する |
+
 ## 260329 seminar deck 現状メモ
 
 対象:
