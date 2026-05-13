@@ -292,37 +292,63 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 ### REV-017 判定運用
 
 REV-017 完了条件の「判断記録」は、以下の二箇所のいずれかで持つ。
-新規枠は作らず、既存 evidence schema (`rules.lint.evidence_schema.enums.review_status`)
-と `REV-016 観点別判定表` を使う。
+新規枠は作らず、既存 evidence schema
+(`rules.lint.finding_evidence_schema.enums.review_status` と
+`judgement_reason`) と `REV-016 観点別判定表` を使う。
 
 判定の置き場所:
 
 - finding 個別判定は lint JSON の各 finding に
   `review_status` (`unreviewed` / `accepted` / `fix_required` / `fixed`
   / `false_positive` / `out_of_scope`) を埋める。
+  `unreviewed` 以外を入れる際は、対応する `judgement_reason` も同時に
+  埋める (enum は `rules.lint.finding_evidence_schema.enums.judgement_reason`)。
 - 観点単位の集約判定は上の `REV-016 観点別判定表` の
   「判定」列に反映する (`done` / `remaining` / `inferred_done`
   / `not_recorded` / `not_applicable`)。
 
-許容と対象外の区別:
+`judgement_reason` の使い分け (`review_status` ごとの subtype):
 
-- `accepted`: テンプレート意図として許容する。理由は finding の
-  `manual_required_reason` または同表の「根拠 / メモ」列に書く。
-- `out_of_scope`: その deck では対象外と判断する (例: 装飾要素、
-  別 deck の管理対象、配布形態が変わる場合)。理由を同じく記録する。
-- `false_positive`: lint ルール側の誤検出として扱う。直後に
-  ルール改修タスク (`LINT-*` / `FIX-*`) を起こす前提。
+- `accepted` (テンプレート意図として残す):
+  - `intentional_template_design`: テンプレートが意図したレイアウト/色
+  - `within_visual_tolerance`: 閾値を僅かに超えたが視覚的に問題なし
+  - `decorative_only`: 装飾要素で情報伝達に影響なし
+  - `brand_approved_exception`: ブランドガイドの例外として承認済み
+- `fix_required` (配布前に必ず直す):
+  - `auto_fixable`: `pptx_fix.py` が `candidate_values` で機械適用できる
+  - `manual_layout_fix`: 枠サイズ・配置の手動調整が必要
+  - `manual_content_fix`: 本文・テキストの編集が必要
+  - `master_template_fix`: スライドマスター側で直す。deck 個別では直さない
+  - `requires_design_decision`: 修正前に色・書体などの設計判断が必要
+- `fixed` (この deck の後続成果物で既に修正済み):
+  - `fixed_in_later_artifact`: 新しい PPTX リビジョンで反映済み
+  - `fixed_by_rule_update`: lint ルール改修で検出されなくなった
+- `false_positive` (lint 側の誤検出):
+  - `lint_rule_too_strict`: 閾値・スコープを緩める rule 改修が必要
+  - `measurement_error`: 計測方法の問題
+  - `missing_context`: lint が読めないコンテキストで誤判定
+- `out_of_scope` (この deck では意図的に扱わない):
+  - `master_owns`: スライドマスター / ブランド管理者が責務
+  - `different_distribution`: 別配布形態でのみ問題になる
+  - `legacy_asset_frozen`: 凍結済みレガシーアセット
+  - `partner_owned`: 第三者コンテンツで編集不可
+
+`false_positive` を選んだ場合は、直後に lint ルール改修タスク
+(`LINT-*` / `FIX-*`) を起票する前提。`fix_required` の subtype が
+`master_template_fix` の場合は、deck 個別では `out_of_scope` 相当として
+扱い、別途マスター修正タスクを起票する。
 
 件数 0 の観点 (`P1-3`, `P1-5`, `P1-7`, `P1-15`):
 
-- finding が無いため `review_status` を埋める対象は無い。
+- finding が無いため `review_status` / `judgement_reason` を埋める対象は無い。
 - 観点単位では `inferred_done` を最終判定として採用する。
 - REV-017 完了判定では「対象 12 観点のうち 4 観点が
   `inferred_done` で確定済み」と扱う。
 
 検証:
 
-- 全 finding の `review_status` が `unreviewed` 以外であることを
+- 全 finding の `review_status` が `unreviewed` 以外、
+  かつ `judgement_reason` が enum 値であることを
   `jq` などで確認する (deck-level / consolidated 双方)。
 - `REV-016 観点別判定表` の対象 12 行に `not_recorded` が残って
   いないことを確認する。
