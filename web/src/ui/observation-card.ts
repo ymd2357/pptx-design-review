@@ -16,6 +16,7 @@ import {
 export function renderObservationCard(
   row: DecisionRow,
   onChange: () => void,
+  visualHref?: string,
 ): HTMLElement {
   const card = document.createElement("article");
   card.className = "observation-card";
@@ -57,7 +58,15 @@ export function renderObservationCard(
   const errorBox = document.createElement("p");
   errorBox.className = "inline-error";
 
-  card.append(header, meta, decisionLabel, dynamicArea, errorBox);
+  card.append(header, meta);
+  if (visualHref) {
+    const visualLink = document.createElement("a");
+    visualLink.className = "secondary-link visual-review-link";
+    visualLink.href = visualHref;
+    visualLink.textContent = "Visual review ->";
+    card.append(visualLink);
+  }
+  card.append(decisionLabel, dynamicArea, errorBox);
 
   function renderDynamicArea(): void {
     dynamicArea.replaceChildren();

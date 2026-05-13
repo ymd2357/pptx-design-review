@@ -4,6 +4,7 @@ import path from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
 const repoRoot = path.resolve(__dirname, "..");
+const docRoot = path.join(repoRoot, "doc");
 const reviewsRoot = path.join(repoRoot, "doc", "reviews");
 const snapshotRoot = path.join(repoRoot, "tmp", "review-snapshot");
 const repositoryName = process.env.GITHUB_REPOSITORY?.split("/")[1];
@@ -38,9 +39,20 @@ function localReviewsPlugin(): Plugin {
         serveRepoFile(req.url ?? "/", reviewsRoot, res);
       });
 
+      server.middlewares.use("/doc", (req, res) => {
+        serveRepoFile(req.url ?? "/", docRoot, res);
+      });
+
       server.middlewares.use("/tmp/review-snapshot", (req, res) => {
         serveRepoFile(req.url ?? "/", snapshotRoot, res);
       });
+    },
+    closeBundle() {
+      const source = path.join(docRoot, "slide-guideline-v1.yml");
+      const target = path.join(__dirname, "dist", "doc", "slide-guideline-v1.yml");
+      if (!fs.existsSync(source)) return;
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(source, target);
     },
   };
 }
@@ -76,6 +88,7 @@ export default defineConfig({
       input: {
         index: path.resolve(__dirname, "index.html"),
         review: path.resolve(__dirname, "review", "index.html"),
+        visual: path.resolve(__dirname, "visual", "index.html"),
       },
     },
   },

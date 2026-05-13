@@ -20,7 +20,7 @@ export type PutFileOptions = {
   path: string;
   message: string;
   content: string;
-  sha: string;
+  sha?: string;
   branch?: string;
 };
 
@@ -35,6 +35,14 @@ export type ReviewSnapshot = {
   imageUrls: string[];
   lint: unknown | undefined;
   priorities: unknown | undefined;
+};
+
+export type JsonContentFile<T> = {
+  data: T;
+  text: string;
+  sha: string | undefined;
+  source: "github" | "local";
+  path: string;
 };
 
 type GitHubContent = {
@@ -139,6 +147,40 @@ export async function getFile(path: string, token = getStoredToken()): Promise<G
   return githubJson<GitHubContent>(contentsUrl(path), token);
 }
 
+export async function fetchJsonFile<T>(path: string): Promise<JsonContentFile<T> | undefined> {
+  const token = getStoredToken();
+  if (token && hasRepoCoordinates()) {
+    try {
+      const file = await getFile(path, token);
+      const text = decodeGitHubContent(file);
+      return {
+        data: JSON.parse(text) as T,
+        text,
+        sha: file.sha,
+        source: "github",
+        path,
+      };
+    } catch (error) {
+      if (error instanceof GitHubContentError && error.status === 404) return undefined;
+      console.warn("GitHub JSON fetch failed; falling back to local data.", error);
+    }
+  }
+
+  const response = await fetch(sitePath(path));
+  if (response.status === 404) return undefined;
+  if (!response.ok) {
+    throw new Error(`Failed to load ${path}: ${response.status}`);
+  }
+  const text = await response.text();
+  return {
+    data: JSON.parse(text) as T,
+    text,
+    sha: undefined,
+    source: "local",
+    path,
+  };
+}
+
 export async function putFile(opts: PutFileOptions): Promise<PutFileResult> {
   const token = getStoredToken();
   if (!token) {
@@ -148,8 +190,8 @@ export async function putFile(opts: PutFileOptions): Promise<PutFileResult> {
   const body: Record<string, string> = {
     message: opts.message,
     content: encodeBase64(opts.content),
-    sha: opts.sha,
   };
+  if (opts.sha) body.sha = opts.sha;
   if (opts.branch) body.branch = opts.branch;
 
   const response = await fetch(contentsUrl(opts.path), {
@@ -176,10 +218,33 @@ export async function putFile(opts: PutFileOptions): Promise<PutFileResult> {
 
   const data = (await response.json()) as GitHubPutContentResponse;
   return {
-    contentSha: data.content?.sha ?? opts.sha,
+    contentSha: data.content?.sha ?? opts.sha ?? "",
     commitSha: data.commit.sha,
     commitUrl: data.commit.html_url,
   };
+}
+
+export async function putJsonFile<T>(opts: {
+  path: string;
+  message: string;
+  data: T;
+  sha?: string;
+  branch?: string;
+}): Promise<PutFileResult> {
+  return putFile({
+    path: opts.path,
+    message: opts.message,
+    content: `${JSON.stringify(opts.data, null, 2)}\n`,
+    sha: opts.sha,
+    branch: opts.branch,
+  });
+}
+
+export async function getAuthenticatedUserLogin(): Promise<string | undefined> {
+  const token = getStoredToken();
+  if (!token) return undefined;
+  const user = await githubJson<{ login?: string }>("https://api.github.com/user", token);
+  return user.login;
 }
 
 async function listReviewDecksFromGitHub(token: string): Promise<ReviewDeck[]> {

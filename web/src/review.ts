@@ -13,10 +13,24 @@ import {
   type DecisionRow,
 } from "./data/decisions-tsv";
 import {
+  aggregateFindingDispositions,
+  clearFindingJudgementDrafts,
+  findingJudgementsPath,
+  initializeFindingJudgements,
+  mergeLocalJudgementDrafts,
+  parseFindingJudgementsJson,
+  serializeFindingJudgementsJson,
+  type FindingJudgementsFile,
+} from "./data/finding-judgements";
+import { parseLintJson, type LintFinding } from "./data/lint-json";
+import {
   fetchDecisionTsv,
+  fetchJsonFile,
   fetchReviewSnapshot,
   GitHubContentError,
+  getAuthenticatedUserLogin,
   putFile,
+  putJsonFile,
   type PutFileResult,
   type ReviewSnapshot,
 } from "./github/contents";
@@ -37,6 +51,10 @@ let sourceSha: string | undefined;
 let filePath = `doc/reviews/${deck}/rev-${rev}-decisions.tsv`;
 let fileSource: "github" | "local" = "local";
 let snapshot: ReviewSnapshot | undefined;
+let lintFindings: LintFinding[] = [];
+let findingJudgements: FindingJudgementsFile = { deck, rev, judgements: {} };
+let findingJudgementsSha: string | undefined;
+let findingJudgementsFilePath = findingJudgementsPath(deck, rev);
 
 void renderReview();
 
@@ -52,6 +70,8 @@ async function renderReview(): Promise<void> {
     rows = cloneRows(parsed.rows);
     applyDrafts(rows);
     snapshot = await loadSnapshot();
+    await loadFindingJudgements();
+    applyFindingJudgementAggregates(rows);
     renderLoaded(file.source, parsed.errors);
   } catch (error) {
     app.replaceChildren(
@@ -93,7 +113,7 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
     persistDrafts();
   };
   rows.forEach((row) => {
-    cardList.append(renderObservationCard(row, rerenderSummary));
+    cardList.append(renderObservationCard(row, rerenderSummary, visualReviewHref(row)));
   });
 
   const actions = document.createElement("div");
@@ -105,8 +125,8 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   const download = document.createElement("button");
   download.type = "button";
   download.className = "primary-button";
-  download.textContent = "Download TSV";
-  download.addEventListener("click", downloadTsv);
+  download.textContent = "Download files";
+  download.addEventListener("click", downloadReviewFiles);
   const commit = document.createElement("button");
   commit.type = "button";
   commit.className = "primary-button";
@@ -134,6 +154,24 @@ async function loadSnapshot(): Promise<ReviewSnapshot | undefined> {
     console.warn("Review snapshot fetch failed.", error);
     return undefined;
   }
+}
+
+async function loadFindingJudgements(): Promise<void> {
+  lintFindings = snapshot?.lint ? parseLintJson(snapshot.lint).findings : [];
+  findingJudgementsFilePath = findingJudgementsPath(deck, rev);
+  const file = await fetchJsonFile<unknown>(findingJudgementsFilePath);
+  findingJudgementsSha = file?.sha;
+  findingJudgements = mergeLocalJudgementDrafts(
+    initializeFindingJudgements(
+      deck,
+      rev,
+      lintFindings,
+      file ? parseFindingJudgementsJson(file.data, deck, rev) : undefined,
+    ),
+    deck,
+    rev,
+    lintFindings,
+  );
 }
 
 function renderSnapshotPanel(): HTMLElement {
@@ -273,13 +311,20 @@ function renderDeviceState(
   }
 }
 
-function downloadTsv(): void {
+function downloadReviewFiles(): void {
+  applyFindingJudgementAggregates(rows);
   const tsv = serializeDecisionTsv(rows);
-  const blob = new Blob([tsv], { type: "text/tab-separated-values;charset=utf-8" });
+  downloadBlob(tsv, `rev-${rev}-decisions.tsv`, "text/tab-separated-values;charset=utf-8");
+  const json = serializeFindingJudgementsJson(prepareFindingJudgementsForSave());
+  downloadBlob(json, `rev-${rev}-finding-judgements.json`, "application/json;charset=utf-8");
+}
+
+function downloadBlob(content: string, filename: string, type: string): void {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `rev-${rev}-decisions.tsv`;
+  link.download = filename;
   document.body.append(link);
   link.click();
   link.remove();
@@ -288,6 +333,7 @@ function downloadTsv(): void {
 
 async function handleCommit(): Promise<void> {
   if (!sourceSha || fileSource !== "github") return;
+  applyFindingJudgementAggregates(rows);
 
   const validationErrors = rows.flatMap((row) =>
     validateDecisionRow(row).map((error) => `${row.review_no} / ${row.check_id}: ${error}`),
@@ -308,12 +354,13 @@ async function handleCommit(): Promise<void> {
   }
 
   const tsv = serializeDecisionTsv(rows);
-  await commitWithRetry(message, tsv, true);
+  await commitWithRetry(message, tsv, prepareFindingJudgementsForSave(), true);
 }
 
 async function commitWithRetry(
   message: string,
   tsv: string,
+  judgements: FindingJudgementsFile,
   retryOnAuthError: boolean,
 ): Promise<void> {
   try {
@@ -324,7 +371,15 @@ async function commitWithRetry(
       content: tsv,
       sha: sourceSha,
     });
-    handleCommitSuccess(result);
+    const login = await getAuthenticatedUserLogin().catch(() => undefined);
+    if (login) fillMissingUpdatedBy(judgements, login);
+    const judgementResult = await putJsonFile({
+      path: findingJudgementsFilePath,
+      message,
+      data: judgements,
+      sha: findingJudgementsSha,
+    });
+    handleCommitSuccess(result, judgementResult);
   } catch (error) {
     if (error instanceof GitHubContentError && error.kind === "conflict") {
       window.alert("Conflict: file changed on the server");
@@ -333,20 +388,22 @@ async function commitWithRetry(
     }
     if (error instanceof GitHubContentError && error.kind === "auth" && retryOnAuthError) {
       await reauthenticateForRetry();
-      await commitWithRetry(message, tsv, false);
+      await commitWithRetry(message, tsv, judgements, false);
       return;
     }
-    window.alert(error instanceof Error ? error.message : "Failed to commit TSV.");
+    window.alert(error instanceof Error ? error.message : "Failed to commit review files.");
   }
 }
 
-function handleCommitSuccess(result: PutFileResult): void {
+function handleCommitSuccess(result: PutFileResult, judgementResult: PutFileResult): void {
   sourceSha = result.contentSha;
+  findingJudgementsSha = judgementResult.contentSha;
   originalRows = cloneRows(rows);
   clearDrafts();
+  clearFindingJudgementDrafts(deck, rev);
   const sourceLabel = app.querySelector<HTMLElement>(".review-summary .eyebrow");
   if (sourceLabel) sourceLabel.textContent = `${fileSource} / ${sourceSha.slice(0, 7)}`;
-  showCommitSuccessBanner(result);
+  showCommitSuccessBanner(judgementResult);
 }
 
 function showCommitSuccessBanner(result: PutFileResult): void {
@@ -440,4 +497,42 @@ function cloneRows(sourceRows: DecisionRow[]): DecisionRow[] {
 
 function lintCount(lint: unknown): number {
   return Array.isArray(lint) ? lint.length : 0;
+}
+
+function visualReviewHref(row: DecisionRow): string {
+  const query = new URLSearchParams({
+    deck,
+    rev,
+    observation: row.review_no,
+  });
+  return sitePath(`visual/?${query.toString()}`);
+}
+
+function applyFindingJudgementAggregates(targetRows: DecisionRow[]): void {
+  if (lintFindings.length === 0) return;
+  for (const row of targetRows) {
+    const hasFindings = lintFindings.some((finding) => finding.check === row.check_id);
+    if (!hasFindings) continue;
+    row.finding_dispositions = aggregateFindingDispositions(
+      lintFindings,
+      findingJudgements,
+      row.check_id,
+    );
+  }
+}
+
+function prepareFindingJudgementsForSave(): FindingJudgementsFile {
+  findingJudgements = mergeLocalJudgementDrafts(
+    initializeFindingJudgements(deck, rev, lintFindings, findingJudgements),
+    deck,
+    rev,
+    lintFindings,
+  );
+  return findingJudgements;
+}
+
+function fillMissingUpdatedBy(file: FindingJudgementsFile, login: string): void {
+  for (const judgement of Object.values(file.judgements)) {
+    if (judgement.updated_at && !judgement.updated_by) judgement.updated_by = login;
+  }
 }

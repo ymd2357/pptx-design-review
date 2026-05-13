@@ -60,6 +60,7 @@ textarea {
 .status-text,
 .auth-panel,
 .review-summary,
+.visual-summary,
 .artifact-panel,
 .observation-card,
 .deck-card {
@@ -75,6 +76,7 @@ textarea {
 
 .auth-panel,
 .review-summary,
+.visual-summary,
 .artifact-panel {
   display: grid;
   gap: 12px;
@@ -89,6 +91,7 @@ textarea {
 
 .auth-panel p,
 .review-summary p,
+.visual-summary p,
 .deck-card p {
   margin: 0;
   color: #526173;
@@ -191,6 +194,27 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.visual-summary {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.visual-summary h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  overflow-wrap: anywhere;
+}
+
+.visual-progress {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #c9d3de;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #243447;
+  font-weight: 800;
+}
+
 .artifact-panel h2 {
   margin: 0;
   font-size: 1rem;
@@ -262,6 +286,10 @@ textarea {
 .observation-card h2 {
   font-size: 1.1rem;
   overflow-wrap: anywhere;
+}
+
+.visual-review-link {
+  width: 100%;
 }
 
 .count-badge {
@@ -351,6 +379,144 @@ textarea {
   margin: 0;
   color: #a32727;
   font-weight: 700;
+}
+
+.slide-gallery {
+  display: grid;
+  gap: 10px;
+  outline: none;
+}
+
+.slide-toolbar {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 88px;
+  gap: 8px;
+  align-items: center;
+}
+
+.slide-position {
+  margin: 0;
+  color: #526173;
+  font-weight: 800;
+  text-align: center;
+}
+
+.slide-stage {
+  display: grid;
+  gap: 8px;
+}
+
+.slide-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #c9d3de;
+  border-radius: 8px;
+  background: #111827;
+  touch-action: pan-y;
+}
+
+.slide-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.finding-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.finding-box {
+  fill: rgb(220 38 38 / 12%);
+  stroke: #dc2626;
+  stroke-width: 4;
+  cursor: pointer;
+  vector-effect: non-scaling-stroke;
+}
+
+.finding-box:focus,
+.finding-box:hover {
+  fill: rgb(220 38 38 / 24%);
+  outline: none;
+}
+
+.finding-box.judged {
+  fill: rgb(22 163 74 / 12%);
+  stroke: #16834a;
+}
+
+.slide-empty {
+  margin: 0;
+  color: #526173;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(15 23 42 / 42%);
+}
+
+.finding-drawer {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  width: min(100%, 430px);
+  min-height: 100%;
+  padding: 18px 14px calc(22px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: -8px 0 24px rgb(15 23 42 / 18%);
+}
+
+.drawer-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.drawer-title {
+  padding-right: 54px;
+}
+
+.drawer-title h2 {
+  margin: 0;
+  font-size: 1.18rem;
+  overflow-wrap: anywhere;
+}
+
+.finding-message {
+  margin: 0;
+  color: #243447;
+  line-height: 1.45;
+}
+
+.finding-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.finding-details dt {
+  color: #65758b;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.finding-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #1f2933;
 }
 
 .sticky-actions {
