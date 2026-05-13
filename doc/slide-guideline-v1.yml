@@ -2695,6 +2695,10 @@ rules:
           required_measurement_fields:
             - "auto_size"
             - "required_auto_size"
+            - "font_scale_percent"
+            - "font_shrink_percent"
+            - "base_font_size_pt"
+            - "effective_font_size_pt"
             - "measured_value"
             - "threshold"
             - "unit"
