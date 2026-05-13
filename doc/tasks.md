@@ -289,11 +289,49 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-13 | `text_vertical_balance` | done | 0 | automated_only | `REV-013`, `REV-014` | `REV-013` 系列で 0 件。`REV-014` はルール evidence のみで正本採用には使わない。 |
 | P3-1 | `geometry_rounding` | remaining | 129 | visual_done | `REV-015` | 残件は `.25/.5/.75pt` 単位。auto-fix 対象外として defer。 |
 
+### REV-017 判定運用
+
+REV-017 完了条件の「判断記録」は、以下の二箇所のいずれかで持つ。
+新規枠は作らず、既存 evidence schema (`rules.lint.evidence_schema.enums.review_status`)
+と `REV-016 観点別判定表` を使う。
+
+判定の置き場所:
+
+- finding 個別判定は lint JSON の各 finding に
+  `review_status` (`unreviewed` / `accepted` / `fix_required` / `fixed`
+  / `false_positive` / `out_of_scope`) を埋める。
+- 観点単位の集約判定は上の `REV-016 観点別判定表` の
+  「判定」列に反映する (`done` / `remaining` / `inferred_done`
+  / `not_recorded` / `not_applicable`)。
+
+許容と対象外の区別:
+
+- `accepted`: テンプレート意図として許容する。理由は finding の
+  `manual_required_reason` または同表の「根拠 / メモ」列に書く。
+- `out_of_scope`: その deck では対象外と判断する (例: 装飾要素、
+  別 deck の管理対象、配布形態が変わる場合)。理由を同じく記録する。
+- `false_positive`: lint ルール側の誤検出として扱う。直後に
+  ルール改修タスク (`LINT-*` / `FIX-*`) を起こす前提。
+
+件数 0 の観点 (`P1-3`, `P1-5`, `P1-7`, `P1-15`):
+
+- finding が無いため `review_status` を埋める対象は無い。
+- 観点単位では `inferred_done` を最終判定として採用する。
+- REV-017 完了判定では「対象 12 観点のうち 4 観点が
+  `inferred_done` で確定済み」と扱う。
+
+検証:
+
+- 全 finding の `review_status` が `unreviewed` 以外であることを
+  `jq` などで確認する (deck-level / consolidated 双方)。
+- `REV-016 観点別判定表` の対象 12 行に `not_recorded` が残って
+  いないことを確認する。
+
 ## Next
 
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
-| REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点を確定する | 機械検出済みの `P0-3`, `P1-4` コントラスト残件と、新規機械 lint 化した `P1-3`, `P1-5`, `P1-7`, `P1-9`, `P1-13`, `P1-15` と、最新 lint 残件の `P2-6`, `P2-7`, `P2-8`, `P2-12` について、修正・許容・対象外の判断が PowerPoint 書き出し evidence と JSON finding とともに記録されている |
+| REV-017 | todo | P1 | `REV-015` 正本候補の要再確認観点を確定する | 対象 12 観点 (`P0-3`, `P1-3`〜`P1-15` のうち 7 件, `P2-6`, `P2-7`, `P2-8`, `P2-12`) の lint JSON finding すべての `review_status` が `unreviewed` 以外 (`accepted` / `fix_required` / `fixed` / `false_positive` / `out_of_scope`) に遷移しており、根拠が `REV-017 観点別判定表` または finding の `manual_required_reason` / `candidate_values` で追跡できる。判定運用は同節を参照 |
 | FIX-001 | todo | P1 | `wrap_break_changes_meaning` に widen-to-fit 候補と auto-fix を追加する | shape を safe area 内で広げて 1 行に収まる場合、lint が `candidate_values` に widen 後 bbox を出し、`pptx_fix.py` が幾何修正として適用できる。検証 deck の根拠は `claude-manual-visual-fixes-2026-05-10.md` の slide 15 / 47 |
 | FIX-002 | todo | P1 | badge コンテナ内テキストの中央揃えを検出・修正する | 単一短文を含む正方形/円形 shape の水平・垂直中央揃えのズレを新規 check で検出し、`fixability=auto_fix_candidate` の `candidate_values` (CENTER / MIDDLE) を出して `pptx_fix.py` が適用できる。検証 deck の根拠は同レポートの slide 3 / 40 |
 | FIX-003 | todo | P2 | 孤立装飾 line / connector / arrow の検出を追加する | semantic group に属さない短い水平・垂直 line shape や孤立 connector / arrow を `decorative_review` finding として検出し、`fixability=manual_required` で残す。自動削除はしない。検証 deck の根拠は同レポートの slide 12 / 44 |
