@@ -56,7 +56,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P1-2 | `alt_text_required` | implemented_lint | automated | manual_review | 意味を持つ画像の代替テキスト欠落 |
 | P1-3 | `color_only_meaning` | implemented_lint | automated | manual_review | 色だけで意味を伝えている |
 | P1-4 | `contrast_ratio` | implemented_lint | automated | manual_review | コントラスト不足 |
-| P1-5 | `heading_hierarchy_broken` | implemented_lint | automated | manual_review | 見出し階層崩れ |
+| P1-5 | `heading_hierarchy_broken` | implemented_lint | automated | manual_review | 見出し・本文のデザインシステム階層不一致 |
 | P1-6 | `image_aspect_distortion` | implemented_lint | automated | manual_review | 画像の縦横比崩れ |
 | P1-7 | `key_area_cropped` | implemented_lint | automated | manual_review | 画像重要部の欠け |
 | P1-8 | `line_height` | implemented_lint | automated | manual_review | 行間が読みやすさを損なう |
@@ -65,7 +65,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P1-11 | `overflow_images` | implemented_lint | automated | manual_review | 画像のスライド外はみ出し |
 | P1-12 | `overflow_shapes` | implemented_lint | automated | manual_review | 図形のスライド外はみ出し |
 | P1-13 | `reading_order` | implemented_lint | automated | manual_review | 読み順不整合 |
-| P1-14 | `text_autofit_disabled` | implemented_lint | automated | auto_fix | 自動縮小による可読性リスク |
+| P1-14 | `text_autofit_disabled` | implemented_lint | automated | auto_fix | PowerPoint自動縮小による可読性リスク |
 | P1-15 | `wrap_break_changes_meaning` | implemented_lint | automated | manual_review | 折返しで意味が変わる |
 | P2-1 | `object_gap_too_small` | implemented_lint | automated | manual_review | 隣接オブジェクト間隔が狭い |
 | P2-2 | `background_color_palette` | implemented_lint | automated | manual_review | 背景・塗り色がパレット外 |

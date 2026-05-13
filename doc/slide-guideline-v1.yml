@@ -2929,7 +2929,7 @@ rules:
             - "threshold"
             - "delta"
             - "unit"
-          manual_required_reason: "Hierarchy repair requires template/content intent review."
+          manual_required_reason: "Repair requires selecting the slide type and mapping text boxes to design-system title/body slots."
         key_area_cropped:
           evidence_source: "pptx_xml"
           evidence_confidence: "medium"
@@ -3139,8 +3139,8 @@ rules:
         detection: "automated"
         fix_policy: "manual_review"
         impact_axis: "comprehension"
-        issue_title: "見出し階層が崩れて理解順を追いにくい"
-        action: "見出し、本文、注記のサイズと配置をテンプレート階層へ戻す。"
+        issue_title: "見出し・本文の階層がデザインシステムと合っていない"
+        action: "スライドタイプごとのテンプレートスロットに合わせ、見出しは title/heading 系、本文は body 系のサイズ・位置・順序へ戻す。"
       image_aspect_distortion:
         status: "implemented_lint"
         priority: "P1"
@@ -3225,8 +3225,8 @@ rules:
         detection: "automated"
         fix_policy: "auto_fix"
         impact_axis: "delivery_quality"
-        issue_title: "自動縮小で文字が読みにくくなるリスクがある"
-        action: "自動縮小を無効化し、枠サイズと文字量を目視で調整する。"
+        issue_title: "PowerPoint自動縮小で文字が読みにくくなるリスクがある"
+        action: "TEXT_TO_FIT_SHAPE による自動縮小を無効化し、枠サイズ・文字量・改行を明示的に調整する。"
       wrap_break_changes_meaning:
         status: "implemented_lint"
         priority: "P1"
@@ -3461,7 +3461,7 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.heading_hierarchy_broken"
-        detection: "Compare title-zone text candidates against body candidates using normalized geometry and dominant font size; warn when body text outranks title hierarchy or title ordering is inconsistent."
+        detection: "Use normalized geometry and dominant font size as an automated proxy for design-system title/body hierarchy; warn when body text visually outranks the title slot or title ordering is inconsistent."
       key_area_cropped:
         severity: "warning"
         automation: "automated"
