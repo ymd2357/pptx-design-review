@@ -298,14 +298,19 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 
 判定の置き場所:
 
-- finding 個別判定は lint JSON の各 finding に
-  `review_status` (`unreviewed` / `accepted` / `fix_required` / `fixed`
-  / `false_positive` / `out_of_scope`) を埋める。
-  `unreviewed` 以外を入れる際は、対応する `judgement_reason` も同時に
-  埋める (enum は `rules.lint.finding_evidence_schema.enums.judgement_reason`)。
+- 観点単位の判定台帳 (本 REV の正本) は
+  `doc/reviews/260329-seminar-curriculum-proposal/rev-017-decisions.tsv`
+  に置く。スキーマと完了条件は `doc/reviews/README.md` を参照。
+  finding 件数の内訳は同 TSV の `finding_dispositions` 列に
+  `<review_status>:<judgement_reason> x<count>` 形式で記録する。
+- finding 個別判定が必要な場合 (例: 同観点内で複数の judgement に
+  分かれる) は lint JSON の各 finding に `review_status` / `judgement_reason`
+  を埋める。`unreviewed` 以外を入れる際は対応する `judgement_reason` も
+  同時に記入 (enum は `rules.lint.finding_evidence_schema.enums`)。
 - 観点単位の集約判定は上の `REV-016 観点別判定表` の
-  「判定」列に反映する (`done` / `remaining` / `inferred_done`
-  / `not_recorded` / `not_applicable`)。
+  「判定」列にも反映する (`done` / `remaining` / `inferred_done`
+  / `not_recorded` / `not_applicable`)。決定 TSV と表が二重で更新される
+  形になるが、deck 跨ぎの索引としての価値があるので両方維持する。
 
 `judgement_reason` の使い分け (`review_status` ごとの subtype):
 
@@ -347,8 +352,12 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 
 検証:
 
-- 全 finding の `review_status` が `unreviewed` 以外、
-  かつ `judgement_reason` が enum 値であることを
+- `doc/reviews/260329-seminar-curriculum-proposal/rev-017-decisions.tsv`
+  の `observation_decision` 列に `not_recorded` または空欄が無いことを確認する。
+- `remaining` 行で `finding_dispositions` の件数合計が
+  `latest_lint_count` と一致することを確認する。
+- finding 単位判定を併用した場合は、lint JSON の `review_status` が
+  `unreviewed` 以外、かつ `judgement_reason` が enum 値であることを
   `jq` などで確認する (deck-level / consolidated 双方)。
 - `REV-016 観点別判定表` の対象 12 行に `not_recorded` が残って
   いないことを確認する。
