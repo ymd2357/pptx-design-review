@@ -66,9 +66,9 @@ def main() -> int:
             )
         ],
     )
-    if manual.status != "manual_required":
+    if manual.status != "apply":
         failures.append(
-            f"manual_required finding should block apply; got {manual.status}"
+            f"manual_required finding should keep mechanical apply enabled; got {manual.status}"
         )
     if "intentional_half_pt_grid" not in manual.reasons:
         failures.append(f"manual_required reason was not preserved: {manual.reasons}")
@@ -113,7 +113,7 @@ def main() -> int:
             ),
         ]
     )
-    if auto_rules != ("geometry",):
+    if auto_rules != ("geometry", "contrast"):
         failures.append(f"auto_rules_from_findings selected wrong rules: {auto_rules}")
 
     if failures:
@@ -122,7 +122,7 @@ def main() -> int:
             print(f"- {line}")
         return 1
 
-    print("OK: pptx_fix consumes evidence-schema fixability with legacy fallback")
+    print("OK: pptx_fix consumes evidence-schema fixability without treating manual_required as manual修正")
     return 0
 
 

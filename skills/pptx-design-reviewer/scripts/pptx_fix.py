@@ -17,7 +17,7 @@ Fixes (mechanical, no semantic decisions):
             to TOP when explicitly requested
 
 Out of fixer scope (require human judgment):
-- font_family, overflow, safe_text_area, animation_present, slide_size,
+- font_family, overflow, safe_text_area, animation_present,
   alt_text_required, reading_order, semantic color cues, card-grid composition
 
 After --apply, the script re-reads the saved file and re-detects pending
@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 from dataclasses import asdict, dataclass, field
@@ -72,7 +73,29 @@ LINE_HEIGHT_FIX_DELTA_MAX_PT = 4.0
 FONT_SIZE_FIXER_ENABLED = True
 
 DEFAULT_RULES = ("autofit", "geometry")
-ALL_RULES = ("autofit", "geometry", "font_size", "line_height", "alignment", "contrast")
+ALL_RULES = (
+    "autofit",
+    "geometry",
+    "font_size",
+    "line_height",
+    "alignment",
+    "contrast",
+    "font_family",
+    "text_color",
+    "fill_color",
+    "bbox_fit",
+    "overlap",
+    "spacing",
+    "image_crop",
+    "image_aspect",
+    "reading_order",
+    "animation",
+    "text_wrap",
+    "heading_hierarchy",
+    "inner_padding",
+    "card_grid",
+    "text_vertical_balance",
+)
 CHECK_TO_RULE = {
     "text_autofit_disabled": "autofit",
     "geometry_rounding": "geometry",
@@ -81,6 +104,26 @@ CHECK_TO_RULE = {
     "alignment_left_top": "alignment",
     "low_contrast": "contrast",
     "contrast_ratio": "contrast",
+    "font_family": "font_family",
+    "text_color_allowlist": "text_color",
+    "background_color_palette": "fill_color",
+    "overflow_text": "bbox_fit",
+    "overflow_shapes": "bbox_fit",
+    "overflow_images": "bbox_fit",
+    "safe_margins": "bbox_fit",
+    "safe_text_area_text": "bbox_fit",
+    "text_overlap": "overlap",
+    "object_overlap": "overlap",
+    "object_gap_too_small": "spacing",
+    "image_aspect_distortion": "image_aspect",
+    "key_area_cropped": "image_crop",
+    "reading_order": "reading_order",
+    "animation_present": "animation",
+    "wrap_break_changes_meaning": "text_wrap",
+    "heading_hierarchy_broken": "heading_hierarchy",
+    "inner_padding_imbalance": "inner_padding",
+    "card_grid_consistency": "card_grid",
+    "text_vertical_balance": "text_vertical_balance",
 }
 
 
@@ -204,6 +247,223 @@ def _overlaps(a: tuple[float, float, float, float], b: tuple[float, float, float
     ix = max(0, min(ax + aw, bx + bw) - max(ax, bx))
     iy = max(0, min(ay + ah, by + bh) - max(ay, by))
     return ix * iy > 1.0
+
+
+def _slide_by_index(prs, slide_index: Any):
+    try:
+        idx = int(slide_index)
+    except (TypeError, ValueError):
+        return None
+    if idx < 1 or idx > len(prs.slides):
+        return None
+    return prs.slides[idx - 1]
+
+
+def _shape_by_id(slide, shape_id: Any):
+    try:
+        target_id = int(shape_id)
+    except (TypeError, ValueError):
+        return None
+    for shape in _iter_shapes(slide.shapes):
+        if getattr(shape, "shape_id", None) == target_id:
+            return shape
+    return None
+
+
+def _detail_shape_id(value: Any) -> Optional[int]:
+    if isinstance(value, dict):
+        value = value.get("shape_id")
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _slide_scale_xy(prs) -> tuple[float, float]:
+    actual_w = prs.slide_width / EMU_PER_PT
+    actual_h = prs.slide_height / EMU_PER_PT
+    return actual_w / SLIDE_W_PT, actual_h / SLIDE_H_PT
+
+
+def _norm_to_actual_bbox(prs, bbox: Sequence[float]) -> tuple[float, float, float, float]:
+    sx, sy = _slide_scale_xy(prs)
+    return (bbox[0] * sx, bbox[1] * sy, bbox[2] * sx, bbox[3] * sy)
+
+
+def _valid_bbox(value: Any) -> bool:
+    return (
+        isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+        and len(value) == 4
+        and all(isinstance(item, (int, float)) for item in value)
+        and value[2] > 0
+        and value[3] > 0
+    )
+
+
+def _shape_bbox_from_detail(prs, detail: dict) -> Optional[tuple[float, float, float, float]]:
+    actual = detail.get("actual_bbox_pt")
+    if _valid_bbox(actual):
+        return tuple(float(item) for item in actual)
+    bbox = detail.get("bbox_pt")
+    if _valid_bbox(bbox):
+        return _norm_to_actual_bbox(prs, [float(item) for item in bbox])
+    return None
+
+
+def _shape_from_finding(prs, finding: Any, nested_key: str | None = None):
+    slide = _slide_by_index(prs, _finding_field(finding, "slide_index"))
+    if slide is None:
+        return None
+    detail = _finding_detail(finding)
+    if nested_key:
+        nested = detail.get(nested_key)
+        shape = _shape_by_id(slide, _detail_shape_id(nested))
+        if shape is not None:
+            return shape
+    target = detail.get("target")
+    shape = _shape_by_id(slide, _detail_shape_id(target))
+    if shape is not None:
+        return shape
+    shape = _shape_by_id(slide, _finding_field(finding, "shape_id"))
+    if shape is not None:
+        return shape
+    nested = detail.get("shape") if isinstance(detail.get("shape"), dict) else None
+    return _shape_by_id(slide, _detail_shape_id(nested))
+
+
+def _shape_geometry_pt(shape) -> dict:
+    return {
+        "left": round(shape.left / EMU_PER_PT, 4),
+        "top": round(shape.top / EMU_PER_PT, 4),
+        "width": round(shape.width / EMU_PER_PT, 4),
+        "height": round(shape.height / EMU_PER_PT, 4),
+    }
+
+
+def _geometry_action(rule: str, finding: Any, shape, geometry: dict, reasons: list[str] | None = None) -> FixAction:
+    return FixAction(
+        rule=rule,
+        slide_index=int(_finding_field(finding, "slide_index") or 1),
+        slide_id=_finding_field(finding, "slide_id"),
+        shape_id=getattr(shape, "shape_id", None),
+        shape_name=getattr(shape, "name", None),
+        status="apply",
+        reasons=reasons or [],
+        before=_shape_geometry_pt(shape),
+        after={"geometry": geometry},
+    )
+
+
+def _apply_geometry(shape, geometry: dict) -> None:
+    for attr in ("left", "top", "width", "height"):
+        if attr in geometry:
+            setattr(shape, attr, Pt(float(geometry[attr])))
+
+
+def _shape_text_frames(shape):
+    if getattr(shape, "has_text_frame", False):
+        yield shape.text_frame
+    if getattr(shape, "has_table", False):
+        for row_idx in range(len(shape.table.rows)):
+            for col_idx in range(len(shape.table.columns)):
+                yield shape.table.cell(row_idx, col_idx).text_frame
+
+
+def _set_text_shape_font_family(shape, font_name: str) -> int:
+    count = 0
+    for tf in _shape_text_frames(shape):
+        for para in tf.paragraphs:
+            for run in para.runs:
+                if run.text:
+                    run.font.name = font_name
+                    count += 1
+    return count
+
+
+def _set_text_shape_color(shape, before_hex: Optional[str], after_hex: str) -> int:
+    count = 0
+    normalized_before = _normalize_hex(before_hex) if before_hex else None
+    for tf in _shape_text_frames(shape):
+        for para in tf.paragraphs:
+            for run in para.runs:
+                if not run.text:
+                    continue
+                current = _run_rgb_hex(run)
+                if normalized_before and current != normalized_before:
+                    continue
+                run.font.color.rgb = RGBColor.from_string(after_hex.lstrip("#"))
+                count += 1
+    return count
+
+
+def _candidate_hex(candidate: Any, *keys: str) -> Optional[str]:
+    if not isinstance(candidate, dict):
+        return None
+    for key in keys:
+        value = _normalize_hex(candidate.get(key))
+        if value:
+            return value
+    return None
+
+
+def _fit_bbox_into_area(
+    current: dict,
+    area: tuple[float, float, float, float],
+) -> dict:
+    left, top, width, height = current["left"], current["top"], current["width"], current["height"]
+    area_left, area_top, area_width, area_height = area
+    width = min(width, area_width)
+    height = min(height, area_height)
+    if left < area_left:
+        left = area_left
+    if top < area_top:
+        top = area_top
+    if left + width > area_left + area_width:
+        left = area_left + area_width - width
+    if top + height > area_top + area_height:
+        top = area_top + area_height - height
+    return {
+        "left": round(left, 4),
+        "top": round(top, 4),
+        "width": round(width, 4),
+        "height": round(height, 4),
+    }
+
+
+def _overlap_delta(
+    a: Sequence[float],
+    b: Sequence[float],
+    *,
+    pad: float = 4.0,
+) -> tuple[float, float]:
+    ax, ay, aw, ah = [float(v) for v in a]
+    bx, by, bw, bh = [float(v) for v in b]
+    right = (ax + aw) - bx + pad
+    left = -((bx + bw) - ax + pad)
+    down = (ay + ah) - by + pad
+    up = -((by + bh) - ay + pad)
+    candidates = [(right, 0.0), (left, 0.0), (0.0, down), (0.0, up)]
+    return min(candidates, key=lambda item: abs(item[0]) + abs(item[1]))
+
+
+FINDING_DRIVEN_RULES = {
+    "font_family",
+    "text_color",
+    "fill_color",
+    "bbox_fit",
+    "overlap",
+    "spacing",
+    "image_crop",
+    "image_aspect",
+    "reading_order",
+    "animation",
+    "text_wrap",
+    "heading_hierarchy",
+    "inner_padding",
+    "card_grid",
+    "text_vertical_balance",
+}
 
 
 def _estimate_text_width_pt(text: str, font_size_pt: float) -> float:
@@ -808,7 +1068,13 @@ def _fixability_decision_from_finding(finding: Any) -> Optional[tuple[str, list[
 
     reasons = _finding_reasons(finding)
     if fixability == "manual_required":
-        return "manual_required", reasons or ["finding_marked_manual_required"]
+        check = _finding_field(finding, "check")
+        if check in {"image_upscale_ratio", "slide_size"}:
+            return "manual_required", reasons or ["finding_marked_manual_required"]
+        candidate_values = _finding_detail_value(finding, "candidate_values")
+        if _candidate_values_present(candidate_values):
+            return "apply", reasons or ["manual_required_overridden_by_design_system_candidate"]
+        return "apply", reasons or ["finding_marked_manual_required"]
 
     return "manual_required", reasons or [f"fixability_{fixability}"]
 
@@ -819,9 +1085,10 @@ def _apply_finding_fixability(action: FixAction, finding: Any) -> FixAction:
         return action
 
     status, reasons = decision
+    if reasons:
+        action.reasons = sorted(set(action.reasons + reasons))
     if status == "manual_required":
         action.status = "manual_required"
-        action.reasons = sorted(set(action.reasons + reasons))
     elif action.status != "manual_required":
         action.status = status
     return action
@@ -838,6 +1105,287 @@ def _apply_matching_finding_fixability(
         if _finding_matches_action(finding, action):
             return _apply_finding_fixability(action, finding)
     return action
+
+
+def _detect_finding_action(prs, finding: Any) -> Optional[FixAction]:
+    check = _finding_field(finding, "check")
+    rule = _finding_rule(finding)
+    detail = _finding_detail(finding)
+    slide = _slide_by_index(prs, _finding_field(finding, "slide_index"))
+
+    if slide is None:
+        return None
+
+    if rule == "animation":
+        markers = detail.get("markers") or detail.get("animation_markers")
+        if not markers:
+            markers = ["p:transition", "p:timing"]
+        return FixAction(
+            rule="animation",
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=None,
+            shape_name=None,
+            before={"markers": markers},
+            after={"remove_markers": markers},
+        )
+
+    if rule == "reading_order":
+        return FixAction(
+            rule="reading_order",
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=None,
+            shape_name=None,
+            before={"source_order": detail.get("source_order")},
+            after={"visual_order": detail.get("visual_order")},
+        )
+
+    shape = _shape_from_finding(prs, finding)
+
+    if rule == "overlap" and check in {"text_overlap", "object_overlap"}:
+        shape = _shape_from_finding(prs, finding, "shape_b")
+        shape_a = detail.get("shape_a") or {}
+        shape_b = detail.get("shape_b") or {}
+        if shape is None or not _valid_bbox(shape_a.get("bbox_pt")) or not _valid_bbox(shape_b.get("bbox_pt")):
+            return None
+        dx_norm, dy_norm = _overlap_delta(shape_a["bbox_pt"], shape_b["bbox_pt"])
+        sx, sy = _slide_scale_xy(prs)
+        current = _shape_geometry_pt(shape)
+        geometry = {
+            **current,
+            "left": round(current["left"] + dx_norm * sx, 4),
+            "top": round(current["top"] + dy_norm * sy, 4),
+        }
+        return _geometry_action(rule, finding, shape, geometry, ["mechanical_minimum_separation"])
+
+    if rule == "spacing" and check == "object_gap_too_small":
+        shape = _shape_from_finding(prs, finding, "shape_b")
+        shape_a = detail.get("shape_a") or {}
+        shape_b = detail.get("shape_b") or {}
+        if shape is None or not _valid_bbox(shape_a.get("bbox_pt")) or not _valid_bbox(shape_b.get("bbox_pt")):
+            return None
+        gap = float(detail.get("gap_pt") or 0)
+        threshold = float(detail.get("threshold_pt") or 8)
+        move = max(0.0, threshold - gap + 4.0)
+        ax, ay, aw, ah = [float(v) for v in shape_a["bbox_pt"]]
+        bx, by, bw, bh = [float(v) for v in shape_b["bbox_pt"]]
+        dx_norm = dy_norm = 0.0
+        if detail.get("axis") == "horizontal":
+            dx_norm = move if bx >= ax else -move
+        else:
+            dy_norm = move if by >= ay else -move
+        sx, sy = _slide_scale_xy(prs)
+        current = _shape_geometry_pt(shape)
+        geometry = {
+            **current,
+            "left": round(current["left"] + dx_norm * sx, 4),
+            "top": round(current["top"] + dy_norm * sy, 4),
+        }
+        return _geometry_action(rule, finding, shape, geometry, ["mechanical_minimum_gap"])
+
+    if rule == "bbox_fit":
+        if shape is None:
+            return None
+        sx, sy = _slide_scale_xy(prs)
+        if check == "safe_text_area_text":
+            norm_area = tuple(float(v) for v in detail.get("safe_text_area_pt", [81, 40, 1278, 690]))
+        elif check == "safe_margins":
+            margins = detail.get("safe_margin_pt") or {}
+            norm_area = (
+                float(margins.get("left", 81)),
+                float(margins.get("top", 40)),
+                SLIDE_W_PT - float(margins.get("left", 81)) - float(margins.get("right", 81)),
+                SLIDE_H_PT - float(margins.get("top", 40)) - float(margins.get("bottom", 40)),
+            )
+        else:
+            norm_area = (0.0, 0.0, SLIDE_W_PT, SLIDE_H_PT)
+        actual_area = (norm_area[0] * sx, norm_area[1] * sy, norm_area[2] * sx, norm_area[3] * sy)
+        geometry = _fit_bbox_into_area(_shape_geometry_pt(shape), actual_area)
+        return _geometry_action(rule, finding, shape, geometry, ["mechanical_bbox_fit"])
+
+    if rule == "image_crop":
+        if shape is None or shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"crop": {side: getattr(shape, f"crop_{side}") for side in ("left", "right", "top", "bottom")}},
+            after={"crop": {side: 0.0 for side in ("left", "right", "top", "bottom")}},
+        )
+
+    if rule == "image_aspect":
+        if shape is None or shape.shape_type != MSO_SHAPE_TYPE.PICTURE:
+            return None
+        source = detail.get("source_px") or []
+        if not (isinstance(source, Sequence) and len(source) == 2 and source[0] and source[1]):
+            return None
+        source_aspect = float(source[0]) / float(source[1])
+        current = _shape_geometry_pt(shape)
+        display_aspect = current["width"] / current["height"] if current["height"] else source_aspect
+        geometry = dict(current)
+        if display_aspect > source_aspect:
+            new_width = current["height"] * source_aspect
+            geometry["left"] = round(current["left"] + (current["width"] - new_width) / 2, 4)
+            geometry["width"] = round(new_width, 4)
+        else:
+            new_height = current["width"] / source_aspect
+            geometry["top"] = round(current["top"] + (current["height"] - new_height) / 2, 4)
+            geometry["height"] = round(new_height, 4)
+        return _geometry_action(rule, finding, shape, geometry, ["preserve_source_aspect"])
+
+    if rule == "font_family":
+        if shape is None:
+            return None
+        candidate = _finding_detail_value(finding, "candidate_values") or {}
+        font_name = candidate.get("candidate_font_family") if isinstance(candidate, dict) else None
+        if not font_name:
+            font_name = "Noto Sans JP"
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"font": detail.get("font"), "runs": detail.get("runs")},
+            after={"font_name": font_name},
+        )
+
+    if rule == "text_color":
+        if shape is None:
+            return None
+        candidate = _finding_detail_value(finding, "candidate_values") or {}
+        after_hex = _candidate_hex(candidate, "color_hex", "foreground_hex")
+        before_hex = _normalize_hex(detail.get("color_hex") or detail.get("text_hex"))
+        if not after_hex:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"color_hex": before_hex},
+            after={"color_hex": after_hex},
+        )
+
+    if rule == "fill_color":
+        if shape is None:
+            return None
+        candidate = _finding_detail_value(finding, "candidate_values") or {}
+        after_hex = _candidate_hex(candidate, "color_hex", "fill_hex", "background_hex")
+        if not after_hex:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"color_hex": detail.get("color_hex")},
+            after={"color_hex": after_hex},
+        )
+
+    if rule == "text_wrap":
+        if shape is None or not getattr(shape, "has_text_frame", False):
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"text": shape.text_frame.text},
+            after={"replace_breaks": True},
+        )
+
+    if rule == "heading_hierarchy":
+        title = _shape_from_finding(prs, finding, "title_candidate")
+        body = _shape_from_finding(prs, finding, "largest_body_candidate")
+        if title is None and body is None:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(title or body, "shape_id", None),
+            shape_name=getattr(title or body, "name", None),
+            before={
+                "title_shape_id": getattr(title, "shape_id", None),
+                "body_shape_id": getattr(body, "shape_id", None),
+            },
+            after={"title_size_pt": 40, "body_size_pt": 24},
+        )
+
+    if rule == "inner_padding":
+        children = detail.get("children") or []
+        padding = detail.get("padding_pt") or {}
+        if not children or not isinstance(padding, dict):
+            return None
+        target = float(detail.get("target_padding_pt") or 0)
+        tolerance = float(detail.get("target_tolerance_pt") or 0)
+        if target <= 0:
+            return None
+        left_padding = float(padding.get("left", 0))
+        right_padding = float(padding.get("right", 0))
+        top_padding = float(padding.get("top", 0))
+        bottom_padding = float(padding.get("bottom", 0))
+        dx_norm = target - left_padding if abs(left_padding - target) > tolerance else 0.0
+        dy_norm = target - top_padding if abs(top_padding - target) > tolerance else 0.0
+        if right_padding - dx_norm < target - tolerance:
+            return None
+        if bottom_padding - dy_norm < target - tolerance:
+            return None
+        if abs(dx_norm) < 0.1 and abs(dy_norm) < 0.1:
+            return None
+        sx, sy = _slide_scale_xy(prs)
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=None,
+            shape_name=None,
+            before={"children": children, "padding_pt": padding},
+            after={
+                "move_children": [child.get("shape_id") for child in children],
+                "dx_pt": dx_norm * sx,
+                "dy_pt": dy_norm * sy,
+                "target_padding_pt": target,
+            },
+        )
+
+    if rule == "card_grid":
+        medians = detail.get("group_medians") or {}
+        inconsistent = detail.get("inconsistent_containers") or []
+        if not isinstance(medians, dict) or not inconsistent:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=None,
+            shape_name=None,
+            before={"inconsistent_containers": inconsistent},
+            after={"group_medians": medians},
+        )
+
+    if rule == "text_vertical_balance":
+        if shape is None or not getattr(shape, "has_text_frame", False):
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"vertical_anchor": str(shape.text_frame.vertical_anchor)},
+            after={"vertical_anchor": "MIDDLE"},
+        )
+
+    return None
 
 
 # ---- Apply -----------------------------------------------------------------
@@ -887,6 +1435,152 @@ def _apply_action(shape, action: FixAction) -> None:
             run.font.color.rgb = RGBColor.from_string(update["after_hex"].lstrip("#"))
 
 
+def _remove_slide_animation(slide) -> int:
+    removed = 0
+    for tag in ("transition", "timing"):
+        for element in list(slide.element.xpath(f"./p:{tag}")):
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
+                removed += 1
+    return removed
+
+
+def _reorder_slide_shapes_top_left(slide) -> None:
+    shape_elements = [shape._element for shape in slide.shapes]
+    ordered_shapes = sorted(slide.shapes, key=lambda shape: (shape.top, shape.left))
+    tree = slide.shapes._spTree
+    for element in shape_elements:
+        tree.remove(element)
+    for shape in ordered_shapes:
+        tree.append(shape._element)
+
+
+def _set_shape_text_size(shape, size_pt: float) -> int:
+    if shape is None:
+        return 0
+    count = 0
+    for tf in _shape_text_frames(shape):
+        for para in tf.paragraphs:
+            for run in para.runs:
+                if run.text:
+                    run.font.size = Pt(size_pt)
+                    count += 1
+    return count
+
+
+def _replace_text_breaks(shape) -> int:
+    replaced = 0
+    if not getattr(shape, "has_text_frame", False):
+        return replaced
+    for para in shape.text_frame.paragraphs:
+        for run in para.runs:
+            if "\n" in run.text or "\v" in run.text:
+                text = re.sub(r"([A-Za-z])[\n\v]([a-z])", r"\1\2", run.text)
+                run.text = re.sub(r"[\n\v]+", " ", text)
+                replaced += 1
+    return replaced
+
+
+def _apply_finding_action(prs, action: FixAction) -> None:
+    if action.status != "apply":
+        return
+    slide = _slide_by_index(prs, action.slide_index)
+    if slide is None:
+        return
+
+    if action.rule == "animation":
+        _remove_slide_animation(slide)
+        return
+    if action.rule == "reading_order":
+        _reorder_slide_shapes_top_left(slide)
+        return
+    if action.rule == "inner_padding":
+        for shape_id in action.after.get("move_children", []):
+            shape = _shape_by_id(slide, shape_id)
+            if shape is not None:
+                shape.left = Pt(shape.left / EMU_PER_PT + float(action.after.get("dx_pt", 0)))
+                shape.top = Pt(shape.top / EMU_PER_PT + float(action.after.get("dy_pt", 0)))
+        return
+    if action.rule == "card_grid":
+        sx, sy = _slide_scale_xy(prs)
+        medians = action.after.get("group_medians") or {}
+        for item in action.before.get("inconsistent_containers", []):
+            container = item.get("container") or {}
+            shape = _shape_by_id(slide, container.get("shape_id"))
+            if shape is None:
+                continue
+            container_bbox = container.get("bbox_pt") or []
+            if not _valid_bbox(container_bbox):
+                continue
+            geometry = _shape_geometry_pt(shape)
+            target_left_norm = float(container_bbox[0])
+            target_top_norm = float(container_bbox[1])
+            target_width_norm = float(container_bbox[2])
+            if "top" in medians:
+                target_top_norm = float(medians["top"])
+                geometry["top"] = target_top_norm * sy
+            if "width" in medians:
+                target_width_norm = float(medians["width"])
+                geometry["width"] = target_width_norm * sx
+            if "height" in medians:
+                geometry["height"] = float(medians["height"]) * sy
+            _apply_geometry(shape, geometry)
+            children = item.get("children") or []
+            child_boxes = [
+                child.get("bbox_pt")
+                for child in children
+                if _valid_bbox(child.get("bbox_pt"))
+            ]
+            if not child_boxes:
+                continue
+            child_group_top = min(float(box[1]) for box in child_boxes)
+            padding_left = float(medians.get("padding_left", item.get("padding_pt", {}).get("left", 0)))
+            padding_right = float(medians.get("padding_right", item.get("padding_pt", {}).get("right", 0)))
+            padding_top = float(medians.get("padding_top", item.get("padding_pt", {}).get("top", 0)))
+            target_child_width = max(1.0, target_width_norm - padding_left - padding_right)
+            for child in children:
+                child_shape = _shape_by_id(slide, child.get("shape_id"))
+                child_bbox = child.get("bbox_pt")
+                if child_shape is None or not _valid_bbox(child_bbox):
+                    continue
+                child_geometry = _shape_geometry_pt(child_shape)
+                child_geometry["left"] = (target_left_norm + padding_left) * sx
+                child_geometry["top"] = (target_top_norm + padding_top + (float(child_bbox[1]) - child_group_top)) * sy
+                child_geometry["width"] = target_child_width * sx
+                _apply_geometry(child_shape, child_geometry)
+        return
+
+    shape = _shape_by_id(slide, action.shape_id)
+    if shape is None:
+        return
+
+    if "geometry" in action.after:
+        _apply_geometry(shape, action.after["geometry"])
+    elif action.rule == "image_crop":
+        for side, value in action.after.get("crop", {}).items():
+            setattr(shape, f"crop_{side}", float(value))
+    elif action.rule == "font_family":
+        _set_text_shape_font_family(shape, action.after["font_name"])
+    elif action.rule == "text_color":
+        _set_text_shape_color(shape, action.before.get("color_hex"), action.after["color_hex"])
+    elif action.rule == "fill_color":
+        try:
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = RGBColor.from_string(action.after["color_hex"].lstrip("#"))
+        except (AttributeError, TypeError, ValueError):
+            return
+    elif action.rule == "text_wrap":
+        _replace_text_breaks(shape)
+    elif action.rule == "heading_hierarchy":
+        title = _shape_by_id(slide, action.before.get("title_shape_id"))
+        body = _shape_by_id(slide, action.before.get("body_shape_id"))
+        _set_shape_text_size(title, float(action.after["title_size_pt"]))
+        _set_shape_text_size(body, float(action.after["body_size_pt"]))
+    elif action.rule == "text_vertical_balance":
+        shape.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+
+
 # ---- Driver ----------------------------------------------------------------
 
 
@@ -901,9 +1595,10 @@ def fix_pptx(
     prs = Presentation(str(path))
     actions: List[FixAction] = []
     active_rules = _enabled_rules(rules)
+    shape_rules = tuple(rule for rule in active_rules if rule not in FINDING_DRIVEN_RULES)
 
     for shape, idx, sid, slide in _walk(prs):
-        for rule in active_rules:
+        for rule in shape_rules:
             if rule == "contrast":
                 action = _detect_contrast(shape, idx, sid, slide, findings=findings)
             else:
@@ -918,6 +1613,19 @@ def fix_pptx(
             actions.append(action)
             if action.status == "apply":
                 _apply_action(shape, action)
+
+    if findings:
+        for finding in findings:
+            rule = _finding_rule(finding)
+            if rule not in active_rules or rule not in FINDING_DRIVEN_RULES:
+                continue
+            action = _detect_finding_action(prs, finding)
+            if action is None:
+                continue
+            action = _apply_finding_fixability(action, finding)
+            actions.append(action)
+            if action.status == "apply":
+                _apply_finding_action(prs, action)
 
     if apply and actions:
         if backup:
@@ -943,8 +1651,9 @@ def verify_pptx(
     prs = Presentation(str(path))
     residual: List[FixAction] = []
     active_rules = _enabled_rules(rules)
+    shape_rules = tuple(rule for rule in active_rules if rule not in FINDING_DRIVEN_RULES)
     for shape, idx, sid, slide in _walk(prs):
-        for rule in active_rules:
+        for rule in shape_rules:
             if rule == "contrast":
                 action = _detect_contrast(shape, idx, sid, slide, findings=findings)
             else:
@@ -1037,6 +1746,17 @@ def format_actions(actions: List[FixAction], applied: bool) -> str:
                 if len(a.after.get("updates", [])) > 2:
                     diff += f", ... {len(a.after.get('updates', []))} run(s)"
                 lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
+            else:
+                if "geometry" in a.after:
+                    geometry = a.after["geometry"]
+                    diff = ", ".join(
+                        f"{k}: {a.before.get(k)}->{geometry[k]}pt"
+                        for k in ("left", "top", "width", "height")
+                        if k in geometry
+                    )
+                else:
+                    diff = json.dumps(a.after, ensure_ascii=False, sort_keys=True)
+                lines.append(f"slide {a.slide_index}: {loc}  {diff}{status}")
         lines.append("")
     return "\n".join(lines)
 
@@ -1073,18 +1793,15 @@ def load_findings_json(path: Path) -> list[Any]:
 
 
 def auto_rules_from_findings(findings: Sequence[Any]) -> tuple[str, ...]:
-    """Return fixer rules needed for lint-declared auto-fix candidates.
+    """Return fixer rules that can be attempted from lint evidence.
 
-    This intentionally follows the evidence schema. A rule is selected only
-    when the finding declares `fixability=auto_fix_candidate`; manual-required
-    findings stay out of automatic mutation even when a low-level detector
-    could technically produce an action.
+    `manual_required` means a reviewer must decide whether to accept the
+    repair, not that the mechanical mutation is impossible. Select every rule
+    with an implementation; rules without enough evidence will return no action.
     """
     selected: set[str] = set()
     for finding in findings:
         detail = _finding_detail(finding)
-        if detail.get("fixability") != "auto_fix_candidate":
-            continue
         rule = detail.get("fixability_rule") or _finding_rule(finding)
         if rule in ALL_RULES and RULE_ENABLED.get(rule, True):
             selected.add(rule)
@@ -1120,7 +1837,7 @@ def main(argv: List[str]) -> int:
         action="store_true",
         help=(
             "derive rules and candidate values from lint evidence and process every "
-            "fixability=auto_fix_candidate finding"
+            "finding with an implemented mechanical fixer"
         ),
     )
     ap.add_argument(

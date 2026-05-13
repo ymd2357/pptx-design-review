@@ -90,6 +90,20 @@ def _build_line_height_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_wrap_break_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(180), Pt(900), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Auto\nmation improves review speed"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _build_alignment_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(720)
@@ -104,6 +118,15 @@ def _build_alignment_fixture(out: Path) -> None:
     run.text = "Alignment fixture"
     run.font.name = "Noto Sans JP"
     run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _build_slide_size_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1000)
+    prs.slide_height = Pt(500)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_textbox(Pt(80), Pt(60), Pt(600), Pt(80))
     prs.save(str(out))
 
 
@@ -127,6 +150,43 @@ def _build_contrast_fixture(out: Path) -> None:
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("858585")
     prs.save(str(out))
+
+
+def _build_text_color_allowlist_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(300), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Brand color review"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    run.font.color.rgb = RGBColor.from_string("FF0000")
+    prs.save(str(out))
+
+
+def _build_text_overlap_fixture(out: Path) -> tuple[int, int]:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    first = slide.shapes.add_textbox(Pt(120), Pt(100), Pt(260), Pt(60))
+    first.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = first.text_frame.paragraphs[0].add_run()
+    run.text = "Text overlap A"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    second = slide.shapes.add_textbox(Pt(140), Pt(120), Pt(260), Pt(60))
+    second.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = second.text_frame.paragraphs[0].add_run()
+    run.text = "Text overlap B"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    ids = (first.shape_id, second.shape_id)
+    prs.save(str(out))
+    return ids
 
 
 def main() -> int:
@@ -231,6 +291,9 @@ def main() -> int:
         fixed_color = prs.slides[0].shapes[1].text_frame.paragraphs[0].runs[0].font.color.rgb
         if str(fixed_color).upper() != "707070":
             failures.append(f"moderate contrast fixture expected #707070; got #{fixed_color}")
+        red_candidate = pptx_lint._contrast_candidate("#FF0000", "#FFFFFF", 4.5)
+        if red_candidate is None or red_candidate.get("foreground_hex") != "#E6033D":
+            failures.append(f"red contrast repair expected #E6033D; got {red_candidate}")
         residual = pptx_fix.verify_pptx(
             contrast,
             rules=auto_rules,
@@ -238,6 +301,38 @@ def main() -> int:
         )
         if residual:
             failures.append(f"contrast verify reported residual: {len(residual)}")
+
+        # --- finding-driven text_overlap fixes the detected shape_b only ---
+        overlap = tmp_dir / "text-overlap.pptx"
+        first_id, second_id = _build_text_overlap_fixture(overlap)
+        overlap_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(overlap)
+            if f.check == "text_overlap"
+        ]
+        if not overlap_findings:
+            failures.append("text_overlap fixture did not trigger text_overlap")
+        overlap_rules = pptx_fix.auto_rules_from_findings(overlap_findings)
+        if "overlap" not in overlap_rules:
+            failures.append(f"auto rules did not include overlap: {overlap_rules}")
+        actions = pptx_fix.fix_pptx(
+            overlap,
+            apply=True,
+            rules=overlap_rules,
+            findings=overlap_findings,
+        )
+        overlap_actions = [a for a in actions if a.rule == "overlap" and a.status == "apply"]
+        if len(overlap_actions) != 1:
+            failures.append(f"text_overlap fixer expected one action; got {len(overlap_actions)}")
+        prs = Presentation(str(overlap))
+        shapes = {shape.shape_id: shape for shape in prs.slides[0].shapes}
+        if shapes[first_id].top != Pt(100):
+            failures.append("text_overlap fixer moved shape_a; expected only shape_b to move")
+        if shapes[second_id].top == Pt(120) and shapes[second_id].left == Pt(140):
+            failures.append("text_overlap fixer did not move shape_b")
+        remaining_overlap = [f for f in pptx_lint.lint_pptx(overlap) if f.check == "text_overlap"]
+        if remaining_overlap:
+            failures.append(f"text_overlap remained after fix: {len(remaining_overlap)}")
 
         # --- backup must preserve the oldest saved state ---
         backup_deck = tmp_dir / "backup.pptx"
@@ -292,6 +387,70 @@ def main() -> int:
             failures.append(f"alignment fixture expected TOP anchor; got {box.text_frame.vertical_anchor}")
         if box.text_frame.paragraphs[0].alignment != PP_ALIGN.LEFT:
             failures.append(f"alignment fixture expected LEFT paragraph; got {box.text_frame.paragraphs[0].alignment}")
+
+        # --- wrap-break latin word split joins the word, not a space ---
+        wrap = tmp_dir / "wrap-break.pptx"
+        _build_wrap_break_fixture(wrap)
+        findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(wrap)
+            if f.check == "wrap_break_changes_meaning"
+        ]
+        if not findings:
+            failures.append("wrap-break fixture did not trigger wrap_break_changes_meaning")
+        actions = pptx_fix.fix_pptx(wrap, apply=True, rules=("text_wrap",), findings=findings)
+        if not any(a.rule == "text_wrap" and a.status == "apply" for a in actions):
+            failures.append("text_wrap fixer did not report an apply action")
+        prs = Presentation(str(wrap))
+        fixed_text = prs.slides[0].shapes[0].text_frame.text
+        if fixed_text != "Automation improves review speed":
+            failures.append(f"text_wrap fixture expected joined word; got {fixed_text!r}")
+        residual_wrap = [f for f in pptx_lint.lint_pptx(wrap) if f.check == "wrap_break_changes_meaning"]
+        if residual_wrap:
+            failures.append(f"wrap_break_changes_meaning remained after fix: {len(residual_wrap)}")
+
+        # --- text color allowlist follows design-system candidate even if marked manual_required ---
+        text_color = tmp_dir / "text-color.pptx"
+        _build_text_color_allowlist_fixture(text_color)
+        text_color_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(text_color)
+            if f.check == "text_color_allowlist"
+        ]
+        if not text_color_findings:
+            failures.append("text-color fixture did not trigger text_color_allowlist")
+        actions = pptx_fix.fix_pptx(
+            text_color,
+            apply=True,
+            rules=("text_color",),
+            findings=text_color_findings,
+        )
+        if not any(a.rule == "text_color" and a.status == "apply" for a in actions):
+            failures.append("text_color_allowlist did not apply design-system candidate")
+        prs = Presentation(str(text_color))
+        color = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0].font.color.rgb
+        if str(color).upper() != "E6033D":
+            failures.append(f"text_color fixture expected #E6033D; got #{color}")
+
+        # --- slide_size is intentionally not auto-fixed ---
+        slide_size = tmp_dir / "slide-size.pptx"
+        _build_slide_size_fixture(slide_size)
+        slide_size_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(slide_size)
+            if f.check == "slide_size"
+        ]
+        if not slide_size_findings:
+            failures.append("slide-size fixture did not trigger slide_size")
+        slide_size_rules = pptx_fix.auto_rules_from_findings(slide_size_findings)
+        if "slide_size" in slide_size_rules:
+            failures.append(f"slide_size must not be auto-selected; got {slide_size_rules}")
+        actions = pptx_fix.fix_pptx(slide_size, apply=True, rules=pptx_fix.ALL_RULES)
+        if any(a.rule == "slide_size" and a.status == "apply" for a in actions):
+            failures.append("slide_size fixer applied an action even though size strategy is manual")
+        prs = Presentation(str(slide_size))
+        if prs.slide_width != Pt(1000) or prs.slide_height != Pt(500):
+            failures.append("slide_size fixture dimensions changed unexpectedly")
 
         # --- self-check (verify_pptx) reports no residual on fixed file ---
         bad3 = tmp_dir / "bad3.pptx"
