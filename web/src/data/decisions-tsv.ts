@@ -115,6 +115,19 @@ export function validateDecisionRow(row: DecisionRow): string[] {
   return errors;
 }
 
+export function countChangedDecisionRows(before: DecisionRow[], after: DecisionRow[]): number {
+  const beforeByKey = new Map(before.map((row) => [decisionRowKey(row), rowSignature(row)]));
+  return after.filter((row) => beforeByKey.get(decisionRowKey(row)) !== rowSignature(row)).length;
+}
+
 function sanitizeCell(value: string): string {
   return String(value).replace(/\t/g, " ").replace(/\r?\n/g, " ").trim();
+}
+
+function decisionRowKey(row: DecisionRow): string {
+  return `${row.review_no}\t${row.check_id}`;
+}
+
+function rowSignature(row: DecisionRow): string {
+  return DECISION_COLUMNS.map((column) => row[column] ?? "").join("\t");
 }

@@ -6,12 +6,18 @@ import {
   type DeviceFlowState,
 } from "./auth/device-flow";
 import {
+  countChangedDecisionRows,
   parseDecisionTsv,
   serializeDecisionTsv,
   validateDecisionRow,
   type DecisionRow,
 } from "./data/decisions-tsv";
-import { fetchDecisionTsv } from "./github/contents";
+import {
+  fetchDecisionTsv,
+  GitHubContentError,
+  putFile,
+  type PutFileResult,
+} from "./github/contents";
 import { renderObservationCard } from "./ui/observation-card";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
@@ -23,7 +29,10 @@ const deck = params.get("deck") ?? "260329-seminar-curriculum-proposal";
 const rev = params.get("rev") ?? "017";
 
 let rows: DecisionRow[] = [];
+let originalRows: DecisionRow[] = [];
 let sourceSha: string | undefined;
+let filePath = `doc/reviews/${deck}/rev-${rev}-decisions.tsv`;
+let fileSource: "github" | "local" = "local";
 
 void renderReview();
 
@@ -32,8 +41,12 @@ async function renderReview(): Promise<void> {
   try {
     const file = await fetchDecisionTsv(deck, rev);
     sourceSha = file.sha;
+    filePath = file.path;
+    fileSource = file.source;
     const parsed = parseDecisionTsv(file.text);
-    rows = parsed.rows;
+    originalRows = cloneRows(parsed.rows);
+    rows = cloneRows(parsed.rows);
+    applyDrafts(rows);
     renderLoaded(file.source, parsed.errors);
   } catch (error) {
     app.replaceChildren(
@@ -72,6 +85,7 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
     const count = rows.filter((row) => validateDecisionRow(row).length > 0).length;
     summary.querySelector("p:last-child")!.textContent =
       `${rows.length} observations / ${count} validation issues`;
+    persistDrafts();
   };
   rows.forEach((row) => {
     cardList.append(renderObservationCard(row, rerenderSummary));
@@ -88,7 +102,21 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   download.className = "primary-button";
   download.textContent = "Download TSV";
   download.addEventListener("click", downloadTsv);
-  actions.append(back, download);
+  const commit = document.createElement("button");
+  commit.type = "button";
+  commit.className = "primary-button";
+  commit.textContent = "Commit to repo";
+  commit.disabled = !getStoredToken() || source !== "github" || !sourceSha;
+  commit.title = commit.disabled
+    ? "Sign in and load the TSV from GitHub before committing."
+    : "Commit edited decisions.tsv to GitHub.";
+  commit.addEventListener("click", () => {
+    commit.disabled = true;
+    void handleCommit().finally(() => {
+      commit.disabled = !getStoredToken() || fileSource !== "github" || !sourceSha;
+    });
+  });
+  actions.append(back, download, commit);
 
   root.append(summary, messages, cardList, actions);
   app.replaceChildren(root);
@@ -196,4 +224,156 @@ function downloadTsv(): void {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+async function handleCommit(): Promise<void> {
+  if (!sourceSha || fileSource !== "github") return;
+
+  const validationErrors = rows.flatMap((row) =>
+    validateDecisionRow(row).map((error) => `${row.review_no} / ${row.check_id}: ${error}`),
+  );
+  if (validationErrors.length > 0) {
+    window.alert(`Resolve validation issues before committing.\n\n${validationErrors.join("\n")}`);
+    return;
+  }
+
+  const changedCount = countChangedDecisionRows(originalRows, rows);
+  const defaultMessage =
+    `docs(reviews): REV-${rev} update from web UI (${changedCount} observations changed)`;
+  const message = window.prompt("Commit message", defaultMessage)?.trim();
+  if (!message) return;
+  if (!isValidCommitMessage(message)) {
+    window.alert("Commit message must be a subject line plus optional body after a blank line.");
+    return;
+  }
+
+  const tsv = serializeDecisionTsv(rows);
+  await commitWithRetry(message, tsv, true);
+}
+
+async function commitWithRetry(
+  message: string,
+  tsv: string,
+  retryOnAuthError: boolean,
+): Promise<void> {
+  try {
+    if (!sourceSha) return;
+    const result = await putFile({
+      path: filePath,
+      message,
+      content: tsv,
+      sha: sourceSha,
+    });
+    handleCommitSuccess(result);
+  } catch (error) {
+    if (error instanceof GitHubContentError && error.kind === "conflict") {
+      window.alert("Conflict: file changed on the server");
+      showConflictBanner();
+      return;
+    }
+    if (error instanceof GitHubContentError && error.kind === "auth" && retryOnAuthError) {
+      await reauthenticateForRetry();
+      await commitWithRetry(message, tsv, false);
+      return;
+    }
+    window.alert(error instanceof Error ? error.message : "Failed to commit TSV.");
+  }
+}
+
+function handleCommitSuccess(result: PutFileResult): void {
+  sourceSha = result.contentSha;
+  originalRows = cloneRows(rows);
+  clearDrafts();
+  const sourceLabel = app.querySelector<HTMLElement>(".review-summary .eyebrow");
+  if (sourceLabel) sourceLabel.textContent = `${fileSource} / ${sourceSha.slice(0, 7)}`;
+  showCommitSuccessBanner(result);
+}
+
+function showCommitSuccessBanner(result: PutFileResult): void {
+  removeBanners();
+  const banner = document.createElement("section");
+  banner.className = "commit-banner success";
+  const link = document.createElement("a");
+  link.className = "text-link";
+  link.href = result.commitUrl;
+  link.target = "_blank";
+  link.rel = "noreferrer";
+  link.textContent = result.commitSha.slice(0, 7);
+  banner.append("Committed ", link);
+  app.querySelector(".app-shell")?.prepend(banner);
+  window.setTimeout(() => banner.remove(), 8000);
+}
+
+function showConflictBanner(): void {
+  removeBanners();
+  const banner = document.createElement("section");
+  banner.className = "commit-banner error";
+  const message = document.createElement("p");
+  message.textContent = "Conflict: file changed on the server.";
+  const reload = document.createElement("button");
+  reload.type = "button";
+  reload.className = "secondary-button";
+  reload.textContent = "Reload";
+  reload.addEventListener("click", () => {
+    if (!window.confirm("Reload latest TSV from GitHub? In-progress edits will be lost.")) return;
+    clearDrafts();
+    void renderReview();
+  });
+  banner.append(message, reload);
+  app.querySelector(".app-shell")?.prepend(banner);
+}
+
+async function reauthenticateForRetry(): Promise<void> {
+  const panel = document.createElement("section");
+  panel.className = "auth-panel compact";
+  const status = document.createElement("p");
+  status.textContent = "GitHub token expired. Re-authenticate to retry commit.";
+  panel.append(status);
+  app.querySelector(".app-shell")?.prepend(panel);
+  await startDeviceFlow((state) => renderDeviceState(panel, state, () => undefined));
+}
+
+function removeBanners(): void {
+  app.querySelectorAll(".commit-banner").forEach((banner) => banner.remove());
+}
+
+function isValidCommitMessage(message: string): boolean {
+  const lines = message.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  return Boolean(lines[0]?.trim()) && (lines.length === 1 || lines[1] === "");
+}
+
+function applyDrafts(targetRows: DecisionRow[]): void {
+  for (const row of targetRows) {
+    const rationale = sessionStorage.getItem(draftKey(row, "rationale"));
+    const findingDispositions = sessionStorage.getItem(draftKey(row, "finding_dispositions"));
+    if (rationale !== null) row.rationale = rationale;
+    if (findingDispositions !== null) row.finding_dispositions = findingDispositions;
+  }
+}
+
+function persistDrafts(): void {
+  for (const row of rows) {
+    sessionStorage.setItem(draftKey(row, "rationale"), row.rationale);
+    sessionStorage.setItem(draftKey(row, "finding_dispositions"), row.finding_dispositions);
+  }
+}
+
+function clearDrafts(): void {
+  const prefix = draftPrefix();
+  for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+    const key = sessionStorage.key(index);
+    if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
+  }
+}
+
+function draftKey(row: DecisionRow, field: "rationale" | "finding_dispositions"): string {
+  return `${draftPrefix()}${encodeURIComponent(row.review_no)}:${encodeURIComponent(row.check_id)}:${field}`;
+}
+
+function draftPrefix(): string {
+  return `pptx-review:draft:${deck}:${rev}:`;
+}
+
+function cloneRows(sourceRows: DecisionRow[]): DecisionRow[] {
+  return sourceRows.map((row) => ({ ...row }));
 }

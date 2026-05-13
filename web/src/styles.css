@@ -27,7 +27,7 @@ textarea {
   width: min(100%, 480px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 20px 14px 92px;
+  padding: 20px 14px 132px;
 }
 
 .app-header {
@@ -127,7 +127,7 @@ textarea {
 
 .primary-button:disabled,
 .secondary-button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.6;
 }
 
@@ -192,6 +192,32 @@ textarea {
 .message-list {
   display: grid;
   gap: 8px;
+}
+
+.commit-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid #b8c5d1;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.commit-banner p {
+  margin: 0;
+}
+
+.commit-banner.success {
+  border-color: #8bb99d;
+  background: #edf8f1;
+}
+
+.commit-banner.error {
+  border-color: #d69a9a;
+  background: #fff1f1;
 }
 
 .observation-card {
@@ -306,6 +332,7 @@ textarea {
   bottom: 0;
   left: 0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 10px;
   padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
@@ -314,7 +341,8 @@ textarea {
 }
 
 .sticky-actions > * {
-  width: min(46%, 220px);
+  flex: 1 1 116px;
+  max-width: 220px;
 }
 
 @media (min-width: 720px) {

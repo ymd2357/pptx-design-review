@@ -1,4 +1,4 @@
-import { getStoredToken } from "../auth/device-flow";
+import { clearStoredToken, getStoredToken } from "../auth/device-flow";
 
 const apiRoot = "https://api.github.com/repos";
 
@@ -10,8 +10,23 @@ export type ReviewDeck = {
 
 export type ContentFile = {
   text: string;
-  sha?: string;
+  sha: string | undefined;
   source: "github" | "local";
+  path: string;
+};
+
+export type PutFileOptions = {
+  path: string;
+  message: string;
+  content: string;
+  sha: string;
+  branch?: string;
+};
+
+export type PutFileResult = {
+  contentSha: string;
+  commitSha: string;
+  commitUrl: string;
 };
 
 type GitHubContent = {
@@ -22,6 +37,27 @@ type GitHubContent = {
   content?: string;
   encoding?: string;
 };
+
+type GitHubPutContentResponse = {
+  content?: {
+    sha: string;
+  };
+  commit: {
+    sha: string;
+    html_url: string;
+  };
+};
+
+export class GitHubContentError extends Error {
+  constructor(
+    public readonly kind: "auth" | "conflict" | "api",
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "GitHubContentError";
+  }
+}
 
 const mockDecks: ReviewDeck[] = [
   {
@@ -53,11 +89,12 @@ export async function fetchDecisionTsv(deck: string, rev: string): Promise<Conte
   const filePath = `doc/reviews/${deck}/rev-${rev}-decisions.tsv`;
   if (token && hasRepoCoordinates()) {
     try {
-      const file = await githubJson<GitHubContent>(contentsUrl(filePath), token);
+      const file = await getFile(filePath, token);
       return {
         text: decodeGitHubContent(file),
         sha: file.sha,
         source: "github",
+        path: filePath,
       };
     } catch (error) {
       console.warn("GitHub TSV fetch failed; falling back to local data.", error);
@@ -68,7 +105,57 @@ export async function fetchDecisionTsv(deck: string, rev: string): Promise<Conte
   if (!response.ok) {
     throw new Error(`Failed to load ${filePath}: ${response.status}`);
   }
-  return { text: await response.text(), source: "local" };
+  return { text: await response.text(), sha: undefined, source: "local", path: filePath };
+}
+
+export async function getFile(path: string, token = getStoredToken()): Promise<GitHubContent> {
+  if (!token) {
+    throw new GitHubContentError("auth", "GitHub token is not available.");
+  }
+  return githubJson<GitHubContent>(contentsUrl(path), token);
+}
+
+export async function putFile(opts: PutFileOptions): Promise<PutFileResult> {
+  const token = getStoredToken();
+  if (!token) {
+    throw new GitHubContentError("auth", "GitHub token is not available.");
+  }
+
+  const body: Record<string, string> = {
+    message: opts.message,
+    content: encodeBase64(opts.content),
+    sha: opts.sha,
+  };
+  if (opts.branch) body.branch = opts.branch;
+
+  const response = await fetch(contentsUrl(opts.path), {
+    method: "PUT",
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "X-GitHub-Api-Version": "2022-11-28",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 409) {
+    throw new GitHubContentError("conflict", "Conflict: file changed on the server.", 409);
+  }
+  if (response.status === 401 || response.status === 403) {
+    clearStoredToken();
+    throw new GitHubContentError("auth", `GitHub API ${response.status}`, response.status);
+  }
+  if (!response.ok) {
+    throw new GitHubContentError("api", `GitHub API ${response.status}`, response.status);
+  }
+
+  const data = (await response.json()) as GitHubPutContentResponse;
+  return {
+    contentSha: data.content?.sha ?? opts.sha,
+    commitSha: data.commit.sha,
+    commitUrl: data.commit.html_url,
+  };
 }
 
 async function listReviewDecksFromGitHub(token: string): Promise<ReviewDeck[]> {
@@ -112,8 +199,12 @@ async function githubJson<T>(url: string, token: string): Promise<T> {
       "X-GitHub-Api-Version": "2022-11-28",
     },
   });
+  if (response.status === 401 || response.status === 403) {
+    clearStoredToken();
+    throw new GitHubContentError("auth", `GitHub API ${response.status}`, response.status);
+  }
   if (!response.ok) {
-    throw new Error(`GitHub API ${response.status}`);
+    throw new GitHubContentError("api", `GitHub API ${response.status}`, response.status);
   }
   return (await response.json()) as T;
 }
@@ -142,4 +233,13 @@ function decodeGitHubContent(file: GitHubContent): string {
   const binary = atob(file.content.replace(/\s/g, ""));
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   return new TextDecoder().decode(bytes);
+}
+
+function encodeBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
 }
