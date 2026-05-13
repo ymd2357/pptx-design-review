@@ -165,6 +165,36 @@ def _make_centered_single_line_good(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_shape_to_fit_text_not_p1_autofit(out: Path) -> None:
+    """Create a deck with spAutoFit; it should not count as actual text shrink."""
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(320), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Shape grows to fit text"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
+def _make_text_to_fit_without_scale_not_p1_autofit(out: Path) -> None:
+    """Create a normAutofit deck without persisted shrink; it should not claim shrink amount."""
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(320), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "No persisted shrink"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _make_bad_table_cell_fill(out: Path) -> None:
     """Create a deck where only a table cell uses a non-palette fill color."""
     prs = Presentation()
@@ -391,10 +421,19 @@ def _add_lint005_text_box(slide, *, x: int, y: int, width: int, text: str):
     return box
 
 
-def _add_lint005_rect(slide, *, x: int, y: int, width: int, height: int):
+def _set_design_element(shape, element: str) -> None:
+    c_nv_pr = shape._element.xpath(".//p:cNvPr")[0]
+    descr = c_nv_pr.get("descr") or ""
+    separator = "; " if descr else ""
+    c_nv_pr.set("descr", f"{descr}{separator}ds:element={element}")
+
+
+def _add_lint005_rect(slide, *, x: int, y: int, width: int, height: int, design_element: str | None = None):
     shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(x), Pt(y), Pt(width), Pt(height))
     shape.fill.solid()
     shape.fill.fore_color.rgb = RGBColor.from_string("EEEEEE")
+    if design_element:
+        _set_design_element(shape, design_element)
     return shape
 
 
@@ -443,17 +482,27 @@ def _make_object_relationships_bad(out: Path) -> None:
     _add_lint005_rect(slide, x=500, y=100, width=120, height=80)
     _add_lint005_rect(slide, x=560, y=130, width=120, height=80)
 
-    _add_lint005_rect(slide, x=900, y=100, width=80, height=80)
-    _add_lint005_rect(slide, x=984, y=100, width=80, height=80)
+    _add_lint005_rect(slide, x=900, y=100, width=80, height=80, design_element="peer_object")
+    _add_lint005_rect(slide, x=984, y=100, width=80, height=80, design_element="peer_object")
 
     _add_lint005_rect(slide, x=120, y=300, width=100, height=60)
     _add_lint005_rect(slide, x=125, y=390, width=100, height=60)
     _add_lint005_text_box(slide, x=300, y=520, width=260, text="Peer text one")
     _add_lint005_text_box(slide, x=305, y=610, width=260, text="Peer text two")
 
-    _add_lint005_rect(slide, x=500, y=300, width=360, height=180)
+    _add_lint005_rect(slide, x=500, y=300, width=360, height=180, design_element="card")
     _add_lint005_rect(slide, x=502, y=330, width=60, height=40)
     _add_lint005_rect(slide, x=580, y=360, width=60, height=40)
+    prs.save(str(out))
+
+
+def _make_unmarked_small_gap_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _add_lint005_rect(slide, x=900, y=100, width=80, height=80)
+    _add_lint005_rect(slide, x=984, y=100, width=80, height=80)
     prs.save(str(out))
 
 
@@ -646,8 +695,8 @@ def _make_heading_hierarchy_bad(out: Path) -> None:
     prs.slide_width = Pt(1440)
     prs.slide_height = Pt(810)
     slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_semantic_text(slide, x=120, y=50, width=900, text="Small title", size=32)
-    _add_semantic_text(slide, x=120, y=220, width=900, text="Oversized body", size=40)
+    _add_semantic_text(slide, x=120, y=50, width=900, text="Heading slot uses subheading size", size=32)
+    _add_semantic_text(slide, x=120, y=220, width=900, text="Body slot uses large-heading size", size=40)
     prs.save(str(out))
 
 
@@ -681,7 +730,15 @@ def _make_key_area_cropped_bad(out: Path, *, decorative: bool = False) -> None:
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _add_semantic_text(slide, x=120, y=50, width=900, text="Title", size=32)
     img = out.with_name("_cropped_fixture.png")
-    img.write_bytes(make_examples.TINY_PNG)
+    crop_fixture = Image.new("RGB", (320, 180), "white")
+    draw = ImageDraw.Draw(crop_fixture)
+    draw.rectangle((0, 0, 100, 180), fill="#E53935")
+    draw.rectangle((100, 0, 220, 180), fill="#FFFFFF")
+    draw.rectangle((220, 0, 320, 180), fill="#1976D2")
+    draw.text((18, 76), "KEY", fill="white")
+    draw.text((128, 76), "CENTER", fill="#222222")
+    draw.text((242, 76), "SIDE", fill="white")
+    crop_fixture.save(img)
     try:
         pic = slide.shapes.add_picture(str(img), Pt(120), Pt(180), width=Pt(320), height=Pt(180))
         pic.crop_left = 0.25
@@ -727,6 +784,8 @@ def main() -> int:
         bad = tmp_dir / "bad.pptx"
         scaled_good = tmp_dir / "scaled-good.pptx"
         centered_single_line_good = tmp_dir / "centered-single-line-good.pptx"
+        shape_to_fit_text_not_p1_autofit = tmp_dir / "shape-to-fit-text-not-p1-autofit.pptx"
+        text_to_fit_without_scale_not_p1_autofit = tmp_dir / "text-to-fit-without-scale-not-p1-autofit.pptx"
         bad_table_cell_fill = tmp_dir / "bad-table-cell-fill.pptx"
         rendered_low_contrast = tmp_dir / "rendered-low-contrast.pptx"
         rendered_low_contrast_images = tmp_dir / "rendered-low-contrast-images"
@@ -745,6 +804,7 @@ def main() -> int:
         structural_containment_good = tmp_dir / "structural-containment-good.pptx"
         structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
         object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
+        unmarked_small_gap_good = tmp_dir / "unmarked-small-gap-good.pptx"
         card_grid_consistency_good = tmp_dir / "card-grid-consistency-good.pptx"
         card_grid_consistency_bad = tmp_dir / "card-grid-consistency-bad.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
@@ -768,6 +828,8 @@ def main() -> int:
         make_examples.make_bad(bad)
         _make_scaled_good(scaled_good)
         _make_centered_single_line_good(centered_single_line_good)
+        _make_shape_to_fit_text_not_p1_autofit(shape_to_fit_text_not_p1_autofit)
+        _make_text_to_fit_without_scale_not_p1_autofit(text_to_fit_without_scale_not_p1_autofit)
         _make_bad_table_cell_fill(bad_table_cell_fill)
         _make_rendered_low_contrast_case(rendered_low_contrast, rendered_low_contrast_images)
         _make_allowed_latin_fonts_good(allowed_latin_fonts_good)
@@ -785,6 +847,7 @@ def main() -> int:
         _make_structural_containment_good(structural_containment_good)
         _make_structural_containment_overflow(structural_containment_overflow)
         _make_object_relationships_bad(object_relationships_bad)
+        _make_unmarked_small_gap_good(unmarked_small_gap_good)
         _make_card_grid_consistency_good(card_grid_consistency_good)
         _make_card_grid_consistency_bad(card_grid_consistency_bad)
         _make_text_vertical_balance_good(text_vertical_balance_good)
@@ -842,6 +905,19 @@ def main() -> int:
             failures.append(
                 "centered-single-line-good.pptx did not trigger vertical anchor alignment in strict profile"
             )
+
+        for label, path in (
+            ("shape-to-fit-text-not-p1-autofit.pptx", shape_to_fit_text_not_p1_autofit),
+            ("text-to-fit-without-scale-not-p1-autofit.pptx", text_to_fit_without_scale_not_p1_autofit),
+        ):
+            autofit_findings = [
+                f for f in pptx_lint.lint_pptx(path) if f.check == "text_autofit_disabled"
+            ]
+            if autofit_findings:
+                failures.append(
+                    f"{label} should not trigger P1-14 actual shrink detection:\n  "
+                    + "\n  ".join(f.message for f in autofit_findings)
+                )
 
         table_cell_findings = [
             f
@@ -1117,6 +1193,14 @@ def main() -> int:
                 f"object-relationships-bad.pptx did not trigger {sorted(missing_lint005)}; "
                 f"got {sorted(lint005_bad_check_set)}"
             )
+        unmarked_gap_findings = [
+            f for f in pptx_lint.lint_pptx(unmarked_small_gap_good) if f.check == "object_gap_too_small"
+        ]
+        if unmarked_gap_findings:
+            failures.append(
+                "unmarked-small-gap-good.pptx triggered object_gap_too_small even though "
+                "default ds:element spacing is 0"
+            )
 
         card_grid_good_findings = [
             f
@@ -1142,6 +1226,14 @@ def main() -> int:
         if missing:
             failures.append(
                 f"bad.pptx did not trigger {sorted(missing)}; got {sorted(bad_check_set)}"
+            )
+        bad_autofit = [f for f in bad_findings if f.check == "text_autofit_disabled"]
+        if not bad_autofit:
+            failures.append("bad.pptx did not trigger P1-14 actual text shrink")
+        elif bad_autofit[0].detail.get("font_scale_percent") != 65:
+            failures.append(
+                "bad.pptx P1-14 should report the persisted 65% font scale; "
+                f"got {bad_autofit[0].detail}"
             )
         guideline_checks = _guideline_lint_check_keys()
         unknown = KNOWN_EMITTED_CHECKS - guideline_checks

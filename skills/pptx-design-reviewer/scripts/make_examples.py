@@ -12,7 +12,7 @@ good.pptx
 bad.pptx
 - 1 slide, 16:9
 - shape A: overflow_text (right edge), font_family ("Arial"), font_size_scale (30pt),
-           text_autofit_disabled (SHAPE_TO_FIT_TEXT), text_color_allowlist,
+           text_autofit_disabled (TEXT_TO_FIT_SHAPE with 65% fontScale), text_color_allowlist,
            contrast_ratio
 - shape B: safe_text_area_text violation (positioned at x=10, left of x=81 boundary),
            background_color_palette, low_contrast
@@ -45,6 +45,7 @@ from pptx.util import Emu, Pt
 
 
 PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 ET.register_namespace("p", PML_NS)
 
 TINY_PNG = base64.b64decode(
@@ -111,6 +112,13 @@ def _clear_alt_text(shape) -> None:
     c_nv_pr.attrib.pop("title", None)
 
 
+def _set_norm_autofit_font_scale(shape, font_scale: int) -> None:
+    body_pr = shape._element.xpath(".//a:bodyPr")[0]
+    norm_autofit = body_pr.find(f"{A_NS}normAutofit")
+    if norm_autofit is not None:
+        norm_autofit.set("fontScale", str(font_scale))
+
+
 def make_good(out: Path) -> None:
     prs = _new_169_deck()
     slide = _add_blank_slide(prs)
@@ -131,8 +139,9 @@ def make_bad(out: Path) -> None:
     slide = _add_blank_slide(prs)
 
     a = slide.shapes.add_textbox(Pt(1300), Pt(40), Pt(200), Pt(120))
-    a.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
-    a_run = _set_run(a.text_frame, "Bad shape A", "Arial", 30)
+    a.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    _set_norm_autofit_font_scale(a, 65000)
+    a_run = _set_run(a.text_frame, "Bad shape A has too much copy", "Arial", 30)
     a_run.font.color.rgb = RGBColor(255, 0, 0)
 
     b = slide.shapes.add_textbox(Pt(10), Pt(300), Pt(300), Pt(50))

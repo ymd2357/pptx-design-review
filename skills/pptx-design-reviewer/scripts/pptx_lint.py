@@ -6,7 +6,7 @@ Checks
 - overflow_shapes      (error)   shape element extends beyond slide canvas
 - overflow_images      (error)   image element extends beyond slide canvas
 - safe_text_area_text  (warning) text-bearing element outside safe text area
-- text_autofit_disabled(error)   text frame auto-size is not NONE
+- text_autofit_disabled(error)   text-to-fit auto-size has an actual font shrink
 - font_family          (warning) font name not in allowlist
 - font_size_scale      (warning) font size not in allowed scale
 - safe_margins        (warning) non-text element outside safe margins
@@ -92,10 +92,21 @@ ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
 LINE_HEIGHT_TOL_PT = 2.0
 OBJECT_OVERLAP_AREA_PT2_MIN = 1.0
 STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN = 0.9
-OBJECT_GAP_MIN_PT = 8.0
+OBJECT_GAP_DEFAULT_MIN_PT = 0.0  # Mirrors rules.slide.object_spacing.default_adjacent_gap_pt_min.
+OBJECT_GAP_ELEMENT_MIN_PT = {
+    "default": OBJECT_GAP_DEFAULT_MIN_PT,
+    "peer_object": 8.0,  # Mirrors rules.slide.object_spacing.element_gap_pt_min.peer_object.
+}
 INNER_PADDING_RATIO_MIN = 0.5
 INNER_PADDING_RATIO_MAX = 2.0
 INNER_PADDING_SIDE_MIN_PT = 4.0
+INNER_PADDING_DEFAULT_TARGET_PT = 0.0
+INNER_PADDING_ELEMENT_TARGET_PT = {
+    "default": INNER_PADDING_DEFAULT_TARGET_PT,
+    "card": 24.0,  # Mirrors tokens.component.card.padding_pt.
+    "callout": 24.0,  # Mirrors tokens.component.callout.padding_pt.
+}
+INNER_PADDING_TARGET_TOL_PT = 4.0
 CARD_GRID_GROUP_MIN = 2
 CARD_GRID_CHILD_COUNT_MIN = 2
 CARD_GRID_ROW_CENTER_TOL_PT = 36.0
@@ -171,9 +182,66 @@ ALLOWED_TEXT_COLORS_HEX = {
     "#1E112D",  # text.alt_dark
     "#FEFEFE",  # brand.utility.off_white
     "#FFFFFF",  # text.inverse
+    "#E6033D",  # brand.gradient.red_deep, allowed for hue-preserving contrast repair
     "#A51E6D",  # accent.magenta, allowed for emphasis text
     "#0072B2",  # state.info, allowed for link-like text
 }
+
+CONTRAST_REPAIR_COLOR_FAMILIES = (
+    (
+        "neutral_black",
+        (
+            "#FFFFFF",
+            "#FEFEFE",
+            "#999999",
+            "#858585",
+            "#707070",
+            "#666666",
+            "#5C5C5C",
+            "#474747",
+            "#333333",
+            "#1E112D",
+            "#000000",
+        ),
+    ),
+    (
+        "red",
+        (
+            "#FF5757",
+            "#E6033D",
+            "#D55E00",
+        ),
+    ),
+    (
+        "magenta",
+        (
+            "#C978A7",
+            "#C06299",
+            "#B74B8A",
+            "#AE357C",
+            "#A51E6D",
+        ),
+    ),
+    (
+        "blue",
+        (
+            "#56B4E9",
+            "#32BED2",
+            "#0072B2",
+        ),
+    ),
+    (
+        "green",
+        (
+            "#68BFAE",
+            "#4FB5A1",
+            "#35AA93",
+            "#1CA086",
+            "#039578",
+            "#009E73",
+        ),
+    ),
+)
 
 ALLOWED_FILL_COLORS_HEX = {
     "#FFFFFF",  # background.base / neutral.n0
@@ -253,6 +321,7 @@ TEXT_COLOR_TOKEN_BY_HEX = {
     "#1E112D": "text.alt_dark",
     "#FEFEFE": "brand.utility.off_white",
     "#FFFFFF": "text.inverse",
+    "#E6033D": "brand.gradient.red_deep",
     "#A51E6D": "accent.magenta",
     "#0072B2": "state.info",
 }
@@ -593,6 +662,24 @@ def _axis_gap(a_min: float, a_max: float, b_min: float, b_max: float) -> float:
     return 0.0
 
 
+def _design_element(record: ShapeRecord) -> str:
+    title, descr = _alt_text_values(record.shape)
+    haystack = " ".join(
+        str(value or "")
+        for value in (getattr(record.shape, "name", ""), title, descr)
+    )
+    match = re.search(r"(?:^|[\s;])ds:element=([A-Za-z0-9_.-]+)", haystack)
+    return match.group(1) if match else "default"
+
+
+def _object_gap_threshold_pt(first: ShapeRecord, second: ShapeRecord) -> tuple[float, str, str]:
+    first_element = _design_element(first)
+    second_element = _design_element(second)
+    first_threshold = OBJECT_GAP_ELEMENT_MIN_PT.get(first_element, OBJECT_GAP_DEFAULT_MIN_PT)
+    second_threshold = OBJECT_GAP_ELEMENT_MIN_PT.get(second_element, OBJECT_GAP_DEFAULT_MIN_PT)
+    return max(first_threshold, second_threshold), first_element, second_element
+
+
 def _bbox_contains(outer: tuple, inner: tuple, tolerance: float = TOL_PT) -> bool:
     ox1, oy1, ox2, oy2 = _bbox_edges(outer)
     ix1, iy1, ix2, iy2 = _bbox_edges(inner)
@@ -608,6 +695,7 @@ def _shape_record_detail(record: ShapeRecord) -> dict:
     return {
         "shape_id": getattr(record.shape, "shape_id", None),
         "shape_name": getattr(record.shape, "name", None),
+        "design_element": _design_element(record),
         "kind": record.kind,
         "source_order_index": record.source_order_index,
         "bbox_pt": [round(v, 2) for v in record.bbox_pt],
@@ -725,18 +813,44 @@ def _nearest_color_hex(source_hex: str, candidates: Iterable[str]) -> str:
     return min(candidates, key=lambda candidate: _rgb_distance(source, _hex_to_rgb(candidate)))
 
 
+def _contrast_repair_family(foreground_hex: str) -> tuple[str, tuple[str, ...]]:
+    source = _hex_to_rgb(foreground_hex)
+    best: tuple[float, str, tuple[str, ...]] | None = None
+    for family_name, colors in CONTRAST_REPAIR_COLOR_FAMILIES:
+        for color in colors:
+            distance = _rgb_distance(source, _hex_to_rgb(color))
+            if best is None or distance < best[0]:
+                best = (distance, family_name, colors)
+    if best is None:
+        return ("neutral_black", CONTRAST_REPAIR_COLOR_FAMILIES[0][1])
+    return best[1], best[2]
+
+
 def _contrast_candidate(
     foreground_hex: str,
     background_hex: str,
     required_ratio: float,
 ) -> Optional[dict]:
+    family_name, family_colors = _contrast_repair_family(foreground_hex)
     passing = [
         color
-        for color in ALLOWED_TEXT_COLORS_HEX
-        if _contrast_ratio(color, background_hex) >= required_ratio
+        for color in family_colors
+        if color in ALLOWED_TEXT_COLORS_HEX
+        and _contrast_ratio(color, background_hex) >= required_ratio
     ]
     if not passing:
-        return None
+        neutral_family = CONTRAST_REPAIR_COLOR_FAMILIES[0][1]
+        passing = [
+            color
+            for color in neutral_family
+            if color in ALLOWED_TEXT_COLORS_HEX
+            and _contrast_ratio(color, background_hex) >= required_ratio
+        ]
+        if not passing:
+            return None
+        candidate_group = "neutral_fallback"
+    else:
+        candidate_group = f"hue_family:{family_name}"
     candidate = _nearest_color_hex(foreground_hex, passing)
     return {
         "foreground_hex": candidate,
@@ -744,6 +858,8 @@ def _contrast_candidate(
         "background_hex": background_hex,
         "recalculated_ratio": round(_contrast_ratio(candidate, background_hex), 2),
         "required_ratio": required_ratio,
+        "repair_candidate_group": candidate_group,
+        "selection_policy": "rules.color.repair_candidates.text.hue_preserving_low_contrast",
     }
 
 
@@ -1465,13 +1581,65 @@ def check_autofit(slide_idx, slide_id, shape, findings):
     if not shape.has_text_frame:
         return
     af = shape.text_frame.auto_size
-    if af is None or af == MSO_AUTO_SIZE.NONE:
+    if af is None or af != MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE:
         return
+    body_pr_matches = shape._element.xpath(".//a:bodyPr")
+    if not body_pr_matches:
+        return
+    norm_autofit = body_pr_matches[0].find(f"{A_NS}normAutofit")
+    if norm_autofit is None:
+        return
+    font_scale_raw = norm_autofit.get("fontScale")
+    line_space_reduction_raw = norm_autofit.get("lnSpcReduction")
+    try:
+        font_scale = int(font_scale_raw) if font_scale_raw is not None else 100000
+    except ValueError:
+        font_scale = 100000
+    try:
+        line_space_reduction = (
+            int(line_space_reduction_raw) if line_space_reduction_raw is not None else 0
+        )
+    except ValueError:
+        line_space_reduction = 0
+    if font_scale >= 100000 and line_space_reduction <= 0:
+        return
+
+    run_sizes = [
+        run.font.size.pt
+        for paragraph in shape.text_frame.paragraphs
+        for run in paragraph.runs
+        if run.font.size is not None
+    ]
+    base_font_size = max(run_sizes) if run_sizes else None
+    font_scale_percent = round(font_scale / 1000, 2)
+    effective_font_size = (
+        round(base_font_size * font_scale / 100000, 2)
+        if base_font_size is not None
+        else None
+    )
+    line_space_reduction_percent = round(line_space_reduction / 1000, 2)
     findings.append(
         make_finding(
             "error", "text_autofit_disabled", slide_idx, slide_id, shape,
-            f"text auto-size is {af} (must be NONE)",
-            {"auto_size": str(af), "expected_auto_size": "NONE"},
+            (
+                f"text auto-fit shrinks font to {font_scale_percent:g}%"
+                + (
+                    f" ({base_font_size:g}pt -> {effective_font_size:g}pt)"
+                    if base_font_size is not None and effective_font_size is not None
+                    else ""
+                )
+                + " (must be NONE)"
+            ),
+            {
+                "auto_size": str(af),
+                "autofit_mode": "TEXT_TO_FIT_SHAPE",
+                "expected_auto_size": "NONE",
+                "font_scale_percent": font_scale_percent,
+                "font_shrink_percent": round(100 - font_scale_percent, 2),
+                "line_space_reduction_percent": line_space_reduction_percent,
+                "base_font_size_pt": base_font_size,
+                "effective_font_size_pt": effective_font_size,
+            },
         )
     )
 
@@ -1590,7 +1758,10 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
             make_finding(
                 "warning", "alignment_left_top", slide_idx, slide_id, shape,
                 f"text vertical alignment is {vertical}; expected TOP",
-                {"vertical_anchor": str(vertical)},
+                {
+                    "vertical_anchor": str(vertical),
+                    "expected_vertical_anchor": "TOP",
+                },
             )
         )
     bad: dict = {}
@@ -1604,7 +1775,13 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
             make_finding(
                 "warning", "alignment_left_top", slide_idx, slide_id, shape,
                 f"paragraph alignment is {alignment}; expected LEFT ({count} paragraph(s))",
-                {"alignment": alignment, "paragraphs": count},
+                {
+                    "alignment": alignment,
+                    "expected_alignment": "LEFT",
+                    "vertical_anchor": str(vertical) if vertical is not None else None,
+                    "expected_vertical_anchor": "TOP",
+                    "paragraphs": count,
+                },
             )
         )
 
@@ -1944,17 +2121,20 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
             vertical_gap = _axis_gap(ay1, ay2, by1, by2)
             horizontal_overlap = vertical_gap == 0.0
             vertical_overlap = horizontal_gap == 0.0
+            gap_threshold_pt, first_element, second_element = _object_gap_threshold_pt(first, second)
+            if gap_threshold_pt <= OBJECT_GAP_DEFAULT_MIN_PT:
+                continue
             gap_candidates: list[tuple[str, float]] = []
-            if horizontal_overlap and 0 < horizontal_gap < OBJECT_GAP_MIN_PT:
+            if horizontal_overlap and 0 < horizontal_gap < gap_threshold_pt:
                 gap_candidates.append(("horizontal", horizontal_gap))
-            if vertical_overlap and 0 < vertical_gap < OBJECT_GAP_MIN_PT:
+            if vertical_overlap and 0 < vertical_gap < gap_threshold_pt:
                 gap_candidates.append(("vertical", vertical_gap))
             for axis, gap in gap_candidates:
                 findings.append(
                     make_finding(
                         "warning", "object_gap_too_small", slide_idx, slide_id, first.shape,
                         (
-                            f"{axis} gap {gap:.1f}pt is below {OBJECT_GAP_MIN_PT:g}pt: "
+                            f"{axis} gap {gap:.1f}pt is below {gap_threshold_pt:g}pt: "
                             f"{_shape_label(first)} / {_shape_label(second)}"
                         ),
                         {
@@ -1962,7 +2142,10 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
                             "shape_b": _shape_record_detail(second),
                             "axis": axis,
                             "gap_pt": round(gap, 2),
-                            "threshold_pt": OBJECT_GAP_MIN_PT,
+                            "threshold_pt": gap_threshold_pt,
+                            "element_a": first_element,
+                            "element_b": second_element,
+                            "default_threshold_pt": OBJECT_GAP_DEFAULT_MIN_PT,
                         },
                     )
                 )
@@ -1985,6 +2168,13 @@ def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord
     for container in records:
         if not _is_container_candidate(container):
             continue
+        container_element = _design_element(container)
+        target_padding = INNER_PADDING_ELEMENT_TARGET_PT.get(
+            container_element,
+            INNER_PADDING_DEFAULT_TARGET_PT,
+        )
+        if target_padding <= INNER_PADDING_DEFAULT_TARGET_PT:
+            continue
         children = children_by_container.get(id(container), [])
         if len(children) < 2:
             continue
@@ -2001,20 +2191,23 @@ def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord
             "bottom": container_bottom - child_bottom,
         }
         triggered_rules: list[str] = []
-        for side, value in padding.items():
-            if value < INNER_PADDING_SIDE_MIN_PT:
-                triggered_rules.append(f"{side}_padding_below_min")
+        for side in ("left", "top"):
+            if abs(padding[side] - target_padding) > INNER_PADDING_TARGET_TOL_PT:
+                triggered_rules.append(f"{side}_padding_target_delta")
+        for side in ("right", "bottom"):
+            if padding[side] < target_padding - INNER_PADDING_TARGET_TOL_PT:
+                triggered_rules.append(f"{side}_padding_below_target")
 
-        horizontal_ratio = None
-        vertical_ratio = None
-        if padding["left"] > 0 and padding["right"] > 0:
-            horizontal_ratio = padding["left"] / padding["right"]
-            if not INNER_PADDING_RATIO_MIN <= horizontal_ratio <= INNER_PADDING_RATIO_MAX:
-                triggered_rules.append("horizontal_padding_ratio")
-        if padding["top"] > 0 and padding["bottom"] > 0:
-            vertical_ratio = padding["top"] / padding["bottom"]
-            if not INNER_PADDING_RATIO_MIN <= vertical_ratio <= INNER_PADDING_RATIO_MAX:
-                triggered_rules.append("vertical_padding_ratio")
+        horizontal_ratio = (
+            padding["left"] / padding["right"]
+            if padding["left"] > 0 and padding["right"] > 0
+            else None
+        )
+        vertical_ratio = (
+            padding["top"] / padding["bottom"]
+            if padding["top"] > 0 and padding["bottom"] > 0
+            else None
+        )
 
         if not triggered_rules:
             continue
@@ -2029,7 +2222,10 @@ def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord
                 {
                     "container": _shape_record_detail(container),
                     "children": [_shape_record_detail(child) for child in children],
+                    "container_element": container_element,
                     "padding_pt": {side: round(value, 2) for side, value in padding.items()},
+                    "target_padding_pt": target_padding,
+                    "target_tolerance_pt": INNER_PADDING_TARGET_TOL_PT,
                     "horizontal_ratio": (
                         round(horizontal_ratio, 3) if horizontal_ratio is not None else None
                     ),
@@ -2038,9 +2234,10 @@ def check_inner_padding_imbalance(slide_idx, slide_id, records: list[ShapeRecord
                     ),
                     "triggered_rules": triggered_rules,
                     "thresholds": {
-                        "side_min_pt": INNER_PADDING_SIDE_MIN_PT,
-                        "ratio_min": INNER_PADDING_RATIO_MIN,
-                        "ratio_max": INNER_PADDING_RATIO_MAX,
+                        "default_padding_pt": INNER_PADDING_DEFAULT_TARGET_PT,
+                        "target_padding_pt": target_padding,
+                        "target_tolerance_pt": INNER_PADDING_TARGET_TOL_PT,
+                        "right_bottom_policy": "minimum_target",
                     },
                 },
             )
