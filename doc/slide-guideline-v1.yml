@@ -315,6 +315,7 @@ tokens:
         w: 1278
         h: 690
       content_width_pt: 1278
+      adjacent_object_gap_pt_min: 8
 
     safe_margins_pt:
       left: 81
@@ -540,6 +541,7 @@ tokens:
         gutter_pt: "tokens.value.grid.gutter_pt"
         column_width_pt: "tokens.value.grid.column_width_pt"
       baseline_grid_pt: "tokens.value.grid.baseline_grid_pt"
+      adjacent_object_gap_pt_min: "tokens.value.layout.adjacent_object_gap_pt_min"
 
     space_pt:
       none: "tokens.value.space_pt.none"
@@ -1140,6 +1142,20 @@ rules:
       gutter_pt: 18
       column_width_pt: 90
       baseline_grid_pt: 6
+
+    object_spacing:
+      default_adjacent_gap_pt_min: 0
+      element_marker: "ds:element"
+      element_gap_pt_min:
+        default: 0
+        peer_object: "tokens.semantic.layout.adjacent_object_gap_pt_min"
+      applies_when: "Two normalized object bounding boxes are adjacent on one axis and overlap on the opposite axis."
+      rule_application: "Use element_gap_pt_min for PPTX objects marked with the matching ds:element value. Missing or unknown elements use default 0 and do not emit object_gap_too_small."
+      excludes:
+        - "intentional_grouping"
+        - "intentional_overlap_or_layering"
+        - "container_child_relationship"
+        - "decorative_template_element"
 
     layout_templates:
       registry: "layout_templates.templates"
@@ -3371,9 +3387,10 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.object_gap_too_small"
-        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below 8pt while the opposite axis overlaps."
+        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below the design-system gap for their ds:element value while the opposite axis overlaps. Missing or unknown elements use default 0 and do not warn."
         thresholds:
-          adjacent_gap_pt_min: 8
+          default_adjacent_gap_pt_min: "rules.slide.object_spacing.default_adjacent_gap_pt_min"
+          element_gap_pt_min: "rules.slide.object_spacing.element_gap_pt_min"
       safe_text_area_text:
         severity: "warning"
         automation: "automated"
@@ -3474,12 +3491,16 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.inner_padding_imbalance"
-        detection: "Detect containers with at least two child objects where left/right or top/bottom internal padding ratio is outside 0.5x-2.0x, or any side is below 4pt."
+        detection: "Detect design-system container elements with at least two child objects whose internal padding does not match the component padding rule. Missing or unknown ds:element containers use default 0 and do not warn."
         thresholds:
           child_count_min: 2
-          padding_ratio_min: 0.5
-          padding_ratio_max: 2.0
-          side_padding_pt_min: 4
+          default_inner_padding_pt: 0
+          element_inner_padding_pt:
+            default: 0
+            card: "tokens.component.card.padding_pt"
+            callout: "tokens.component.callout.padding_pt"
+          padding_target_tolerance_pt: 4
+          padding_policy: "left/top should match the component padding target within tolerance; right/bottom must not be below the target. Cases requiring child resize or semantic regrouping are manual."
       card_grid_consistency:
         severity: "warning"
         automation: "automated"
