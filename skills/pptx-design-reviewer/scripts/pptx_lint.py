@@ -3345,6 +3345,19 @@ def _geometry_auto_fixable(evidence: dict) -> bool:
     return all(abs(value - round(value)) < 0.1 for value in drifted.values())
 
 
+def _card_grid_auto_fixable(check: str, evidence: dict) -> bool:
+    if check != "card_grid_consistency":
+        return False
+    medians = evidence.get("group_medians")
+    inconsistent = evidence.get("inconsistent_containers")
+    if not isinstance(medians, dict) or not isinstance(inconsistent, list) or not inconsistent:
+        return False
+    for key in ("top", "width", "height"):
+        if key not in medians:
+            return False
+    return True
+
+
 def _contrast_auto_fixable(check: str, evidence: dict) -> bool:
     if check not in {"contrast_ratio", "low_contrast"}:
         return False
@@ -3404,6 +3417,12 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
             "fixability": "auto_fix_candidate",
             "fixability_rule": "contrast",
             "fixability_reason": "nearest allowed foreground color passes the required contrast ratio",
+        }
+    if _card_grid_auto_fixable(check, evidence):
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "card_grid",
+            "fixability_reason": "row containers can be aligned to the group median geometry (top/width/height + padding)",
         }
     if check in {"contrast_ratio", "low_contrast"}:
         reason = MANUAL_REQUIRED_REASONS.get(check, "contrast repair requires visual review")
@@ -3470,6 +3489,15 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
             if candidate is not None:
                 candidate["candidate_token"] = candidate.get("foreground_token")
             return candidate
+    if check == "card_grid_consistency":
+        medians = evidence.get("group_medians")
+        inconsistent = evidence.get("inconsistent_containers")
+        if isinstance(medians, dict) and isinstance(inconsistent, list) and inconsistent:
+            return {
+                "group_medians": medians,
+                "container_count_to_align": len(inconsistent),
+                "selection_policy": "row_group_median",
+            }
     return None
 
 
