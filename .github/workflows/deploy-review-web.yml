@@ -2,6 +2,8 @@ name: Deploy review web
 
 on:
   push:
+    branches:
+      - master
     paths:
       - "web/**"
       - "doc/reviews/**"
@@ -10,24 +12,20 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: review-pages-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 jobs:
-  build:
-    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+  build-and-publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout source branch
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -42,31 +40,35 @@ jobs:
 
       - name: Build
         working-directory: web
+        env:
+          VITE_GITHUB_CLIENT_ID: ${{ vars.VITE_GITHUB_CLIENT_ID }}
         run: npm run build
 
-      - name: Copy review TSV files
+      - name: Stage publish tree
         run: |
-          mkdir -p web/dist/doc
-          cp -R doc/reviews web/dist/doc/reviews
+          rm -rf publish-tree
+          mkdir -p publish-tree
+          cp -R web/dist/. publish-tree/
 
-      - name: Copy review snapshot files
-        run: |
+          mkdir -p publish-tree/doc/reviews
+          cp -R doc/reviews/. publish-tree/doc/reviews/
+
           if [ -d tmp/review-snapshot ]; then
-            mkdir -p web/dist/tmp
-            cp -R tmp/review-snapshot web/dist/tmp/review-snapshot
+            mkdir -p publish-tree/tmp/review-snapshot
+            cp -R tmp/review-snapshot/. publish-tree/tmp/review-snapshot/
           fi
 
-      - name: Disable Jekyll
-        run: touch web/dist/.nojekyll
+          touch publish-tree/.nojekyll
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: web/dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Push to review-pages branch
+        run: |
+          cd publish-tree
+          git init -q -b review-pages
+          git config user.name "review-pages-bot"
+          git config user.email "review-pages-bot@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git add -A
+          git commit -q -m "review-pages: ${GITHUB_SHA::7} on ${GITHUB_REF##*/}"
+          git push -q --force origin "HEAD:refs/heads/review-pages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
