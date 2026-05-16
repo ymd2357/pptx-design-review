@@ -46,17 +46,21 @@ function renderDeckGrid(decks: ReviewDeck[]): HTMLElement {
   const grid = document.createElement("section");
   grid.className = "deck-grid";
   for (const deck of decks) {
-    const card = document.createElement("a");
+    const card = document.createElement("div");
     card.className = "deck-card";
     const rev = deck.revs.at(-1) ?? "017";
-    card.href =
-      `${sitePath("review/")}?deck=${encodeURIComponent(deck.deck)}&rev=${encodeURIComponent(rev)}`;
+    const compareHref = `${sitePath("compare/")}?deck=${encodeURIComponent(deck.deck)}&rev=${encodeURIComponent(rev)}`;
+    const reviewHref = `${sitePath("review/")}?deck=${encodeURIComponent(deck.deck)}&rev=${encodeURIComponent(rev)}`;
     card.innerHTML = `
       <div class="thumb-placeholder"></div>
       <div>
         <p class="eyebrow">${deck.source}</p>
         <h2>${deck.deck}</h2>
         <p>REV-${deck.revs.join(", REV-")}</p>
+        <div class="deck-card-actions">
+          <a class="primary-button" href="${compareHref}">修正比較を開く</a>
+          <a class="secondary-link" href="${reviewHref}">観点別レビュー</a>
+        </div>
       </div>
     `;
     grid.append(card);

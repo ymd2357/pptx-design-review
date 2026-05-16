@@ -89,6 +89,7 @@ export default defineConfig({
         index: path.resolve(__dirname, "index.html"),
         review: path.resolve(__dirname, "review", "index.html"),
         visual: path.resolve(__dirname, "visual", "index.html"),
+        compare: path.resolve(__dirname, "compare", "index.html"),
       },
     },
   },
