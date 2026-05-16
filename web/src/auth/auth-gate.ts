@@ -1,6 +1,5 @@
 const PIN_SHA256_HEX =
   "255338aaf00799eeaea7a6bcc85984ea0b15a01d13831564628eb0d4d2d3f13c";
-const PIN_DISPLAY = "661271";
 const storageKey = "pptx-review:pin-passed";
 
 export async function requireAuth(app: HTMLElement): Promise<void> {
@@ -51,7 +50,7 @@ function renderGateCard(
 
   const note = document.createElement("p");
   note.className = "status-text";
-  note.innerHTML = `閲覧には PIN が必要です。<br><span class="pin-hint">PIN: <strong>${PIN_DISPLAY}</strong></span>`;
+  note.textContent = "閲覧には PIN が必要です。";
 
   const form = document.createElement("form");
   form.className = "auth-form";
@@ -65,7 +64,6 @@ function renderGateCard(
   input.placeholder = "PIN";
   input.className = "token-input";
   input.required = true;
-  input.value = PIN_DISPLAY;
 
   const submit = document.createElement("button");
   submit.type = "submit";
