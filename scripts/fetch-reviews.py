@@ -36,7 +36,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def fetch_json(url: str) -> dict:
-    with urllib.request.urlopen(url, timeout=30) as resp:
+    # Cloudflare's default bot mitigation rejects the Python-urllib UA with 403.
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "pptx-design-review fetch-reviews.py",
+            "Accept": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=30) as resp:
         return json.loads(resp.read())
 
 
@@ -96,6 +104,16 @@ def render_decisions_tsv(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_compare_tsv(slides: list[dict]) -> str:
+    header = ["slide_no", "decision", "memo"]
+    lines = ["\t".join(header)]
+    for slide in slides:
+        decision = slide.get("decision") or ""
+        memo = (slide.get("memo") or "").replace("\t", " ").replace("\n", " / ")
+        lines.append("\t".join([str(slide.get("slideNo", "")), decision, memo]))
+    return "\n".join(lines) + "\n"
+
+
 def write_outputs(payload: dict, key: str, dry_run: bool) -> None:
     deck = payload.get("deck")
     rev = payload.get("rev")
@@ -106,21 +124,46 @@ def write_outputs(payload: dict, key: str, dry_run: bool) -> None:
     out_dir = REPO_ROOT / "doc" / "reviews" / deck
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    decisions = payload.get("decisions")
+
+    # Compare-mode payload (REV-017 onwards): {mode: "compare", slides: [...]}.
+    if isinstance(decisions, dict) and decisions.get("mode") == "compare":
+        slides = decisions.get("slides") or []
+        if not isinstance(slides, list):
+            print(f"skip {key}: compare.slides not list", file=sys.stderr)
+            return
+        compare_path = out_dir / f"rev-{rev}-compare.tsv"
+        tsv = render_compare_tsv(slides)
+        adopted = sum(1 for s in slides if s.get("decision") == "adopt")
+        rejected = sum(1 for s in slides if s.get("decision") == "reject")
+        undecided = sum(1 for s in slides if not s.get("decision"))
+        print(f"{key}: deck={deck} rev={rev} mode=compare")
+        print(
+            f"  -> {compare_path.relative_to(REPO_ROOT)}"
+            f" ({len(slides)} slides / 採用 {adopted} / 不採用 {rejected} / 未判定 {undecided})"
+        )
+        if dry_run:
+            return
+        compare_path.write_text(tsv, encoding="utf-8")
+        return
+
+    # Legacy observation-list payload: decisions is a list of decision rows.
+    if not isinstance(decisions, list):
+        print(f"skip {key}: decisions has unsupported shape", file=sys.stderr)
+        return
+
     decisions_path = out_dir / f"rev-{rev}-decisions.tsv"
     judgements_path = out_dir / f"rev-{rev}-finding-judgements.json"
-
-    decisions = payload.get("decisions") or []
-    if not isinstance(decisions, list):
-        print(f"skip {key}: decisions not list", file=sys.stderr)
-        return
     tsv = render_decisions_tsv(decisions)
-
     judgements = payload.get("findingJudgements") or {}
     judgements_text = json.dumps(judgements, ensure_ascii=False, indent=2) + "\n"
 
     print(f"{key}: deck={deck} rev={rev}")
     print(f"  -> {decisions_path.relative_to(REPO_ROOT)} ({len(decisions)} rows)")
-    print(f"  -> {judgements_path.relative_to(REPO_ROOT)} ({len(judgements.get('judgements', {}))} findings)")
+    print(
+        f"  -> {judgements_path.relative_to(REPO_ROOT)}"
+        f" ({len(judgements.get('judgements', {}))} findings)"
+    )
     if dry_run:
         return
     decisions_path.write_text(tsv, encoding="utf-8")
