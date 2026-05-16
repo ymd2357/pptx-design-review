@@ -22,7 +22,6 @@ import {
   fetchDecisionTsv,
   fetchJsonFile,
   fetchReviewSnapshot,
-  getAuthenticatedUserLogin,
 } from "./github/contents";
 import { sitePath } from "./site-path";
 import { renderFindingDrawer } from "./ui/finding-drawer";
@@ -42,7 +41,7 @@ let findings: LintFinding[] = [];
 let judgements: FindingJudgementsFile = { deck, rev, judgements: {} };
 let slideSize: SlideSizePt = { w: 1440, h: 810 };
 let imageUrls: string[] = [];
-let updatedBy = "local";
+const updatedBy = "local";
 let progressText: HTMLElement | undefined;
 
 void (async () => {
@@ -81,11 +80,6 @@ async function renderVisualReview(): Promise<void> {
       rev,
       lintData.findings,
     );
-    void getAuthenticatedUserLogin()
-      .then((login) => {
-        if (login) updatedBy = login;
-      })
-      .catch(() => undefined);
     renderLoaded();
   } catch (error) {
     app.replaceChildren(

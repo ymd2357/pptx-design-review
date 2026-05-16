@@ -1,13 +1,12 @@
 import "./styles.css";
 import { requireAuth } from "./auth/auth-gate";
-import { clearStoredToken, getStoredToken } from "./auth/token-store";
 import {
-  countChangedDecisionRows,
   parseDecisionTsv,
   serializeDecisionTsv,
   validateDecisionRow,
   type DecisionRow,
 } from "./data/decisions-tsv";
+import { submitFeedback } from "./data/feedback-client";
 import {
   aggregateFindingDispositions,
   clearFindingJudgementDrafts,
@@ -23,11 +22,6 @@ import {
   fetchDecisionTsv,
   fetchJsonFile,
   fetchReviewSnapshot,
-  GitHubContentError,
-  getAuthenticatedUserLogin,
-  putFile,
-  putJsonFile,
-  type PutFileResult,
   type ReviewSnapshot,
 } from "./github/contents";
 import { sitePath } from "./site-path";
@@ -42,14 +36,10 @@ const deck = params.get("deck") ?? "260329-seminar-curriculum-proposal";
 const rev = params.get("rev") ?? "017";
 
 let rows: DecisionRow[] = [];
-let originalRows: DecisionRow[] = [];
 let sourceSha: string | undefined;
-let filePath = `doc/reviews/${deck}/rev-${rev}-decisions.tsv`;
-let fileSource: "github" | "local" = "local";
 let snapshot: ReviewSnapshot | undefined;
 let lintFindings: LintFinding[] = [];
 let findingJudgements: FindingJudgementsFile = { deck, rev, judgements: {} };
-let findingJudgementsSha: string | undefined;
 let findingJudgementsFilePath = findingJudgementsPath(deck, rev);
 
 void (async () => {
@@ -62,10 +52,7 @@ async function renderReview(): Promise<void> {
   try {
     const file = await fetchDecisionTsv(deck, rev);
     sourceSha = file.sha;
-    filePath = file.path;
-    fileSource = file.source;
     const parsed = parseDecisionTsv(file.text);
-    originalRows = cloneRows(parsed.rows);
     rows = cloneRows(parsed.rows);
     applyDrafts(rows);
     snapshot = await loadSnapshot();
@@ -81,7 +68,6 @@ async function renderReview(): Promise<void> {
 
 function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   const root = shell("");
-  root.append(renderAuthPanel(() => void renderReview()));
 
   const summary = document.createElement("section");
   summary.className = "review-summary";
@@ -126,21 +112,18 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   download.className = "primary-button";
   download.textContent = "Download files";
   download.addEventListener("click", downloadReviewFiles);
-  const commit = document.createElement("button");
-  commit.type = "button";
-  commit.className = "primary-button";
-  commit.textContent = "Commit to repo";
-  commit.disabled = !getStoredToken() || source !== "github" || !sourceSha;
-  commit.title = commit.disabled
-    ? "Sign in and load the TSV from GitHub before committing."
-    : "Commit edited decisions.tsv to GitHub.";
-  commit.addEventListener("click", () => {
-    commit.disabled = true;
-    void handleCommit().finally(() => {
-      commit.disabled = !getStoredToken() || fileSource !== "github" || !sourceSha;
+  const submit = document.createElement("button");
+  submit.type = "button";
+  submit.className = "primary-button";
+  submit.textContent = "Submit to KV";
+  submit.title = "Encrypt with age public key and POST to the shared KV.";
+  submit.addEventListener("click", () => {
+    submit.disabled = true;
+    void handleSubmit().finally(() => {
+      submit.disabled = false;
     });
   });
-  actions.append(back, download, commit);
+  actions.append(back, download, submit);
 
   root.append(summary, messages, renderSnapshotPanel(), cardList, actions);
   app.replaceChildren(root);
@@ -159,7 +142,6 @@ async function loadFindingJudgements(): Promise<void> {
   lintFindings = snapshot?.lint ? parseLintJson(snapshot.lint).findings : [];
   findingJudgementsFilePath = findingJudgementsPath(deck, rev);
   const file = await fetchJsonFile<unknown>(findingJudgementsFilePath);
-  findingJudgementsSha = file?.sha;
   findingJudgements = mergeLocalJudgementDrafts(
     initializeFindingJudgements(
       deck,
@@ -240,31 +222,6 @@ function shell(statusText: string): HTMLElement {
   return root;
 }
 
-function renderAuthPanel(onAuthChange: () => void): HTMLElement {
-  const panel = document.createElement("section");
-  panel.className = "auth-panel compact";
-  const token = getStoredToken();
-  const status = document.createElement("p");
-  status.textContent = token ? "GitHub Contents API read/write mode." : "Sign in required.";
-  const actions = document.createElement("div");
-  actions.className = "button-row";
-
-  if (token) {
-    const signOut = document.createElement("button");
-    signOut.type = "button";
-    signOut.className = "secondary-button";
-    signOut.textContent = "Sign out";
-    signOut.addEventListener("click", () => {
-      clearStoredToken();
-      onAuthChange();
-    });
-    actions.append(signOut);
-  }
-
-  panel.append(status, actions);
-  return panel;
-}
-
 function downloadReviewFiles(): void {
   applyFindingJudgementAggregates(rows);
   const tsv = serializeDecisionTsv(rows);
@@ -285,127 +242,46 @@ function downloadBlob(content: string, filename: string, type: string): void {
   URL.revokeObjectURL(url);
 }
 
-async function handleCommit(): Promise<void> {
-  if (!sourceSha || fileSource !== "github") return;
+async function handleSubmit(): Promise<void> {
   applyFindingJudgementAggregates(rows);
 
   const validationErrors = rows.flatMap((row) =>
     validateDecisionRow(row).map((error) => `${row.review_no} / ${row.check_id}: ${error}`),
   );
   if (validationErrors.length > 0) {
-    window.alert(`Resolve validation issues before committing.\n\n${validationErrors.join("\n")}`);
+    window.alert(`Resolve validation issues before submitting.\n\n${validationErrors.join("\n")}`);
     return;
   }
 
-  const changedCount = countChangedDecisionRows(originalRows, rows);
-  const defaultMessage =
-    `docs(reviews): REV-${rev} update from web UI (${changedCount} observations changed)`;
-  const message = window.prompt("Commit message", defaultMessage)?.trim();
-  if (!message) return;
-  if (!isValidCommitMessage(message)) {
-    window.alert("Commit message must be a subject line plus optional body after a blank line.");
-    return;
-  }
-
-  const tsv = serializeDecisionTsv(rows);
-  await commitWithRetry(message, tsv, prepareFindingJudgementsForSave(), true);
-}
-
-async function commitWithRetry(
-  message: string,
-  tsv: string,
-  judgements: FindingJudgementsFile,
-  retryOnAuthError: boolean,
-): Promise<void> {
   try {
-    if (!sourceSha) return;
-    const result = await putFile({
-      path: filePath,
-      message,
-      content: tsv,
-      sha: sourceSha,
+    const judgements = prepareFindingJudgementsForSave();
+    const { key } = await submitFeedback({
+      deck,
+      rev,
+      decisions: rows,
+      findingJudgements: judgements,
     });
-    const login = await getAuthenticatedUserLogin().catch(() => undefined);
-    if (login) fillMissingUpdatedBy(judgements, login);
-    const judgementResult = await putJsonFile({
-      path: findingJudgementsFilePath,
-      message,
-      data: judgements,
-      sha: findingJudgementsSha,
-    });
-    handleCommitSuccess(result, judgementResult);
+    clearDrafts();
+    clearFindingJudgementDrafts(deck, rev);
+    showSubmitSuccessBanner(key);
   } catch (error) {
-    if (error instanceof GitHubContentError && error.kind === "conflict") {
-      window.alert("Conflict: file changed on the server");
-      showConflictBanner();
-      return;
-    }
-    if (error instanceof GitHubContentError && error.kind === "auth" && retryOnAuthError) {
-      await reauthenticateForRetry();
-      await commitWithRetry(message, tsv, judgements, false);
-      return;
-    }
-    window.alert(error instanceof Error ? error.message : "Failed to commit review files.");
+    window.alert(error instanceof Error ? error.message : "Failed to submit review.");
   }
 }
 
-function handleCommitSuccess(result: PutFileResult, judgementResult: PutFileResult): void {
-  sourceSha = result.contentSha;
-  findingJudgementsSha = judgementResult.contentSha;
-  originalRows = cloneRows(rows);
-  clearDrafts();
-  clearFindingJudgementDrafts(deck, rev);
-  const sourceLabel = app.querySelector<HTMLElement>(".review-summary .eyebrow");
-  if (sourceLabel) sourceLabel.textContent = `${fileSource} / ${sourceSha.slice(0, 7)}`;
-  showCommitSuccessBanner(judgementResult);
-}
-
-function showCommitSuccessBanner(result: PutFileResult): void {
+function showSubmitSuccessBanner(key: string): void {
   removeBanners();
   const banner = document.createElement("section");
   banner.className = "commit-banner success";
-  const link = document.createElement("a");
-  link.className = "text-link";
-  link.href = result.commitUrl;
-  link.target = "_blank";
-  link.rel = "noreferrer";
-  link.textContent = result.commitSha.slice(0, 7);
-  banner.append("Committed ", link);
+  const note = document.createElement("span");
+  note.textContent = `Submitted (${key}). Run scripts/fetch-reviews.py on your PC to apply.`;
+  banner.append(note);
   app.querySelector(".app-shell")?.prepend(banner);
   window.setTimeout(() => banner.remove(), 8000);
 }
 
-function showConflictBanner(): void {
-  removeBanners();
-  const banner = document.createElement("section");
-  banner.className = "commit-banner error";
-  const message = document.createElement("p");
-  message.textContent = "Conflict: file changed on the server.";
-  const reload = document.createElement("button");
-  reload.type = "button";
-  reload.className = "secondary-button";
-  reload.textContent = "Reload";
-  reload.addEventListener("click", () => {
-    if (!window.confirm("Reload latest TSV from GitHub? In-progress edits will be lost.")) return;
-    clearDrafts();
-    void renderReview();
-  });
-  banner.append(message, reload);
-  app.querySelector(".app-shell")?.prepend(banner);
-}
-
-async function reauthenticateForRetry(): Promise<void> {
-  clearStoredToken();
-  await requireAuth(app);
-}
-
 function removeBanners(): void {
   app.querySelectorAll(".commit-banner").forEach((banner) => banner.remove());
-}
-
-function isValidCommitMessage(message: string): boolean {
-  const lines = message.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  return Boolean(lines[0]?.trim()) && (lines.length === 1 || lines[1] === "");
 }
 
 function applyDrafts(targetRows: DecisionRow[]): void {
@@ -480,8 +356,3 @@ function prepareFindingJudgementsForSave(): FindingJudgementsFile {
   return findingJudgements;
 }
 
-function fillMissingUpdatedBy(file: FindingJudgementsFile, login: string): void {
-  for (const judgement of Object.values(file.judgements)) {
-    if (judgement.updated_at && !judgement.updated_by) judgement.updated_by = login;
-  }
-}

@@ -1,6 +1,5 @@
 import "./styles.css";
 import { requireAuth } from "./auth/auth-gate";
-import { clearStoredToken, getStoredToken } from "./auth/token-store";
 import { listReviewDecks, type ReviewDeck } from "./github/contents";
 import { sitePath } from "./site-path";
 
@@ -17,7 +16,6 @@ async function renderHub(): Promise<void> {
   app.replaceChildren(shell("Loading reviews..."));
   const decks = await listReviewDecks();
   const root = shell("");
-  root.append(renderAuthPanel(() => void renderHub()));
   root.append(renderDeckGrid(decks));
   app.replaceChildren(root);
 }
@@ -64,32 +62,4 @@ function renderDeckGrid(decks: ReviewDeck[]): HTMLElement {
     grid.append(card);
   }
   return grid;
-}
-
-function renderAuthPanel(onAuthChange: () => void): HTMLElement {
-  const panel = document.createElement("section");
-  panel.className = "auth-panel";
-  const token = getStoredToken();
-  const status = document.createElement("p");
-  status.textContent = token
-    ? "GitHub authenticated. Contents API reads are enabled."
-    : "Sign in required to view reviews.";
-
-  const actions = document.createElement("div");
-  actions.className = "button-row";
-
-  if (token) {
-    const signOut = document.createElement("button");
-    signOut.type = "button";
-    signOut.className = "secondary-button";
-    signOut.textContent = "Sign out";
-    signOut.addEventListener("click", () => {
-      clearStoredToken();
-      onAuthChange();
-    });
-    actions.append(signOut);
-  }
-
-  panel.append(status, actions);
-  return panel;
 }
