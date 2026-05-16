@@ -1,6 +1,12 @@
 import type { FindingJudgement } from "../data/finding-judgements";
 import type { LintFinding } from "../data/lint-json";
-import { reasonsForStatus, REVIEW_STATUSES, type ReviewStatus } from "../data/enums";
+import {
+  labelForJudgementReason,
+  labelForReviewStatus,
+  reasonsForStatus,
+  REVIEW_STATUSES,
+  type ReviewStatus,
+} from "../data/enums";
 
 export type FindingDrawerOptions = {
   finding: LintFinding;
@@ -50,7 +56,7 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
   const status = document.createElement("select");
   for (const value of REVIEW_STATUSES) {
     status.append(
-      new Option(value, value, false, options.judgement.review_status === value),
+      new Option(labelForReviewStatus(value), value, false, options.judgement.review_status === value),
     );
   }
   statusField.append(status);
@@ -99,12 +105,12 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
     const reasons = reasonsForStatus(current.review_status);
     reason.disabled = reasons.length === 0;
     if (reasons.length === 0) {
-      reason.append(new Option("none", "", true, true));
+      reason.append(new Option("(なし)", "", true, true));
       current.judgement_reason = null;
       return;
     }
     for (const value of reasons) {
-      reason.append(new Option(value, value, false, current.judgement_reason === value));
+      reason.append(new Option(labelForJudgementReason(value), value, false, current.judgement_reason === value));
     }
     if (!current.judgement_reason || !reasons.includes(current.judgement_reason)) {
       current.judgement_reason = reasons[0] ?? null;

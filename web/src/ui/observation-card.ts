@@ -7,6 +7,9 @@ import {
 } from "../data/decisions-tsv";
 import {
   JUDGEMENT_REASONS,
+  labelForJudgementReason,
+  labelForObservationDecision,
+  labelForReviewStatus,
   OBSERVATION_DECISIONS,
   reasonsForStatus,
   type DispositionStatus,
@@ -35,7 +38,7 @@ export function renderObservationCard(
   meta.className = "card-meta";
   meta.innerHTML = `
     <span>判定</span>
-    <strong>${escapeHtml(row.observation_decision || "not_recorded")}</strong>
+    <strong>${escapeHtml(labelForObservationDecision(row.observation_decision || "not_recorded"))}</strong>
   `;
 
   const decisionLabel = document.createElement("label");
@@ -43,7 +46,7 @@ export function renderObservationCard(
   decisionLabel.innerHTML = `<span>観点判定 (observation_decision)</span>`;
   const decisionSelect = document.createElement("select");
   for (const decision of OBSERVATION_DECISIONS) {
-    decisionSelect.append(new Option(decision, decision, false, row.observation_decision === decision));
+    decisionSelect.append(new Option(labelForObservationDecision(decision), decision, false, row.observation_decision === decision));
   }
   decisionSelect.addEventListener("change", () => {
     row.observation_decision = decisionSelect.value as ObservationDecision;
@@ -147,14 +150,14 @@ function renderDispositionRow(
 
   const status = document.createElement("select");
   for (const value of Object.keys(JUDGEMENT_REASONS)) {
-    status.append(new Option(value, value, false, disposition.review_status === value));
+    status.append(new Option(labelForReviewStatus(value), value, false, disposition.review_status === value));
   }
 
   const reason = document.createElement("select");
   const renderReasons = () => {
     reason.replaceChildren();
     for (const value of reasonsForStatus(disposition.review_status)) {
-      reason.append(new Option(value, value, false, disposition.judgement_reason === value));
+      reason.append(new Option(labelForJudgementReason(value), value, false, disposition.judgement_reason === value));
     }
     if (!reasonsForStatus(disposition.review_status).includes(disposition.judgement_reason)) {
       disposition.judgement_reason = reason.value;
