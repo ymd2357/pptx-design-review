@@ -378,6 +378,7 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | WEB-004 | todo | P1 | drawer を閉じた直後に観点進捗と bbox 色を即時反映 | (1) drawer を閉じると `判定済 X / N finding` が即座に更新される (現状でも `updateJudgement` 内で更新だが描画タイミングを確認)、(2) SVG overlay の bbox 色が「未判定 = 赤 / 判定済 = 緑」に switch される (`unreviewed` 以外 + `judgement_reason` 決定済を判定済と扱う)、(3) 観点カード側の `判定済 X / N` バッジも `renderObservationCard` で同様に追従 |
 | WEB-005 | todo | P2 | UI ラベルから schema 名の英語併記を排除する | 「観点判定 (observation_decision)」「レビュー状態 (review_status)」「判定理由 (judgement_reason)」「補足コメント (rationale)」など、現状日本語の後に括弧で原語を併記しているラベルから括弧部分を撤去し、日本語のみで統一する。データとして保存する value (TSV / JSON) は元の英語 enum のまま維持 |
 | WEB-006 | todo | P1 | 観点カードの判定内訳セクションを読み取り専用化する | `observation_decision = remaining` のときに表示される判定内訳 (review_status × judgement_reason × count) は finding 単位の判定を集計した結果であり、人手で `count` 数値を変えたり「判定内訳を追加 / 削除」できるべきではない。集計結果の表示のみに変え、編集経路は finding drawer 経由に一本化する |
+| WEB-007 | todo | P1 | 視覚レビューから戻った時の観点一覧スクロール位置を復元する | `視覚レビューへ →` で遷移する前のスクロール位置 (もしくは対象観点カードの位置) を sessionStorage に保存し、戻り時に復元する。観点単位の deep link (例: `review/?...#P0-3`) でも fragment anchor が効くようにし、観点カードに `id="<review_no>"` を付与する |
 
 ### LINT-007 evidence schema 方針
 
