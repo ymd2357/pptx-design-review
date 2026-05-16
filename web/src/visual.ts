@@ -25,6 +25,7 @@ import {
 } from "./github/contents";
 import { sitePath } from "./site-path";
 import { renderFindingDrawer } from "./ui/finding-drawer";
+import { renderFindingList, type FindingListHandle } from "./ui/finding-list";
 import { renderSlideGallery } from "./ui/slide-gallery";
 
 const appElement = document.querySelector<HTMLDivElement>("#app");
@@ -43,6 +44,8 @@ let slideSize: SlideSizePt = { w: 1440, h: 810 };
 let imageUrls: string[] = [];
 const updatedBy = "local";
 let progressText: HTMLElement | undefined;
+let galleryHandle: { element: HTMLElement; refresh(): void; goToSlide(slideNo: number): void } | undefined;
+let listHandle: FindingListHandle | undefined;
 
 void (async () => {
   await requireAuth(app);
@@ -109,48 +112,72 @@ function renderLoaded(): void {
   progressText.className = "visual-progress";
   updateProgress();
 
-  const gallery =
-    imageUrls.length > 0
-      ? renderSlideGallery({
-          imageUrls,
-          findings,
-          judgements,
-          slideSizePt: slideSize,
-          initialSlideNo: findings[0]?.slideNo,
-          onSelectFinding: openFinding,
-        })
-      : renderEmptyState("レビュースナップショットにスライド PNG が見つかりません。");
+  if (imageUrls.length > 0) {
+    galleryHandle = renderSlideGallery({
+      imageUrls,
+      findings,
+      judgements,
+      slideSizePt: slideSize,
+      initialSlideNo: findings[0]?.slideNo,
+      onSelectFinding: openFinding,
+    });
+    root.append(summary, progressText, galleryHandle.element);
+  } else {
+    galleryHandle = undefined;
+    root.append(summary, progressText, renderEmptyState("レビュースナップショットにスライド PNG が見つかりません。"));
+  }
 
-  root.append(summary, progressText, gallery);
+  listHandle = renderFindingList({
+    findings,
+    judgements,
+    onSelect: openFinding,
+  });
+  root.append(listHandle.element);
+
   app.replaceChildren(root);
 }
 
 function openFinding(finding: LintFinding): void {
   const existing = document.querySelector(".drawer-backdrop");
   existing?.remove();
-  const judgement = judgements.judgements[finding.key] ?? {
-    review_status: "unreviewed",
-    judgement_reason: null,
-  };
   document.body.append(
     renderFindingDrawer({
-      finding,
-      judgement,
-      onClose: () => document.querySelector(".drawer-backdrop")?.remove(),
-      onChange: (next) => updateJudgement(finding, next),
+      findings,
+      initialKey: finding.key,
+      judgements,
+      onClose: () => {
+        document.querySelector(".drawer-backdrop")?.remove();
+        updateProgress();
+        galleryHandle?.refresh();
+        listHandle?.refresh();
+      },
+      onChange: (key, next) => updateJudgement(key, next),
+      onComplete: () => showCompleteToast(),
     }),
   );
 }
 
-function updateJudgement(finding: LintFinding, next: FindingJudgement): void {
+function updateJudgement(key: string, next: FindingJudgement): void {
   const judgement: FindingJudgement = {
     ...next,
     updated_at: new Date().toISOString(),
     updated_by: updatedBy,
   };
-  judgements.judgements[finding.key] = judgement;
-  storeFindingJudgementDraft(deck, rev, finding.key, judgement);
+  judgements.judgements[key] = judgement;
+  storeFindingJudgementDraft(deck, rev, key, judgement);
   updateProgress();
+  galleryHandle?.refresh();
+  listHandle?.refresh();
+  const finding = findings.find((f) => f.key === key);
+  if (finding) galleryHandle?.goToSlide(finding.slideNo);
+}
+
+function showCompleteToast(): void {
+  const toast = document.createElement("div");
+  toast.className = "visual-toast";
+  toast.textContent = "この観点の全 finding を判定しました。";
+  document.body.append(toast);
+  window.setTimeout(() => toast.remove(), 3500);
 }
 
 function updateProgress(): void {

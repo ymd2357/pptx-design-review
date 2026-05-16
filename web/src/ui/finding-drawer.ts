@@ -1,4 +1,4 @@
-import type { FindingJudgement } from "../data/finding-judgements";
+import type { FindingJudgement, FindingJudgementsFile } from "../data/finding-judgements";
 import type { LintFinding } from "../data/lint-json";
 import {
   labelForJudgementReason,
@@ -9,10 +9,16 @@ import {
 } from "../data/enums";
 
 export type FindingDrawerOptions = {
-  finding: LintFinding;
-  judgement: FindingJudgement;
+  findings: readonly LintFinding[];
+  initialKey: string;
+  judgements: FindingJudgementsFile;
+  onChange: (key: string, judgement: FindingJudgement) => void;
   onClose: () => void;
-  onChange: (judgement: FindingJudgement) => void;
+  onComplete?: () => void;
+};
+
+export type FindingDrawerHandle = {
+  element: HTMLElement;
 };
 
 export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement {
@@ -23,6 +29,15 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
   drawer.className = "finding-drawer";
   drawer.setAttribute("aria-label", "finding 判定");
 
+  let currentIndex = Math.max(
+    0,
+    options.findings.findIndex((f) => f.key === options.initialKey),
+  );
+  if (options.findings.length === 0) {
+    options.onClose();
+    return backdrop;
+  }
+
   const close = document.createElement("button");
   close.type = "button";
   close.className = "icon-button drawer-close";
@@ -31,96 +46,180 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
   close.setAttribute("aria-label", "finding 詳細を閉じる");
   close.addEventListener("click", options.onClose);
 
+  const counter = document.createElement("p");
+  counter.className = "drawer-counter eyebrow";
+
   const title = document.createElement("div");
   title.className = "drawer-title";
-  title.innerHTML = `
-    <p class="eyebrow">${escapeHtml(options.finding.check)} / slide ${options.finding.slideNo}</p>
-    <h2>${escapeHtml(options.finding.shapeName || options.finding.key)}</h2>
-  `;
 
   const message = document.createElement("p");
   message.className = "finding-message";
-  message.textContent = options.finding.message;
 
   const details = document.createElement("dl");
   details.className = "finding-details";
-  appendDetail(details, "severity", options.finding.severity);
-  appendDetail(details, "shape_id", String(options.finding.shapeId ?? ""));
-  appendDetail(details, "measured_value", stringifyValue(options.finding.measuredValue));
-  appendDetail(details, "bbox_pt", options.finding.bboxPt?.join(", ") ?? "");
-  appendDetail(details, "group_key", options.finding.key);
 
   const statusField = document.createElement("label");
   statusField.className = "field";
-  statusField.innerHTML = "<span>レビュー状態 (review_status)</span>";
+  statusField.innerHTML = "<span>レビュー状態</span>";
   const status = document.createElement("select");
   for (const value of REVIEW_STATUSES) {
-    status.append(
-      new Option(labelForReviewStatus(value), value, false, options.judgement.review_status === value),
-    );
+    status.append(new Option(labelForReviewStatus(value), value));
   }
   statusField.append(status);
 
   const reasonField = document.createElement("label");
   reasonField.className = "field";
-  reasonField.innerHTML = "<span>判定理由 (judgement_reason)</span>";
+  reasonField.innerHTML = "<span>判定理由</span>";
   const reason = document.createElement("select");
   reasonField.append(reason);
 
   const rationaleField = document.createElement("label");
   rationaleField.className = "field";
-  rationaleField.innerHTML = "<span>補足コメント (rationale)</span>";
+  rationaleField.innerHTML = "<span>補足コメント</span>";
   const rationale = document.createElement("textarea");
-  rationale.rows = 4;
-  rationale.value = options.judgement.rationale ?? "";
+  rationale.rows = 3;
   rationaleField.append(rationale);
 
-  const current: FindingJudgement = { ...options.judgement };
+  const footer = document.createElement("div");
+  footer.className = "drawer-footer";
+  const prevBtn = document.createElement("button");
+  prevBtn.type = "button";
+  prevBtn.className = "secondary-button";
+  prevBtn.textContent = "← 前へ";
+  const nextBtn = document.createElement("button");
+  nextBtn.type = "button";
+  nextBtn.className = "secondary-button";
+  nextBtn.textContent = "次へ →";
+  const nextUnreviewedBtn = document.createElement("button");
+  nextUnreviewedBtn.type = "button";
+  nextUnreviewedBtn.className = "primary-button";
+  nextUnreviewedBtn.textContent = "✓ 保存して次の未判定へ";
+  footer.append(prevBtn, nextBtn, nextUnreviewedBtn);
+
+  drawer.append(close, counter, title, message, details, statusField, reasonField, rationaleField, footer);
+
+  prevBtn.addEventListener("click", () => navigateTo(currentIndex - 1));
+  nextBtn.addEventListener("click", () => navigateTo(currentIndex + 1));
+  nextUnreviewedBtn.addEventListener("click", () => {
+    const nextIdx = findNextUnreviewedIndex(currentIndex);
+    if (nextIdx === -1) {
+      options.onComplete?.();
+      options.onClose();
+    } else {
+      navigateTo(nextIdx);
+    }
+  });
 
   status.addEventListener("change", () => {
-    current.review_status = status.value as ReviewStatus;
-    current.judgement_reason = reasonsForStatus(current.review_status)[0] ?? null;
-    updateReasonOptions();
-    emitChange();
+    const newStatus = status.value as ReviewStatus;
+    const reasons = reasonsForStatus(newStatus);
+    const judgement: FindingJudgement = {
+      review_status: newStatus,
+      judgement_reason: reasons[0] ?? null,
+      rationale: rationale.value || undefined,
+    };
+    updateJudgement(judgement);
+    updateReasonOptions(judgement);
   });
   reason.addEventListener("change", () => {
-    current.judgement_reason = reason.value || null;
-    emitChange();
+    const judgement: FindingJudgement = {
+      review_status: status.value as ReviewStatus,
+      judgement_reason: reason.value || null,
+      rationale: rationale.value || undefined,
+    };
+    updateJudgement(judgement);
   });
   rationale.addEventListener("input", () => {
-    current.rationale = rationale.value;
-    emitChange();
+    const judgement: FindingJudgement = {
+      review_status: status.value as ReviewStatus,
+      judgement_reason: reason.value || null,
+      rationale: rationale.value || undefined,
+    };
+    updateJudgement(judgement);
   });
 
-  updateReasonOptions();
-  drawer.append(close, title, message, details, statusField, reasonField, rationaleField);
   backdrop.append(drawer);
   backdrop.addEventListener("click", (event) => {
     if (event.target === backdrop) options.onClose();
   });
+
+  applyCurrent();
   return backdrop;
 
-  function updateReasonOptions(): void {
+  function navigateTo(targetIndex: number): void {
+    if (targetIndex < 0 || targetIndex >= options.findings.length) return;
+    currentIndex = targetIndex;
+    applyCurrent();
+  }
+
+  function applyCurrent(): void {
+    const finding = options.findings[currentIndex]!;
+    const judgement = options.judgements.judgements[finding.key] ?? {
+      review_status: "unreviewed" as ReviewStatus,
+      judgement_reason: null,
+    };
+
+    counter.textContent = `${currentIndex + 1} / ${options.findings.length}`;
+    title.innerHTML = `
+      <p class="eyebrow">${escapeHtml(finding.check)} / スライド ${finding.slideNo}</p>
+      <h2>${escapeHtml(finding.shapeName || finding.key)}</h2>
+    `;
+    message.textContent = finding.message;
+
+    details.replaceChildren();
+    appendDetail(details, "severity", finding.severity);
+    appendDetail(details, "shape_id", String(finding.shapeId ?? ""));
+    appendDetail(details, "measured_value", stringifyValue(finding.measuredValue));
+    appendDetail(details, "bbox_pt", finding.bboxPt?.join(", ") ?? "");
+    appendDetail(details, "group_key", finding.key);
+
+    status.value = judgement.review_status;
+    rationale.value = judgement.rationale ?? "";
+    updateReasonOptions(judgement);
+
+    prevBtn.disabled = currentIndex === 0;
+    nextBtn.disabled = currentIndex === options.findings.length - 1;
+  }
+
+  function updateReasonOptions(judgement: { review_status: string; judgement_reason?: string | null }): void {
     reason.replaceChildren();
-    const reasons = reasonsForStatus(current.review_status);
+    const reasons = reasonsForStatus(judgement.review_status);
     reason.disabled = reasons.length === 0;
     if (reasons.length === 0) {
       reason.append(new Option("(なし)", "", true, true));
-      current.judgement_reason = null;
       return;
     }
     for (const value of reasons) {
-      reason.append(new Option(labelForJudgementReason(value), value, false, current.judgement_reason === value));
+      reason.append(new Option(labelForJudgementReason(value), value, false, judgement.judgement_reason === value));
     }
-    if (!current.judgement_reason || !reasons.includes(current.judgement_reason)) {
-      current.judgement_reason = reasons[0] ?? null;
-      reason.value = current.judgement_reason ?? "";
+    if (!judgement.judgement_reason || !reasons.includes(judgement.judgement_reason)) {
+      reason.value = reasons[0] ?? "";
     }
   }
 
-  function emitChange(): void {
-    options.onChange({ ...current });
+  function updateJudgement(judgement: FindingJudgement): void {
+    const finding = options.findings[currentIndex]!;
+    options.judgements.judgements[finding.key] = judgement;
+    options.onChange(finding.key, judgement);
   }
+
+  function findNextUnreviewedIndex(fromIndex: number): number {
+    for (let i = fromIndex + 1; i < options.findings.length; i += 1) {
+      const finding = options.findings[i]!;
+      if (!isJudged(options.judgements.judgements[finding.key])) return i;
+    }
+    for (let i = 0; i <= fromIndex; i += 1) {
+      const finding = options.findings[i]!;
+      if (!isJudged(options.judgements.judgements[finding.key])) return i;
+    }
+    return -1;
+  }
+}
+
+function isJudged(judgement: { review_status?: string; judgement_reason?: string | null } | undefined): boolean {
+  if (!judgement) return false;
+  if (!judgement.review_status || judgement.review_status === "unreviewed") return false;
+  return Boolean(judgement.judgement_reason);
 }
 
 function appendDetail(target: HTMLDListElement, label: string, value: string): void {

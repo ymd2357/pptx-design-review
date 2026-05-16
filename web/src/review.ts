@@ -127,6 +127,19 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
 
   root.append(summary, messages, renderSnapshotPanel(), cardList, actions);
   app.replaceChildren(root);
+  restoreScrollAnchor();
+}
+
+function restoreScrollAnchor(): void {
+  const anchor = sessionStorage.getItem("pptx-review:scroll-anchor");
+  if (!anchor) return;
+  sessionStorage.removeItem("pptx-review:scroll-anchor");
+  window.requestAnimationFrame(() => {
+    const target = document.getElementById(`obs-${anchor}`);
+    if (target) {
+      target.scrollIntoView({ block: "start", behavior: "instant" as ScrollBehavior });
+    }
+  });
 }
 
 async function loadSnapshot(): Promise<ReviewSnapshot | undefined> {

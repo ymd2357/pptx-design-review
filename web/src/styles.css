@@ -498,8 +498,186 @@ textarea {
   right: 12px;
 }
 
+.drawer-counter {
+  margin: 0;
+  padding-right: 54px;
+  color: #65758b;
+}
+
 .drawer-title {
   padding-right: 54px;
+}
+
+.drawer-footer {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 4px;
+  background: linear-gradient(to top, #ffffff 70%, rgb(255 255 255 / 0%));
+}
+
+.drawer-footer .primary-button {
+  grid-column: 3;
+}
+
+.disposition-summary {
+  margin-bottom: 8px;
+}
+
+.disposition-readonly-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  list-style: none;
+}
+
+.disposition-readonly-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+.disposition-pair {
+  color: #1f2933;
+}
+
+.disposition-count {
+  color: #65758b;
+}
+
+.status-text.inline {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #65758b;
+  font-size: 0.85rem;
+}
+
+.finding-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+}
+
+.finding-list-header h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.finding-list-header .inline {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #65758b;
+  font-size: 0.85rem;
+}
+
+.finding-row-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finding-row-button {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.finding-row.judged .finding-row-button {
+  background: rgb(22 163 74 / 8%);
+  border-color: rgb(22 163 74 / 32%);
+}
+
+.finding-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.finding-row-left {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  overflow: hidden;
+}
+
+.finding-row-slide {
+  flex-shrink: 0;
+  color: #65758b;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.finding-row-shape {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finding-row-badge {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  background: #fee;
+  color: #b91c1c;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.finding-row-badge.judged {
+  background: rgb(22 163 74 / 14%);
+  color: #16834a;
+}
+
+.finding-row-message {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #243447;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.visual-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  padding: 12px 18px;
+  background: #1f8a3a;
+  color: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 24%);
+  z-index: 100;
 }
 
 .drawer-title h2 {

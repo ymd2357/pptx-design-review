@@ -373,6 +373,13 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | FIX-003 | todo | P2 | 孤立装飾 line / connector / arrow の検出を追加する | semantic group に属さない短い水平・垂直 line shape や孤立 connector / arrow を `decorative_review` finding として検出し、`fixability=manual_required` で残す。自動削除はしない。検証 deck の根拠は同レポートの slide 12 / 44 |
 | FIX-004 | todo | P2 | `object_gap_too_small` を semantic ペアに拡張する | 同種 label グループや title-subtitle ペアに対するテンプレート由来の最小 gap を guideline YAML から取得し、検出と幾何修正候補を出す。検証 deck の根拠は同レポートの slide 8 / 13 |
 | FIX-005 | todo | P2 | `text_overlap` / `overflow_text` の修正候補を多段化する | shape 移動だけでなく、shape 高さ縮小・font_size 縮小・line_height 圧縮を組み合わせた multi-step `candidate_values` を出し、`pptx_fix.py` が適用できる。検証 deck の根拠は同レポートの slide 28 |
+| WEB-002 | done | P1 | 視覚レビューで finding 判定後に自動で次の未判定 finding へ進む | `review_status` を選んで判定が確定 (= `unreviewed` 以外 + `judgement_reason` が決定) した時点で drawer を閉じて、現観点内の次の未判定 finding を開く。最後の未判定が判定された場合は drawer を閉じてトーストで完了を示す。連続判定 200 タップを最少操作で回せる |
+| WEB-003 | done | P1 | finding drawer 内に「前/次の finding」ナビを追加 | drawer ヘッダに `< 前へ` / `次へ >` ボタンを置き、現観点の findings 配列内で前後の finding に切り替えられる。スライドギャラリー側のスライド/bbox 強調も追従。判定の確定有無に関わらず手動移動できる (WEB-002 とは独立) |
+| WEB-004 | done | P1 | drawer を閉じた直後に観点進捗と bbox 色を即時反映 | (1) drawer を閉じると `判定済 X / N finding` が即座に更新される (現状でも `updateJudgement` 内で更新だが描画タイミングを確認)、(2) SVG overlay の bbox 色が「未判定 = 赤 / 判定済 = 緑」に switch される (`unreviewed` 以外 + `judgement_reason` 決定済を判定済と扱う)、(3) 観点カード側の `判定済 X / N` バッジも `renderObservationCard` で同様に追従 |
+| WEB-005 | done | P2 | UI ラベルから schema 名の英語併記を排除する | 「観点判定 (observation_decision)」「レビュー状態 (review_status)」「判定理由 (judgement_reason)」「補足コメント (rationale)」など、現状日本語の後に括弧で原語を併記しているラベルから括弧部分を撤去し、日本語のみで統一する。データとして保存する value (TSV / JSON) は元の英語 enum のまま維持 |
+| WEB-006 | done | P1 | 観点カードの判定内訳セクションを読み取り専用化する | `observation_decision = remaining` のときに表示される判定内訳 (review_status × judgement_reason × count) は finding 単位の判定を集計した結果であり、人手で `count` 数値を変えたり「判定内訳を追加 / 削除」できるべきではない。集計結果の表示のみに変え、編集経路は finding drawer 経由に一本化する |
+| WEB-007 | done | P1 | 視覚レビューから戻った時の観点一覧スクロール位置を復元する | `視覚レビューへ →` で遷移する前のスクロール位置 (もしくは対象観点カードの位置) を sessionStorage に保存し、戻り時に復元する。観点単位の deep link (例: `review/?...#P0-3`) でも fragment anchor が効くようにし、観点カードに `id="<review_no>"` を付与する |
+| WEB-008 | done | P1 | 視覚レビューに finding 一覧パネルを追加し、bbox 無し finding も含めて drawer に到達可能にする | スライドギャラリーの下 (or タブ切替) に「現観点の全 finding 一覧」をリスト表示する。各行は `slide N / shape 名 / check_id / 簡易 message / 判定状態バッジ` を持ち、タップで `openFinding` を呼んで drawer を開く。`bboxPt` を持たない finding (タップ可能 SVG が無いタイプ) でも一覧から drawer に飛べる。スライド上の「このスライドには finding がありません。」表示には「下の一覧から確認できます」の案内を添える |
 
 ### LINT-007 evidence schema 方針
 

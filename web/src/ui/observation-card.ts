@@ -1,18 +1,13 @@
 import {
   parseFindingDispositions,
-  serializeFindingDispositions,
   validateDecisionRow,
   type DecisionRow,
-  type FindingDisposition,
 } from "../data/decisions-tsv";
 import {
-  JUDGEMENT_REASONS,
   labelForJudgementReason,
   labelForObservationDecision,
   labelForReviewStatus,
   OBSERVATION_DECISIONS,
-  reasonsForStatus,
-  type DispositionStatus,
   type ObservationDecision,
 } from "../data/enums";
 
@@ -23,6 +18,7 @@ export function renderObservationCard(
 ): HTMLElement {
   const card = document.createElement("article");
   card.className = "observation-card";
+  card.id = `obs-${row.review_no}`;
 
   const header = document.createElement("div");
   header.className = "card-header";
@@ -43,7 +39,7 @@ export function renderObservationCard(
 
   const decisionLabel = document.createElement("label");
   decisionLabel.className = "field";
-  decisionLabel.innerHTML = `<span>観点判定 (observation_decision)</span>`;
+  decisionLabel.innerHTML = `<span>観点判定</span>`;
   const decisionSelect = document.createElement("select");
   for (const decision of OBSERVATION_DECISIONS) {
     decisionSelect.append(new Option(labelForObservationDecision(decision), decision, false, row.observation_decision === decision));
@@ -67,6 +63,9 @@ export function renderObservationCard(
     visualLink.className = "secondary-link visual-review-link";
     visualLink.href = visualHref;
     visualLink.textContent = "視覚レビューへ →";
+    visualLink.addEventListener("click", () => {
+      sessionStorage.setItem("pptx-review:scroll-anchor", row.review_no);
+    });
     card.append(visualLink);
   }
   card.append(decisionLabel, dynamicArea, errorBox);
@@ -79,40 +78,34 @@ export function renderObservationCard(
     }
 
     const dispositions = parseFindingDispositions(row.finding_dispositions);
-    const list = document.createElement("div");
-    list.className = "disposition-list";
+    const summary = document.createElement("div");
+    summary.className = "disposition-summary";
     if (dispositions.length === 0) {
-      dispositions.push({
-        review_status: "fix_required",
-        judgement_reason: JUDGEMENT_REASONS.fix_required[0],
-        count: Number.parseInt(row.latest_lint_count, 10) || 1,
-      });
-      row.finding_dispositions = serializeFindingDispositions(dispositions);
+      const empty = document.createElement("p");
+      empty.className = "status-text inline";
+      empty.textContent = "視覚レビューで finding 単位の判定を行うと、ここに集計が表示されます。";
+      summary.append(empty);
+    } else {
+      const list = document.createElement("ul");
+      list.className = "disposition-readonly-list";
+      for (const disposition of dispositions) {
+        const item = document.createElement("li");
+        const statusLabel = labelForReviewStatus(disposition.review_status);
+        const reasonLabel = labelForJudgementReason(disposition.judgement_reason);
+        item.innerHTML = `
+          <span class="disposition-pair">${escapeHtml(statusLabel)} / ${escapeHtml(reasonLabel)}</span>
+          <strong class="disposition-count">${disposition.count}</strong>
+        `;
+        list.append(item);
+      }
+      summary.append(list);
     }
-
-    dispositions.forEach((disposition, index) => {
-      list.append(renderDispositionRow(disposition, index, dispositions, commitDispositions));
-    });
-
-    const addButton = document.createElement("button");
-    addButton.type = "button";
-    addButton.className = "secondary-button";
-    addButton.textContent = "判定内訳を追加";
-    addButton.addEventListener("click", () => {
-      dispositions.push({
-        review_status: "fix_required",
-        judgement_reason: JUDGEMENT_REASONS.fix_required[0],
-        count: 1,
-      });
-      commitDispositions();
-      renderDynamicArea();
-    });
 
     const rationale = document.createElement("label");
     rationale.className = "field";
-    rationale.innerHTML = `<span>補足コメント (rationale)</span>`;
+    rationale.innerHTML = `<span>補足コメント</span>`;
     const textarea = document.createElement("textarea");
-    textarea.rows = 4;
+    textarea.rows = 3;
     textarea.value = row.rationale;
     textarea.addEventListener("input", () => {
       row.rationale = textarea.value;
@@ -120,14 +113,8 @@ export function renderObservationCard(
     });
     rationale.append(textarea);
 
-    dynamicArea.append(list, addButton, rationale);
+    dynamicArea.append(summary, rationale);
     updateErrors();
-
-    function commitDispositions(): void {
-      row.finding_dispositions = serializeFindingDispositions(dispositions);
-      updateErrors();
-      onChange();
-    }
   }
 
   function updateErrors(): void {
@@ -137,70 +124,6 @@ export function renderObservationCard(
   renderDynamicArea();
   updateErrors();
   return card;
-}
-
-function renderDispositionRow(
-  disposition: FindingDisposition,
-  index: number,
-  dispositions: FindingDisposition[],
-  onCommit: () => void,
-): HTMLElement {
-  const row = document.createElement("div");
-  row.className = "disposition-row";
-
-  const status = document.createElement("select");
-  for (const value of Object.keys(JUDGEMENT_REASONS)) {
-    status.append(new Option(labelForReviewStatus(value), value, false, disposition.review_status === value));
-  }
-
-  const reason = document.createElement("select");
-  const renderReasons = () => {
-    reason.replaceChildren();
-    for (const value of reasonsForStatus(disposition.review_status)) {
-      reason.append(new Option(labelForJudgementReason(value), value, false, disposition.judgement_reason === value));
-    }
-    if (!reasonsForStatus(disposition.review_status).includes(disposition.judgement_reason)) {
-      disposition.judgement_reason = reason.value;
-    }
-  };
-
-  const count = document.createElement("input");
-  count.type = "number";
-  count.min = "0";
-  count.step = "1";
-  count.inputMode = "numeric";
-  count.value = String(disposition.count);
-
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "icon-button";
-  remove.textContent = "x";
-  remove.title = "判定内訳を削除";
-  remove.setAttribute("aria-label", "判定内訳を削除");
-
-  status.addEventListener("change", () => {
-    disposition.review_status = status.value as DispositionStatus;
-    disposition.judgement_reason = reasonsForStatus(disposition.review_status)[0] ?? "";
-    renderReasons();
-    onCommit();
-  });
-  reason.addEventListener("change", () => {
-    disposition.judgement_reason = reason.value;
-    onCommit();
-  });
-  count.addEventListener("input", () => {
-    disposition.count = Number.parseInt(count.value, 10) || 0;
-    onCommit();
-  });
-  remove.addEventListener("click", () => {
-    dispositions.splice(index, 1);
-    onCommit();
-    row.remove();
-  });
-
-  renderReasons();
-  row.append(status, reason, count, remove);
-  return row;
 }
 
 function escapeHtml(value: string): string {

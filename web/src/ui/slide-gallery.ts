@@ -10,7 +10,13 @@ export type SlideGalleryOptions = {
   onSelectFinding: (finding: LintFinding) => void;
 };
 
-export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
+export type SlideGalleryHandle = {
+  element: HTMLElement;
+  refresh(): void;
+  goToSlide(slideNo: number): void;
+};
+
+export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHandle {
   let currentIndex = initialSlideIndex(options.imageUrls, options.initialSlideNo);
   let pointerStartX: number | null = null;
 
@@ -57,7 +63,18 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
 
   root.append(toolbar, stage);
   render();
-  return root;
+
+  return {
+    element: root,
+    refresh: render,
+    goToSlide(slideNo: number): void {
+      const index = options.imageUrls.findIndex((url) => slideNumberFromUrl(url) === slideNo);
+      if (index >= 0 && index !== currentIndex) {
+        currentIndex = index;
+        render();
+      }
+    },
+  };
 
   function move(delta: number): void {
     const nextIndex = Math.min(Math.max(currentIndex + delta, 0), options.imageUrls.length - 1);
@@ -71,7 +88,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
     const imageUrl = options.imageUrls[currentIndex];
     const slideNo = slideNumberFromUrl(imageUrl) ?? currentIndex + 1;
     const slideFindings = options.findings.filter((finding) => finding.slideNo === slideNo);
-    position.textContent = `Slide ${slideNo} / ${options.imageUrls.length}`;
+    position.textContent = `スライド ${slideNo} / ${options.imageUrls.length}`;
     previous.disabled = currentIndex === 0;
     next.disabled = currentIndex === options.imageUrls.length - 1;
 
@@ -79,7 +96,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
     frame.className = "slide-frame";
 
     const image = document.createElement("img");
-    image.alt = `Slide ${slideNo}`;
+    image.alt = `スライド ${slideNo}`;
     image.loading = "eager";
     image.decoding = "async";
     image.src = imageUrl;
@@ -115,7 +132,11 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
 
     const empty = document.createElement("p");
     empty.className = "slide-empty";
-    empty.textContent = slideFindings.length === 0 ? "このスライドには finding がありません。" : "";
+    if (slideFindings.length === 0) {
+      empty.textContent = "このスライドに紐づく bbox はありません (下の一覧から finding を選んでください)。";
+    } else {
+      empty.textContent = "";
+    }
 
     frame.append(image, overlay);
     stage.append(frame);
@@ -135,9 +156,13 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
 
 function judgementClass(judgements: FindingJudgementsFile, groupKey: string): string {
   const judgement = judgements.judgements[groupKey];
-  return judgement?.review_status && judgement.review_status !== "unreviewed"
-    ? "finding-box judged"
-    : "finding-box";
+  return isJudged(judgement) ? "finding-box judged" : "finding-box";
+}
+
+function isJudged(judgement: { review_status?: string; judgement_reason?: string | null } | undefined): boolean {
+  if (!judgement) return false;
+  if (!judgement.review_status || judgement.review_status === "unreviewed") return false;
+  return Boolean(judgement.judgement_reason);
 }
 
 function slideNumberFromUrl(url: string): number | null {
