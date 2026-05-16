@@ -373,6 +373,9 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | FIX-003 | todo | P2 | 孤立装飾 line / connector / arrow の検出を追加する | semantic group に属さない短い水平・垂直 line shape や孤立 connector / arrow を `decorative_review` finding として検出し、`fixability=manual_required` で残す。自動削除はしない。検証 deck の根拠は同レポートの slide 12 / 44 |
 | FIX-004 | todo | P2 | `object_gap_too_small` を semantic ペアに拡張する | 同種 label グループや title-subtitle ペアに対するテンプレート由来の最小 gap を guideline YAML から取得し、検出と幾何修正候補を出す。検証 deck の根拠は同レポートの slide 8 / 13 |
 | FIX-005 | todo | P2 | `text_overlap` / `overflow_text` の修正候補を多段化する | shape 移動だけでなく、shape 高さ縮小・font_size 縮小・line_height 圧縮を組み合わせた multi-step `candidate_values` を出し、`pptx_fix.py` が適用できる。検証 deck の根拠は同レポートの slide 28 |
+| WEB-002 | todo | P1 | 視覚レビューで finding 判定後に自動で次の未判定 finding へ進む | `review_status` を選んで判定が確定 (= `unreviewed` 以外 + `judgement_reason` が決定) した時点で drawer を閉じて、現観点内の次の未判定 finding を開く。最後の未判定が判定された場合は drawer を閉じてトーストで完了を示す。連続判定 200 タップを最少操作で回せる |
+| WEB-003 | todo | P1 | finding drawer 内に「前/次の finding」ナビを追加 | drawer ヘッダに `< 前へ` / `次へ >` ボタンを置き、現観点の findings 配列内で前後の finding に切り替えられる。スライドギャラリー側のスライド/bbox 強調も追従。判定の確定有無に関わらず手動移動できる (WEB-002 とは独立) |
+| WEB-004 | todo | P1 | drawer を閉じた直後に観点進捗と bbox 色を即時反映 | (1) drawer を閉じると `判定済 X / N finding` が即座に更新される (現状でも `updateJudgement` 内で更新だが描画タイミングを確認)、(2) SVG overlay の bbox 色が「未判定 = 赤 / 判定済 = 緑」に switch される (`unreviewed` 以外 + `judgement_reason` 決定済を判定済と扱う)、(3) 観点カード側の `判定済 X / N` バッジも `renderObservationCard` で同様に追従 |
 
 ### LINT-007 evidence schema 方針
 
