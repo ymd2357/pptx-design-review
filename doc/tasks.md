@@ -379,6 +379,7 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | WEB-005 | todo | P2 | UI ラベルから schema 名の英語併記を排除する | 「観点判定 (observation_decision)」「レビュー状態 (review_status)」「判定理由 (judgement_reason)」「補足コメント (rationale)」など、現状日本語の後に括弧で原語を併記しているラベルから括弧部分を撤去し、日本語のみで統一する。データとして保存する value (TSV / JSON) は元の英語 enum のまま維持 |
 | WEB-006 | todo | P1 | 観点カードの判定内訳セクションを読み取り専用化する | `observation_decision = remaining` のときに表示される判定内訳 (review_status × judgement_reason × count) は finding 単位の判定を集計した結果であり、人手で `count` 数値を変えたり「判定内訳を追加 / 削除」できるべきではない。集計結果の表示のみに変え、編集経路は finding drawer 経由に一本化する |
 | WEB-007 | todo | P1 | 視覚レビューから戻った時の観点一覧スクロール位置を復元する | `視覚レビューへ →` で遷移する前のスクロール位置 (もしくは対象観点カードの位置) を sessionStorage に保存し、戻り時に復元する。観点単位の deep link (例: `review/?...#P0-3`) でも fragment anchor が効くようにし、観点カードに `id="<review_no>"` を付与する |
+| WEB-008 | todo | P1 | 視覚レビューに finding 一覧パネルを追加し、bbox 無し finding も含めて drawer に到達可能にする | スライドギャラリーの下 (or タブ切替) に「現観点の全 finding 一覧」をリスト表示する。各行は `slide N / shape 名 / check_id / 簡易 message / 判定状態バッジ` を持ち、タップで `openFinding` を呼んで drawer を開く。`bboxPt` を持たない finding (タップ可能 SVG が無いタイプ) でも一覧から drawer に飛べる。スライド上の「このスライドには finding がありません。」表示には「下の一覧から確認できます」の案内を添える |
 
 ### LINT-007 evidence schema 方針
 
