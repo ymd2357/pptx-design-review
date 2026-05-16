@@ -1,4 +1,4 @@
-import { clearStoredToken, getStoredToken } from "../auth/device-flow";
+import { clearStoredToken, getStoredToken } from "../auth/token-store";
 import { sitePath } from "../site-path";
 
 const apiRoot = "https://api.github.com/repos";

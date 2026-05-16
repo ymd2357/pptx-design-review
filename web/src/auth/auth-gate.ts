@@ -1,38 +1,37 @@
 import {
   getStoredToken,
-  startDeviceFlow,
-  type DeviceFlowState,
-} from "./device-flow";
+  setStoredToken,
+  verifyToken,
+} from "./token-store";
 
 export async function requireAuth(app: HTMLElement): Promise<string> {
   const existing = getStoredToken();
   if (existing) return existing;
 
-  return new Promise<string>((resolve, reject) => {
-    const card = renderGateCard((onUpdate) => {
-      void startDeviceFlow((state) => {
-        onUpdate(state);
-        if (state.status === "authenticated") {
-          const token = getStoredToken();
-          if (token) {
-            resolve(token);
-          } else {
-            reject(new Error("Authenticated but token missing"));
-          }
-        }
-      }).catch((error: unknown) => {
-        onUpdate({
-          status: "error",
-          message: error instanceof Error ? error.message : String(error),
+  return new Promise<string>((resolve) => {
+    const card = renderGateCard(async (token, onResult) => {
+      try {
+        const login = await verifyToken(token);
+        setStoredToken(token);
+        onResult({ ok: true, message: `Signed in as ${login}. Loading…` });
+        resolve(token);
+      } catch (error) {
+        onResult({
+          ok: false,
+          message:
+            error instanceof Error ? error.message : String(error),
         });
-      });
+      }
     });
     app.replaceChildren(card);
   });
 }
 
 function renderGateCard(
-  onStart: (onUpdate: (state: DeviceFlowState) => void) => void,
+  onSubmit: (
+    token: string,
+    onResult: (result: { ok: boolean; message: string }) => void,
+  ) => void,
 ): HTMLElement {
   const root = document.createElement("main");
   root.className = "app-shell auth-gate";
@@ -49,43 +48,47 @@ function renderGateCard(
   const note = document.createElement("p");
   note.className = "status-text";
   note.textContent =
-    "このページは GitHub の認証が必要です。Sign in を押して表示されたコードを GitHub で入力してください。";
+    "GitHub Personal Access Token を貼り付けてください。fine-grained / classic どちらでも可。必要 scope: Contents (Read and write)。";
 
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "primary-button";
-  button.textContent = "Sign in with GitHub";
+  const help = document.createElement("p");
+  help.className = "status-text";
+  help.innerHTML =
+    'Token 発行: <a class="text-link" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">fine-grained</a> ' +
+    'または <a class="text-link" href="https://github.com/settings/tokens/new?scopes=repo&description=pptx-design-review" target="_blank" rel="noreferrer">classic (repo)</a>';
+
+  const form = document.createElement("form");
+  form.className = "auth-form";
+
+  const input = document.createElement("input");
+  input.type = "password";
+  input.name = "token";
+  input.autocomplete = "off";
+  input.placeholder = "ghp_… / github_pat_…";
+  input.className = "token-input";
+  input.required = true;
+
+  const submit = document.createElement("button");
+  submit.type = "submit";
+  submit.className = "primary-button";
+  submit.textContent = "Sign in";
+
+  form.append(input, submit);
 
   const state = document.createElement("div");
   state.className = "device-state";
 
-  button.addEventListener("click", () => {
-    button.disabled = true;
-    onStart((s) => renderState(state, s));
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const token = input.value.trim();
+    if (!token) return;
+    submit.disabled = true;
+    state.textContent = "Verifying token…";
+    onSubmit(token, ({ ok, message }) => {
+      state.textContent = message;
+      if (!ok) submit.disabled = false;
+    });
   });
 
-  const row = document.createElement("div");
-  row.className = "button-row";
-  row.append(button);
-
-  root.append(header, note, row, state);
+  root.append(header, note, help, form, state);
   return root;
-}
-
-function renderState(host: HTMLElement, state: DeviceFlowState): void {
-  if (state.status === "code") {
-    host.innerHTML = `
-      <p>Enter this code on GitHub:</p>
-      <strong class="user-code">${state.code.user_code}</strong>
-      <a class="text-link" href="${state.code.verification_uri}" target="_blank" rel="noreferrer">
-        Open GitHub verification
-      </a>
-    `;
-  } else if (state.status === "pending") {
-    host.textContent = state.message;
-  } else if (state.status === "authenticated") {
-    host.textContent = "Signed in. Loading...";
-  } else {
-    host.textContent = state.message;
-  }
 }

@@ -1,11 +1,6 @@
 import "./styles.css";
 import { requireAuth } from "./auth/auth-gate";
-import {
-  clearStoredToken,
-  getStoredToken,
-  startDeviceFlow,
-  type DeviceFlowState,
-} from "./auth/device-flow";
+import { clearStoredToken, getStoredToken } from "./auth/token-store";
 import { listReviewDecks, type ReviewDeck } from "./github/contents";
 import { sitePath } from "./site-path";
 
@@ -78,7 +73,7 @@ function renderAuthPanel(onAuthChange: () => void): HTMLElement {
   const status = document.createElement("p");
   status.textContent = token
     ? "GitHub authenticated. Contents API reads are enabled."
-    : "Local/mock review data is shown until GitHub sign-in.";
+    : "Sign in required to view reviews.";
 
   const actions = document.createElement("div");
   actions.className = "button-row";
@@ -93,54 +88,8 @@ function renderAuthPanel(onAuthChange: () => void): HTMLElement {
       onAuthChange();
     });
     actions.append(signOut);
-  } else {
-    const signIn = document.createElement("button");
-    signIn.type = "button";
-    signIn.className = "primary-button";
-    signIn.textContent = "Sign in with GitHub";
-    signIn.addEventListener("click", () => {
-      signIn.disabled = true;
-      void startDeviceFlow((state) => {
-        renderDeviceState(panel, state, onAuthChange);
-      }).catch((error: unknown) => {
-        renderDeviceState(panel, {
-          status: "error",
-          message: error instanceof Error ? error.message : String(error),
-        }, onAuthChange);
-      });
-    });
-    actions.append(signIn);
   }
 
   panel.append(status, actions);
   return panel;
-}
-
-function renderDeviceState(
-  panel: HTMLElement,
-  state: DeviceFlowState,
-  onAuthChange: () => void,
-): void {
-  let device = panel.querySelector<HTMLElement>(".device-state");
-  if (!device) {
-    device = document.createElement("div");
-    device.className = "device-state";
-    panel.append(device);
-  }
-
-  if (state.status === "code") {
-    device.innerHTML = `
-      <p>Enter this code on GitHub:</p>
-      <strong class="user-code">${state.code.user_code}</strong>
-      <a class="text-link" href="${state.code.verification_uri}" target="_blank" rel="noreferrer">
-        Open GitHub verification
-      </a>
-    `;
-  } else if (state.status === "pending") {
-    device.textContent = state.message;
-  } else if (state.status === "authenticated") {
-    onAuthChange();
-  } else {
-    device.textContent = state.message;
-  }
 }

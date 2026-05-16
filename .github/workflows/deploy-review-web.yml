@@ -40,8 +40,6 @@ jobs:
 
       - name: Build
         working-directory: web
-        env:
-          VITE_GITHUB_CLIENT_ID: ${{ vars.VITE_GITHUB_CLIENT_ID }}
         run: npm run build
 
       - name: Stage publish tree

@@ -84,6 +84,24 @@ textarea {
   padding: 14px;
 }
 
+.auth-gate .auth-form {
+  display: grid;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid #d7dde5;
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+}
+
+.auth-gate .token-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #c4ccd6;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .auth-panel.compact {
   grid-template-columns: 1fr auto;
   align-items: center;

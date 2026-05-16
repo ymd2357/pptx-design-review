@@ -1,11 +1,6 @@
 import "./styles.css";
 import { requireAuth } from "./auth/auth-gate";
-import {
-  clearStoredToken,
-  getStoredToken,
-  startDeviceFlow,
-  type DeviceFlowState,
-} from "./auth/device-flow";
+import { clearStoredToken, getStoredToken } from "./auth/token-store";
 import {
   countChangedDecisionRows,
   parseDecisionTsv,
@@ -250,7 +245,7 @@ function renderAuthPanel(onAuthChange: () => void): HTMLElement {
   panel.className = "auth-panel compact";
   const token = getStoredToken();
   const status = document.createElement("p");
-  status.textContent = token ? "GitHub Contents API read mode." : "Local TSV read mode.";
+  status.textContent = token ? "GitHub Contents API read/write mode." : "Sign in required.";
   const actions = document.createElement("div");
   actions.className = "button-row";
 
@@ -264,55 +259,10 @@ function renderAuthPanel(onAuthChange: () => void): HTMLElement {
       onAuthChange();
     });
     actions.append(signOut);
-  } else {
-    const signIn = document.createElement("button");
-    signIn.type = "button";
-    signIn.className = "secondary-button";
-    signIn.textContent = "Sign in with GitHub";
-    signIn.addEventListener("click", () => {
-      signIn.disabled = true;
-      void startDeviceFlow((state) => renderDeviceState(panel, state, onAuthChange)).catch(
-        (error: unknown) =>
-          renderDeviceState(
-            panel,
-            {
-              status: "error",
-              message: error instanceof Error ? error.message : String(error),
-            },
-            onAuthChange,
-          ),
-      );
-    });
-    actions.append(signIn);
   }
 
   panel.append(status, actions);
   return panel;
-}
-
-function renderDeviceState(
-  panel: HTMLElement,
-  state: DeviceFlowState,
-  onAuthChange: () => void,
-): void {
-  let device = panel.querySelector<HTMLElement>(".device-state");
-  if (!device) {
-    device = document.createElement("div");
-    device.className = "device-state";
-    panel.append(device);
-  }
-  if (state.status === "code") {
-    device.innerHTML = `
-      <strong class="user-code">${state.code.user_code}</strong>
-      <a class="text-link" href="${state.code.verification_uri}" target="_blank" rel="noreferrer">
-        Open GitHub verification
-      </a>
-    `;
-  } else if (state.status === "authenticated") {
-    onAuthChange();
-  } else {
-    device.textContent = state.status === "pending" ? state.message : state.message;
-  }
 }
 
 function downloadReviewFiles(): void {
@@ -445,13 +395,8 @@ function showConflictBanner(): void {
 }
 
 async function reauthenticateForRetry(): Promise<void> {
-  const panel = document.createElement("section");
-  panel.className = "auth-panel compact";
-  const status = document.createElement("p");
-  status.textContent = "GitHub token expired. Re-authenticate to retry commit.";
-  panel.append(status);
-  app.querySelector(".app-shell")?.prepend(panel);
-  await startDeviceFlow((state) => renderDeviceState(panel, state, () => undefined));
+  clearStoredToken();
+  await requireAuth(app);
 }
 
 function removeBanners(): void {
