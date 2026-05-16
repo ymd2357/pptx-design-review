@@ -376,6 +376,8 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | WEB-002 | todo | P1 | 視覚レビューで finding 判定後に自動で次の未判定 finding へ進む | `review_status` を選んで判定が確定 (= `unreviewed` 以外 + `judgement_reason` が決定) した時点で drawer を閉じて、現観点内の次の未判定 finding を開く。最後の未判定が判定された場合は drawer を閉じてトーストで完了を示す。連続判定 200 タップを最少操作で回せる |
 | WEB-003 | todo | P1 | finding drawer 内に「前/次の finding」ナビを追加 | drawer ヘッダに `< 前へ` / `次へ >` ボタンを置き、現観点の findings 配列内で前後の finding に切り替えられる。スライドギャラリー側のスライド/bbox 強調も追従。判定の確定有無に関わらず手動移動できる (WEB-002 とは独立) |
 | WEB-004 | todo | P1 | drawer を閉じた直後に観点進捗と bbox 色を即時反映 | (1) drawer を閉じると `判定済 X / N finding` が即座に更新される (現状でも `updateJudgement` 内で更新だが描画タイミングを確認)、(2) SVG overlay の bbox 色が「未判定 = 赤 / 判定済 = 緑」に switch される (`unreviewed` 以外 + `judgement_reason` 決定済を判定済と扱う)、(3) 観点カード側の `判定済 X / N` バッジも `renderObservationCard` で同様に追従 |
+| WEB-005 | todo | P2 | UI ラベルから schema 名の英語併記を排除する | 「観点判定 (observation_decision)」「レビュー状態 (review_status)」「判定理由 (judgement_reason)」「補足コメント (rationale)」など、現状日本語の後に括弧で原語を併記しているラベルから括弧部分を撤去し、日本語のみで統一する。データとして保存する value (TSV / JSON) は元の英語 enum のまま維持 |
+| WEB-006 | todo | P1 | 観点カードの判定内訳セクションを読み取り専用化する | `observation_decision = remaining` のときに表示される判定内訳 (review_status × judgement_reason × count) は finding 単位の判定を集計した結果であり、人手で `count` 数値を変えたり「判定内訳を追加 / 削除」できるべきではない。集計結果の表示のみに変え、編集経路は finding drawer 経由に一本化する |
 
 ### LINT-007 evidence schema 方針
 
