@@ -21,12 +21,14 @@ type SlideEntry = {
   beforeUrl: string;
   afterUrl: string;
   diffUrl: string;
+  changed: boolean;
 };
 
 const draftKey = `pptx-review:compare:${deck}:${rev}`;
 let slides: SlideEntry[] = [];
 const decisions = new Map<number, SlideDecision>();
 let progressText: HTMLElement | undefined;
+let showUnchanged = false;
 
 void (async () => {
   await requireAuth(app);
@@ -65,11 +67,38 @@ function renderLoaded(): void {
   progressText.className = "visual-progress";
   updateProgress();
 
+  const filterRow = document.createElement("div");
+  filterRow.className = "compare-filter-row";
+  const filterLabel = document.createElement("label");
+  filterLabel.className = "compare-filter-label";
+  const filterCheckbox = document.createElement("input");
+  filterCheckbox.type = "checkbox";
+  filterCheckbox.checked = showUnchanged;
+  filterCheckbox.addEventListener("change", () => {
+    showUnchanged = filterCheckbox.checked;
+    renderList();
+  });
+  filterLabel.append(filterCheckbox, document.createTextNode(" 変更なしスライドも表示"));
+  filterRow.append(filterLabel);
+
   const list = document.createElement("section");
   list.className = "compare-list";
-  for (const slide of slides) {
-    list.append(renderSlideCard(slide));
+
+  function renderList(): void {
+    list.replaceChildren();
+    const visible = slides.filter((s) => showUnchanged || s.changed);
+    if (visible.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "status-text";
+      empty.textContent = "変更ありのスライドはありません。";
+      list.append(empty);
+      return;
+    }
+    for (const slide of visible) {
+      list.append(renderSlideCard(slide));
+    }
   }
+  renderList();
 
   const actions = document.createElement("div");
   actions.className = "sticky-actions";
@@ -86,7 +115,7 @@ function renderLoaded(): void {
   });
   actions.append(submit);
 
-  root.append(summary, progressText, list, actions);
+  root.append(summary, progressText, filterRow, list, actions);
   app.replaceChildren(root);
 }
 
@@ -195,35 +224,40 @@ function renderSlideCard(slide: SlideEntry): HTMLElement {
 
 function updateProgress(): void {
   if (!progressText) return;
+  const targets = slides.filter((s) => s.changed);
   let adopt = 0;
   let reject = 0;
-  for (const d of decisions.values()) {
-    if (d.decision === "adopt") adopt += 1;
-    if (d.decision === "reject") reject += 1;
+  for (const slide of targets) {
+    const d = decisions.get(slide.slideNo);
+    if (d?.decision === "adopt") adopt += 1;
+    if (d?.decision === "reject") reject += 1;
   }
-  const remaining = slides.length - adopt - reject;
-  progressText.textContent = `判定済 ${adopt + reject} / ${slides.length} (採用 ${adopt} / 不採用 ${reject} / 未判定 ${remaining})`;
+  const remaining = targets.length - adopt - reject;
+  progressText.textContent = `変更あり ${targets.length} 枚 / 判定済 ${adopt + reject} (採用 ${adopt} / 不採用 ${reject} / 未判定 ${remaining})`;
 }
 
 async function handleSubmit(): Promise<void> {
   const undecided: number[] = [];
   for (const slide of slides) {
+    if (!slide.changed) continue;
     if (!decisions.get(slide.slideNo)?.decision) undecided.push(slide.slideNo);
   }
   if (undecided.length > 0) {
     const ok = window.confirm(
-      `未判定が ${undecided.length} 件あります (スライド ${undecided.join(", ")})。\nこのまま送信しますか？`,
+      `変更ありスライドのうち未判定が ${undecided.length} 件あります (スライド ${undecided.join(", ")})。\nこのまま送信しますか？`,
     );
     if (!ok) return;
   }
   try {
     const payload = {
       mode: "compare" as const,
-      slides: slides.map((slide) => ({
-        slideNo: slide.slideNo,
-        decision: decisions.get(slide.slideNo)?.decision ?? null,
-        memo: decisions.get(slide.slideNo)?.memo ?? "",
-      })),
+      slides: slides
+        .filter((slide) => slide.changed)
+        .map((slide) => ({
+          slideNo: slide.slideNo,
+          decision: decisions.get(slide.slideNo)?.decision ?? null,
+          memo: decisions.get(slide.slideNo)?.memo ?? "",
+        })),
     };
     const { key } = await submitFeedback({
       deck,
@@ -243,9 +277,12 @@ async function handleSubmit(): Promise<void> {
 }
 
 async function discoverSlides(deckId: string, revId: string): Promise<SlideEntry[]> {
-  const basePath = sitePath(
-    `tmp/review-snapshot/${encodeURIComponent(deckId)}/rev-${encodeURIComponent(revId)}/images`,
+  const revBase = sitePath(
+    `tmp/review-snapshot/${encodeURIComponent(deckId)}/rev-${encodeURIComponent(revId)}`,
   );
+  const basePath = `${revBase}/images`;
+  const meta = await fetchMeta(`${revBase}/meta.json`);
+  const changedSet = new Set(meta?.changed_slides ?? []);
   const results: SlideEntry[] = [];
   for (let i = 1; i <= 99; i += 1) {
     const num = String(i).padStart(2, "0");
@@ -264,9 +301,20 @@ async function discoverSlides(deckId: string, revId: string): Promise<SlideEntry
       beforeUrl,
       afterUrl: afterExists ? afterUrl : beforeUrl,
       diffUrl: diffExists ? diffUrl : beforeUrl,
+      changed: meta ? changedSet.has(i) : true,
     });
   }
   return results;
+}
+
+async function fetchMeta(url: string): Promise<{ changed_slides?: number[] } | undefined> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return undefined;
+    return (await res.json()) as { changed_slides?: number[] };
+  } catch {
+    return undefined;
+  }
 }
 
 async function assetExists(url: string): Promise<boolean> {

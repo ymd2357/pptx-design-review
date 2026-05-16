@@ -667,6 +667,20 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.compare-filter-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 2px 0;
+}
+
+.compare-filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #65758b;
+  font-size: 0.85rem;
+}
+
 .compare-list {
   display: grid;
   gap: 14px;
