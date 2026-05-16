@@ -34,13 +34,13 @@ export function renderObservationCard(
   const meta = document.createElement("div");
   meta.className = "card-meta";
   meta.innerHTML = `
-    <span>decision</span>
+    <span>判定</span>
     <strong>${escapeHtml(row.observation_decision || "not_recorded")}</strong>
   `;
 
   const decisionLabel = document.createElement("label");
   decisionLabel.className = "field";
-  decisionLabel.innerHTML = `<span>observation_decision</span>`;
+  decisionLabel.innerHTML = `<span>観点判定 (observation_decision)</span>`;
   const decisionSelect = document.createElement("select");
   for (const decision of OBSERVATION_DECISIONS) {
     decisionSelect.append(new Option(decision, decision, false, row.observation_decision === decision));
@@ -63,7 +63,7 @@ export function renderObservationCard(
     const visualLink = document.createElement("a");
     visualLink.className = "secondary-link visual-review-link";
     visualLink.href = visualHref;
-    visualLink.textContent = "Visual review ->";
+    visualLink.textContent = "視覚レビューへ →";
     card.append(visualLink);
   }
   card.append(decisionLabel, dynamicArea, errorBox);
@@ -94,7 +94,7 @@ export function renderObservationCard(
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button";
-    addButton.textContent = "Add disposition";
+    addButton.textContent = "判定内訳を追加";
     addButton.addEventListener("click", () => {
       dispositions.push({
         review_status: "fix_required",
@@ -107,7 +107,7 @@ export function renderObservationCard(
 
     const rationale = document.createElement("label");
     rationale.className = "field";
-    rationale.innerHTML = `<span>rationale</span>`;
+    rationale.innerHTML = `<span>補足コメント (rationale)</span>`;
     const textarea = document.createElement("textarea");
     textarea.rows = 4;
     textarea.value = row.rationale;
@@ -172,8 +172,8 @@ function renderDispositionRow(
   remove.type = "button";
   remove.className = "icon-button";
   remove.textContent = "x";
-  remove.title = "Remove disposition";
-  remove.setAttribute("aria-label", "Remove disposition");
+  remove.title = "判定内訳を削除";
+  remove.setAttribute("aria-label", "判定内訳を削除");
 
   status.addEventListener("change", () => {
     disposition.review_status = status.value as DispositionStatus;

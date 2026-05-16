@@ -50,7 +50,7 @@ void (async () => {
 })();
 
 async function renderVisualReview(): Promise<void> {
-  app.replaceChildren(shell("Loading visual review..."));
+  app.replaceChildren(shell("視覚レビューを読み込み中..."));
   try {
     const [decisionFile, lintData, snapshot, loadedSlideSize, judgementFile] = await Promise.all([
       fetchDecisionTsv(deck, rev),
@@ -83,7 +83,7 @@ async function renderVisualReview(): Promise<void> {
     renderLoaded();
   } catch (error) {
     app.replaceChildren(
-      shell(error instanceof Error ? error.message : "Failed to load visual review."),
+      shell(error instanceof Error ? error.message : "視覚レビューの読み込みに失敗しました。"),
     );
   }
 }
@@ -102,7 +102,7 @@ function renderLoaded(): void {
       <p class="eyebrow">${escapeHtml(deck)} / REV-${escapeHtml(rev)}</p>
       <h2>${escapeHtml(observation.review_no)} ${escapeHtml(observation.check_id)}</h2>
     </div>
-    <a class="secondary-link" href="${back}">Back</a>
+    <a class="secondary-link" href="${back}">戻る</a>
   `;
 
   progressText = document.createElement("p");
@@ -119,7 +119,7 @@ function renderLoaded(): void {
           initialSlideNo: findings[0]?.slideNo,
           onSelectFinding: openFinding,
         })
-      : renderEmptyState("No slide PNGs found in the review snapshot.");
+      : renderEmptyState("レビュースナップショットにスライド PNG が見つかりません。");
 
   root.append(summary, progressText, gallery);
   app.replaceChildren(root);
@@ -155,7 +155,7 @@ function updateJudgement(finding: LintFinding, next: FindingJudgement): void {
 
 function updateProgress(): void {
   if (!progressText) return;
-  progressText.textContent = `${judgedFindingCount(findings, judgements)} of ${findings.length} findings judged`;
+  progressText.textContent = `判定済 ${judgedFindingCount(findings, judgements)} / ${findings.length} finding`;
 }
 
 function findObservation(rows: readonly DecisionRow[], value: string): DecisionRow | undefined {
@@ -169,8 +169,8 @@ function shell(statusText: string): HTMLElement {
   header.className = "app-header";
   header.innerHTML = `
     <div>
-      <p class="eyebrow">PPTX Design Review</p>
-      <h1>Visual Review</h1>
+      <p class="eyebrow">PPTX デザインレビュー</p>
+      <h1>視覚レビュー</h1>
     </div>
   `;
   root.append(header);

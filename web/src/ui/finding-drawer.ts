@@ -15,14 +15,14 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
 
   const drawer = document.createElement("aside");
   drawer.className = "finding-drawer";
-  drawer.setAttribute("aria-label", "Finding judgement");
+  drawer.setAttribute("aria-label", "finding 判定");
 
   const close = document.createElement("button");
   close.type = "button";
   close.className = "icon-button drawer-close";
   close.textContent = "x";
-  close.title = "Close";
-  close.setAttribute("aria-label", "Close finding details");
+  close.title = "閉じる";
+  close.setAttribute("aria-label", "finding 詳細を閉じる");
   close.addEventListener("click", options.onClose);
 
   const title = document.createElement("div");
@@ -46,7 +46,7 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
 
   const statusField = document.createElement("label");
   statusField.className = "field";
-  statusField.innerHTML = "<span>review_status</span>";
+  statusField.innerHTML = "<span>レビュー状態 (review_status)</span>";
   const status = document.createElement("select");
   for (const value of REVIEW_STATUSES) {
     status.append(
@@ -57,13 +57,13 @@ export function renderFindingDrawer(options: FindingDrawerOptions): HTMLElement 
 
   const reasonField = document.createElement("label");
   reasonField.className = "field";
-  reasonField.innerHTML = "<span>judgement_reason</span>";
+  reasonField.innerHTML = "<span>判定理由 (judgement_reason)</span>";
   const reason = document.createElement("select");
   reasonField.append(reason);
 
   const rationaleField = document.createElement("label");
   rationaleField.className = "field";
-  rationaleField.innerHTML = "<span>rationale</span>";
+  rationaleField.innerHTML = "<span>補足コメント (rationale)</span>";
   const rationale = document.createElement("textarea");
   rationale.rows = 4;
   rationale.value = options.judgement.rationale ?? "";

@@ -48,7 +48,7 @@ void (async () => {
 })();
 
 async function renderReview(): Promise<void> {
-  app.replaceChildren(shell("Loading decisions..."));
+  app.replaceChildren(shell("判定台帳を読み込み中..."));
   try {
     const file = await fetchDecisionTsv(deck, rev);
     sourceSha = file.sha;
@@ -61,7 +61,7 @@ async function renderReview(): Promise<void> {
     renderLoaded(file.source, parsed.errors);
   } catch (error) {
     app.replaceChildren(
-      shell(error instanceof Error ? error.message : "Failed to load decisions."),
+      shell(error instanceof Error ? error.message : "判定台帳の読み込みに失敗しました。"),
     );
   }
 }
@@ -77,7 +77,7 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
       <p class="eyebrow">${source}${sourceSha ? ` / ${sourceSha.slice(0, 7)}` : ""}</p>
       <h2>${deck} / REV-${rev}</h2>
     </div>
-    <p>${rows.length} observations / ${invalidCount} validation issues</p>
+    <p>${rows.length} 観点 / 入力不備 ${invalidCount} 件</p>
   `;
 
   const messages = document.createElement("div");
@@ -94,7 +94,7 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   const rerenderSummary = () => {
     const count = rows.filter((row) => validateDecisionRow(row).length > 0).length;
     summary.querySelector("p:last-child")!.textContent =
-      `${rows.length} observations / ${count} validation issues`;
+      `${rows.length} 観点 / 入力不備 ${count} 件`;
     persistDrafts();
   };
   rows.forEach((row) => {
@@ -106,17 +106,17 @@ function renderLoaded(source: "github" | "local", parseErrors: string[]): void {
   const back = document.createElement("a");
   back.className = "secondary-link";
   back.href = sitePath("");
-  back.textContent = "Hub";
+  back.textContent = "一覧へ";
   const download = document.createElement("button");
   download.type = "button";
   download.className = "primary-button";
-  download.textContent = "Download files";
+  download.textContent = "ファイルをダウンロード";
   download.addEventListener("click", downloadReviewFiles);
   const submit = document.createElement("button");
   submit.type = "button";
   submit.className = "primary-button";
-  submit.textContent = "Submit to KV";
-  submit.title = "Encrypt with age public key and POST to the shared KV.";
+  submit.textContent = "送信";
+  submit.title = "判定を age 公開鍵で暗号化して共有 KV に送信します。";
   submit.addEventListener("click", () => {
     submit.disabled = true;
     void handleSubmit().finally(() => {
@@ -164,18 +164,18 @@ function renderSnapshotPanel(): HTMLElement {
   eyebrow.className = "eyebrow";
   eyebrow.textContent = "snapshot";
   const heading = document.createElement("h2");
-  heading.textContent = snapshot ? "Published review artifacts" : "No published artifacts";
+  heading.textContent = snapshot ? "公開済みレビュー資産" : "公開済み資産なし";
   title.append(eyebrow, heading);
 
   const meta = document.createElement("p");
   if (!snapshot) {
-    meta.textContent = "Run the snapshot publisher and commit tmp/review-snapshot to show evidence.";
+    meta.textContent = "スナップショット公開スクリプトを実行して tmp/review-snapshot をコミットすると証跡が表示されます。";
     panel.append(title, meta);
     return panel;
   }
 
   meta.textContent =
-    `${snapshot.imageUrls.length} slide images / ${lintCount(snapshot.lint)} lint findings` +
+    `スライド ${snapshot.imageUrls.length} 枚 / lint ${lintCount(snapshot.lint)} 件` +
     (snapshot.priorities ? " / priorities.json" : "");
 
   const imageGrid = document.createElement("div");
@@ -183,7 +183,7 @@ function renderSnapshotPanel(): HTMLElement {
   for (const imageUrl of snapshot.imageUrls.slice(0, 4)) {
     const image = document.createElement("img");
     image.src = imageUrl;
-    image.alt = "Published slide snapshot";
+    image.alt = "公開済みスライドスナップショット";
     image.loading = "lazy";
     imageGrid.append(image);
   }
@@ -249,7 +249,7 @@ async function handleSubmit(): Promise<void> {
     validateDecisionRow(row).map((error) => `${row.review_no} / ${row.check_id}: ${error}`),
   );
   if (validationErrors.length > 0) {
-    window.alert(`Resolve validation issues before submitting.\n\n${validationErrors.join("\n")}`);
+    window.alert(`入力不備を解消してから送信してください。\n\n${validationErrors.join("\n")}`);
     return;
   }
 
@@ -265,7 +265,7 @@ async function handleSubmit(): Promise<void> {
     clearFindingJudgementDrafts(deck, rev);
     showSubmitSuccessBanner(key);
   } catch (error) {
-    window.alert(error instanceof Error ? error.message : "Failed to submit review.");
+    window.alert(error instanceof Error ? error.message : "判定の送信に失敗しました。");
   }
 }
 
@@ -274,7 +274,7 @@ function showSubmitSuccessBanner(key: string): void {
   const banner = document.createElement("section");
   banner.className = "commit-banner success";
   const note = document.createElement("span");
-  note.textContent = `Submitted (${key}). Run scripts/fetch-reviews.py on your PC to apply.`;
+  note.textContent = `送信完了 (${key})。PC で scripts/fetch-reviews.py --apply を実行すると判定が取り込まれます。`;
   banner.append(note);
   app.querySelector(".app-shell")?.prepend(banner);
   window.setTimeout(() => banner.remove(), 8000);

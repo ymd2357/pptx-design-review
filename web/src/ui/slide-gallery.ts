@@ -24,7 +24,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
   const previous = document.createElement("button");
   previous.type = "button";
   previous.className = "secondary-button";
-  previous.textContent = "Prev";
+  previous.textContent = "前へ";
 
   const position = document.createElement("p");
   position.className = "slide-position";
@@ -32,7 +32,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
   const next = document.createElement("button");
   next.type = "button";
   next.className = "secondary-button";
-  next.textContent = "Next";
+  next.textContent = "次へ";
   toolbar.append(previous, position, next);
 
   const stage = document.createElement("div");
@@ -90,7 +90,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
     overlay.setAttribute("class", "finding-overlay");
     overlay.setAttribute("viewBox", `0 0 ${options.slideSizePt.w} ${options.slideSizePt.h}`);
     overlay.setAttribute("preserveAspectRatio", "none");
-    overlay.setAttribute("aria-label", "Finding overlays");
+    overlay.setAttribute("aria-label", "finding オーバーレイ");
     for (const finding of slideFindings) {
       if (!finding.bboxPt) continue;
       const [x, y, width, height] = finding.bboxPt;
@@ -115,7 +115,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): HTMLElement {
 
     const empty = document.createElement("p");
     empty.className = "slide-empty";
-    empty.textContent = slideFindings.length === 0 ? "No findings on this slide." : "";
+    empty.textContent = slideFindings.length === 0 ? "このスライドには finding がありません。" : "";
 
     frame.append(image, overlay);
     stage.append(frame);

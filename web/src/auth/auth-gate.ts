@@ -10,7 +10,7 @@ export async function requireAuth(app: HTMLElement): Promise<void> {
       const ok = await verifyPin(pin);
       if (ok) {
         sessionStorage.setItem(storageKey, "1");
-        onResult({ ok: true, message: "Unlocked. Loading…" });
+        onResult({ ok: true, message: "認証成功。読み込み中..." });
         resolve();
       } else {
         onResult({ ok: false, message: "PIN が違います。" });
@@ -43,14 +43,14 @@ function renderGateCard(
   header.className = "app-header";
   header.innerHTML = `
     <div>
-      <p class="eyebrow">PPTX Design Review</p>
-      <h1>PIN required</h1>
+      <p class="eyebrow">PPTX デザインレビュー</p>
+      <h1>PIN を入力</h1>
     </div>
   `;
 
   const note = document.createElement("p");
   note.className = "status-text";
-  note.textContent = "PIN を入力してください。";
+  note.textContent = "閲覧には PIN が必要です。Claude に PIN を尋ねてください。";
 
   const form = document.createElement("form");
   form.className = "auth-form";
@@ -68,7 +68,7 @@ function renderGateCard(
   const submit = document.createElement("button");
   submit.type = "submit";
   submit.className = "primary-button";
-  submit.textContent = "Unlock";
+  submit.textContent = "解錠";
 
   form.append(input, submit);
 
@@ -80,7 +80,7 @@ function renderGateCard(
     const pin = input.value.trim();
     if (!pin) return;
     submit.disabled = true;
-    state.textContent = "Checking…";
+    state.textContent = "確認中..."
     onSubmit(pin, ({ ok, message }) => {
       state.textContent = message;
       if (!ok) {

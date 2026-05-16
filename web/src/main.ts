@@ -13,7 +13,7 @@ void (async () => {
 })();
 
 async function renderHub(): Promise<void> {
-  app.replaceChildren(shell("Loading reviews..."));
+  app.replaceChildren(shell("レビューを読み込み中..."));
   const decks = await listReviewDecks();
   const root = shell("");
   root.append(renderDeckGrid(decks));
@@ -27,8 +27,8 @@ function shell(title: string): HTMLElement {
   header.className = "app-header";
   header.innerHTML = `
     <div>
-      <p class="eyebrow">PPTX Design Review</p>
-      <h1>Review Hub</h1>
+      <p class="eyebrow">PPTX デザインレビュー</p>
+      <h1>レビュー一覧</h1>
     </div>
   `;
   if (title) {
