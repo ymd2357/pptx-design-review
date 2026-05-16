@@ -197,9 +197,9 @@ if shape.has_text_frame:
 
 - 中央揃えが意図した表現の slide (タイトル中央寄せ等) は対象外。
   slide_idx か shape.name で除外する。
-- `alignment_drift` (`REV-012` / `p2-12` 系) はテンプレ起因が多く、中身を直すより
-  マスターを直すべきケースがある。再発するなら deck ではなくテンプレに
-  上げる。
+- `card_grid_consistency` (旧 `alignment_drift` の責務を吸収、`REV-012` / `p2-12` 系)
+  はテンプレ起因が多く、中身を直すよりマスターを直すべきケースがある。
+  再発するなら deck ではなくテンプレに上げる。
 
 ## 参考
 

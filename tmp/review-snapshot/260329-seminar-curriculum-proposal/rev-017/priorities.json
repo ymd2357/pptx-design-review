@@ -119,7 +119,6 @@
     ],
     "action": "SHIFT AI テンプレートとして意図した表現なら許容ルールへ寄せ、そうでなければマスター/スタイルを直す。",
     "checks": [
-      "alignment_drift",
       "alignment_left_top",
       "alt_text_required",
       "background_color_palette",

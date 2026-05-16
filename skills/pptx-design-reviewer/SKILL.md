@@ -74,7 +74,7 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 | `text_overlap` | error | Text frame bounding boxes overlap each other |
 | `object_overlap` | error | Non-text object bounding boxes overlap, excluding structural containment metadata |
 | `object_gap_too_small` | warning | Adjacent object gap is below the minimum spacing |
-| `alignment_drift` | warning | Nearby left/top/center alignment drifts beyond tolerance |
+| `card_grid_consistency` | warning | Same-kind card group's outer frame / inner padding / key child position is not aligned across the group (absorbed the former `alignment_drift` responsibility) |
 | `inner_padding_imbalance` | warning | Child objects are unbalanced inside a container |
 | `image_aspect_distortion` | warning | Picture source aspect ratio differs from displayed box aspect ratio |
 | `image_upscale_ratio` | warning | Picture is displayed larger than its source pixels support |
