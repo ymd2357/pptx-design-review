@@ -150,6 +150,17 @@ Pn は finding 数ではなく、納品物への影響度で決める。
   残 129 件は `.25/.5/.75pt` 単位のため auto-fix 対象外。
   主な artifact は `p0-p2-15-geometry-fixed.pptx`、
   `p2-15-after-{lint,priorities}.json`。
+- `REV-017` (`p0-3`): `low_contrast` (`P0-3`) の auto-fix を before/after
+  比較 UI でスライド単位採否レビュー。
+  入力 `p0-p2-15-geometry-fixed.pptx` に `pptx_lint --no-consolidate +
+  pptx_fix --rules contrast` を当てて 20 件の灰色テキスト色値置換
+  (`#999999→#707070` 等) を反映。
+  20 スライドすべて「採用」で確定 (`rev-017-compare.tsv`)。
+  主な artifact は `p0-rev-017-low-contrast-fixed.pptx`、
+  `tmp/review-snapshot/.../rev-017/images/{before,after,diff}/`、
+  `doc/reviews/.../rev-017-compare.tsv`。
+  なお赤背景の白文字など視覚的に大胆な修正は最新 lint が検出して
+  おらず未反映 (= `FIX-006` で継続)。
 
 種別:
 
@@ -257,7 +268,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | --- | --- | --- | ---: | --- | --- | --- |
 | P0-1 | `text_encoding` | inferred_done | n/a | automated_only | `REV-015` | `p2-15-after-priorities.json` で P0/P1 なし。 |
 | P0-2 | `text_overlap` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P0-3 | `low_contrast` | remaining | 21 | rendered_automated | `REV-017` | `rev-017-rendered-contrast-lint.json` で PowerPoint 書き出し画像から `low_contrast` を機械検出。P0 修正対象。 |
+| P0-3 | `low_contrast` | done | 0 (auto-fix 後) | rendered_automated | `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` で灰色テキスト 20 件を `pptx_fix --rules contrast` で色値差し替え (`#999999→#707070` 等)、スライド単位の比較 UI で全 20 件「採用」確定 (`rev-017-compare.tsv`)。赤背景白文字など視覚的に大胆な修正は最新 lint が未検出のため `FIX-006` で継続。 |
 | P0-4 | `overflow_text` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-1 | `animation_present` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-2 | `alt_text_required` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
@@ -367,7 +378,8 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | ID | 状態 | 優先度 | タスク | 完了条件 |
 | ---- | ------ | -------- | -------- | ---------- |
 | WEB-001 | doing | P1 | レビュー UI を GitHub Pages 公開し、KV 経由でローカルに判定を取り込む | (1) `ymd2357/pptx-design-review` を public で push 済、(2) `deploy-review-web` ワークフローが `review-pages` ブランチに orphan push、(3) Settings → Pages の Source は `review-pages` ブランチ、(4) 画面ゲートは PIN (SHA-256 を SPA に埋め込み、平文は Claude メモリのみ) で通る、(5) Submit ボタンで判定 payload を age 公開鍵で暗号化し `https://pptx-visual-review.pages.dev/api/feedback` に POST、(6) `scripts/fetch-reviews.py --apply` を PC で実行し KV から復号して `doc/reviews/<deck>/rev-NNN-decisions.tsv` & `rev-NNN-finding-judgements.json` を書き出す、(7) `git commit` して反映。**前提**: vscode-pptx-viewer 側の `gallery/functions/api/feedback.js` に `?key=<id>` GET を追加するパッチが production deploy 済 (Claude が当て済、ユーザーが main マージ + push) |
-| REV-017 | todo | P1 | P0-3 `low_contrast` の auto-fix を before/after 比較でスライド単位に採否確定する | (1) 入力 `260329_seminar_curriculum_proposal.p0-p2-15-geometry-fixed.pptx`、(2) `pptx_fix.py` で `low_contrast` を auto-fix した `260329_seminar_curriculum_proposal.p0-p2-17-contrast-fixed.pptx` を生成、(3) PowerPoint 書き出しで before/after/diff の slide PNG 20 枚を生成し `tmp/review-snapshot/.../rev-017/images/{before,after,diff}/` に配置、(4) リモート UI (`/compare/?deck=…&rev=017`) でスライドごとに before/after を見比べ、「採用 / 不採用 + メモ」を入れる、(5) Submit で KV に payload を送信、(6) `scripts/fetch-reviews.py --apply` でローカルに `doc/reviews/<deck>/rev-017-compare.tsv` を書き出して commit、(7) 採用スライドだけを反映した最終 PPTX を新リビジョンとして生成。観点単位 / finding 単位の細分判定運用 (旧方針) は `slide-guideline-v1.yml` の `finding_evidence_schema` として残すが、本 REV-017 のスコープ外 |
+| REV-017 | done | P1 | P0-3 `low_contrast` の auto-fix を before/after 比較でスライド単位に採否確定する | 完了。`p0-rev-017-low-contrast-fixed.pptx` を確定、`rev-017-compare.tsv` で 20 件全部「採用」記録済。残った大胆な修正候補は `FIX-006` (検出範囲拡張) で継続。 |
+| REV-018 | todo | P1 | P1-4 `contrast_ratio` の auto-fix を before/after 比較でスライド単位に採否確定する | (1) 入力 `p0-rev-017-low-contrast-fixed.pptx` (= REV-017 確定版) に `pptx_lint --no-consolidate` を当てて `contrast_ratio` finding を全件展開、(2) `pptx_fix --rules contrast --findings-json` で auto-fix を適用した `p0-rev-018-contrast-ratio-fixed.pptx` を生成、(3) PowerPoint 書き出しで before/after/diff の slide PNG を生成し `tmp/review-snapshot/.../rev-018/images/{before,after,diff}/` に配置、(4) `/compare/?deck=…&rev=018` でスライドごとに採否、(5) `fetch-reviews.py --apply` で `rev-018-compare.tsv` を取り込み、(6) REV-016 観点別判定表の `P1-4` を `done` に、(7) `REV-018` を `done` に。検出件数が rendered-image 由来で消えるかどうかは lint 実行で確認。 |
 | FIX-001 | todo | P1 | `wrap_break_changes_meaning` に widen-to-fit 候補と auto-fix を追加する | shape を safe area 内で広げて 1 行に収まる場合、lint が `candidate_values` に widen 後 bbox を出し、`pptx_fix.py` が幾何修正として適用できる。検証 deck の根拠は `claude-manual-visual-fixes-2026-05-10.md` の slide 15 / 47 |
 | FIX-002 | todo | P1 | badge コンテナ内テキストの中央揃えを検出・修正する | 単一短文を含む正方形/円形 shape の水平・垂直中央揃えのズレを新規 check で検出し、`fixability=auto_fix_candidate` の `candidate_values` (CENTER / MIDDLE) を出して `pptx_fix.py` が適用できる。検証 deck の根拠は同レポートの slide 3 / 40 |
 | FIX-003 | todo | P2 | 孤立装飾 line / connector / arrow の検出を追加する | semantic group に属さない短い水平・垂直 line shape や孤立 connector / arrow を `decorative_review` finding として検出し、`fixability=manual_required` で残す。自動削除はしない。検証 deck の根拠は同レポートの slide 12 / 44 |
