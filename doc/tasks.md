@@ -278,11 +278,11 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P1-6 | `image_aspect_distortion` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-7 | `key_area_cropped` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P1-8 | `line_height` | done | 0 | visual_done | `REV-006` | `p0-p2-6-*.pptx` と `p2-6-powerpoint-review-images/`。 |
-| P1-9 | `missing_required_element` | remaining | 1 | automated_only | `REV-017` | `rev-017-rendered-contrast-lint.json` で 3 スライド (1, 4, 15) に title/header 候補欠落を機械検出。 |
+| P1-9 | `missing_required_element` | inferred_done | 0 | automated_only | `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` に対する最新 lint (XML / rendered 双方) で 0 件。旧 lint で 3 スライド検出されていた候補欠落は最新 lint アルゴリズムで消えた。 |
 | P1-10 | `object_overlap` | done | 0 | automated_only | `REV-009` | `p2-9-evaluation-structure.json` で構造メタ化。最新 lint で未検出。 |
 | P1-11 | `overflow_images` | done | 0 | automated_only | `REV-010` | 装飾ラスター除外ルールで解消。最新 lint で未検出。 |
 | P1-12 | `overflow_shapes` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P1-13 | `reading_order` | remaining | 1 | automated_only | `REV-017` | `rev-017-rendered-contrast-lint.json` で 5 スライド (2, 7, 10, 12, 13) に source order と visual order の inversion を機械検出。 |
+| P1-13 | `reading_order` | inferred_done | 0 | automated_only | `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` に対する最新 lint で 0 件。旧 lint で 5 スライド検出されていた source/visual order inversion は最新 lint で消えた。 |
 | P1-14 | `text_autofit_disabled` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P1-15 | `wrap_break_changes_meaning` | inferred_done | 0 | automated_only | `REV-017` | 機械 lint で未検出。 |
 | P2-1 | `object_gap_too_small` | done | 0 | visual_done | `REV-012` | `p0-p2-12-object-gap-fixed.pptx` と `p2-12-review-images/`。 |
@@ -290,9 +290,9 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-3 | `font_family` | done | 0 | visual_done | `REV-007` | `p0-p2-7-font-family-fixed.pptx` と PowerPoint review images。 |
 | P2-4 | `font_size_scale` | done | 0 | visual_done | `REV-008` | `p0-p2-8-font-size-fixed.pptx` と PowerPoint review images。 |
 | P2-5 | `image_upscale_ratio` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
-| P2-6 | `inner_padding_imbalance` | remaining | 17 | needs_visual_judgment | `REV-015` | 最新 lint 残件。許容または修正判断が必要。 |
-| P2-7 | `safe_margins` | remaining | 1 | needs_visual_judgment | `REV-015` | 最新 lint 残件。テンプレート意図の確認が必要。 |
-| P2-8 | `safe_text_area_text` | remaining | 27 | needs_visual_judgment | `REV-015` | 最新 lint 残件。安全領域外テキストの許容判断が必要。 |
+| P2-6 | `inner_padding_imbalance` | inferred_done | 0 | automated_only | `REV-015`, `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` に対する最新 lint で 0 件。旧 lint で残っていた 17 件は最新 lint で消えた。 |
+| P2-7 | `safe_margins` | inferred_done | 0 | automated_only | `REV-015`, `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` に対する最新 lint で 0 件。旧 lint で残っていた 1 件は最新 lint で消えた。 |
+| P2-8 | `safe_text_area_text` | inferred_done | 0 | automated_only | `REV-015`, `REV-017` | `p0-rev-017-low-contrast-fixed.pptx` に対する最新 lint で 0 件。旧 lint で残っていた 27 件は最新 lint で消えた。 |
 | P2-9 | `slide_size` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-10 | `text_color_allowlist` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-11 | `alignment_left_top` | done | 0 | visual_done | `REV-013` | `p0-p2-13-left-align-fixed.pptx`。`REV-014` の 2 件残りは正本系列に採用しない。 |
