@@ -1,4 +1,5 @@
 import "./styles.css";
+import { requireAuth } from "./auth/auth-gate";
 import {
   clearStoredToken,
   getStoredToken,
@@ -12,7 +13,10 @@ const appElement = document.querySelector<HTMLDivElement>("#app");
 if (!appElement) throw new Error("Missing #app");
 const app = appElement;
 
-void renderHub();
+void (async () => {
+  await requireAuth(app);
+  await renderHub();
+})();
 
 async function renderHub(): Promise<void> {
   app.replaceChildren(shell("Loading reviews..."));

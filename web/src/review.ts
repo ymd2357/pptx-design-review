@@ -1,4 +1,5 @@
 import "./styles.css";
+import { requireAuth } from "./auth/auth-gate";
 import {
   clearStoredToken,
   getStoredToken,
@@ -56,7 +57,10 @@ let findingJudgements: FindingJudgementsFile = { deck, rev, judgements: {} };
 let findingJudgementsSha: string | undefined;
 let findingJudgementsFilePath = findingJudgementsPath(deck, rev);
 
-void renderReview();
+void (async () => {
+  await requireAuth(app);
+  await renderReview();
+})();
 
 async function renderReview(): Promise<void> {
   app.replaceChildren(shell("Loading decisions..."));

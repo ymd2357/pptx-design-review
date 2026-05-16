@@ -1,4 +1,5 @@
 import "./styles.css";
+import { requireAuth } from "./auth/auth-gate";
 import {
   findingJudgementsPath,
   initializeFindingJudgements,
@@ -44,7 +45,10 @@ let imageUrls: string[] = [];
 let updatedBy = "local";
 let progressText: HTMLElement | undefined;
 
-void renderVisualReview();
+void (async () => {
+  await requireAuth(app);
+  await renderVisualReview();
+})();
 
 async function renderVisualReview(): Promise<void> {
   app.replaceChildren(shell("Loading visual review..."));
