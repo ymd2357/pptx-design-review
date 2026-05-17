@@ -161,6 +161,24 @@ Pn は finding 数ではなく、納品物への影響度で決める。
   `doc/reviews/.../rev-017-compare.tsv`。
   なお赤背景の白文字など視覚的に大胆な修正は最新 lint が検出して
   おらず未反映 (= `FIX-006` で継続)。
+- `REV-019` (`p2-12`): `card_grid_consistency` (`P2-12`) の auto-fix を
+  before/after 比較 UI でスライド単位採否レビュー。
+  入力 `p0-rev-017-low-contrast-fixed.pptx` に対し
+  `pptx_lint --no-consolidate + pptx_fix --rules card_grid` を当てて
+  4 finding (slide 2, 7, 13, 20) を container 単位 10 action に展開し
+  6 件 apply / 4 件 manual_required で反映。
+  初版 (v1) は children の width を一律 `target_child_width` に拡大して
+  image を壊し、レビューで全件 reject された。Codex デバッグの結果、
+  pptx_fix.py を「children の width/height を保持し平行移動のみ」に
+  修正 (v3)。視覚的変化は微小 (padding 微調整のみ) だが、画像破壊は
+  解消し保守的修正として採用。
+  主な artifact は `p0-rev-017-low-contrast-fixed.pptx` (= 採用後の
+  正本に変更なし、card_grid 修正の effect が微小なため上書きせず)、
+  `rev-019-card-grid-autofix-v3.pptx`、
+  `tmp/review-snapshot/.../rev-019/images/{before,after,diff}/`、
+  `doc/reviews/.../rev-019-compare.tsv`。
+  賢い修正 (shape kind 別の処理、image は縦横比保持で再配置、text は
+  inner_width に揃え) は `FIX-008` で継続。
 
 種別:
 
@@ -296,7 +314,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | P2-9 | `slide_size` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-10 | `text_color_allowlist` | inferred_done | 0 | automated_only | `REV-015` | 最新 lint で未検出。 |
 | P2-11 | `alignment_left_top` | done | 0 | visual_done | `REV-013` | `p0-p2-13-left-align-fixed.pptx`。`REV-014` の 2 件残りは正本系列に採用しない。 |
-| P2-12 | `card_grid_consistency` | remaining | 4 | needs_visual_judgment | `REV-028` | 旧 `alignment_drift` の責務を吸収。同種カード群の外枠・内余白・主要子要素の相対位置をグループとして確認する。 |
+| P2-12 | `card_grid_consistency` | done | 0 (auto-fix 後) | needs_visual_judgment | `REV-019` | `pptx_fix --rules card_grid` の保守的修正 (子要素の bbox 保持 + 平行移動のみ、container 高さは group_medians に揃え) を 6 container に適用。children が inner box を超える 4 container は manual_required で skip。視覚変化は微小だが画像破壊なしで採用。賢い修正 (shape kind 別の処理) は `FIX-008` で継続。 |
 | P2-13 | `text_vertical_balance` | done | 0 | automated_only | `REV-013`, `REV-014` | `REV-013` 系列で 0 件。`REV-014` はルール evidence のみで正本採用には使わない。 |
 | P3-1 | `geometry_rounding` | remaining | 129 | visual_done | `REV-015` | 残件は `.25/.5/.75pt` 単位。auto-fix 対象外として defer。 |
 
@@ -380,7 +398,7 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | WEB-001 | doing | P1 | レビュー UI を GitHub Pages 公開し、KV 経由でローカルに判定を取り込む | (1) `ymd2357/pptx-design-review` を public で push 済、(2) `deploy-review-web` ワークフローが `review-pages` ブランチに orphan push、(3) Settings → Pages の Source は `review-pages` ブランチ、(4) 画面ゲートは PIN (SHA-256 を SPA に埋め込み、平文は Claude メモリのみ) で通る、(5) Submit ボタンで判定 payload を age 公開鍵で暗号化し `https://pptx-visual-review.pages.dev/api/feedback` に POST、(6) `scripts/fetch-reviews.py --apply` を PC で実行し KV から復号して `doc/reviews/<deck>/rev-NNN-decisions.tsv` & `rev-NNN-finding-judgements.json` を書き出す、(7) `git commit` して反映。**前提**: vscode-pptx-viewer 側の `gallery/functions/api/feedback.js` に `?key=<id>` GET を追加するパッチが production deploy 済 (Claude が当て済、ユーザーが main マージ + push) |
 | REV-017 | done | P1 | P0-3 `low_contrast` の auto-fix を before/after 比較でスライド単位に採否確定する | 完了。`p0-rev-017-low-contrast-fixed.pptx` を確定、`rev-017-compare.tsv` で 20 件全部「採用」記録済。残った大胆な修正候補は `FIX-006` (検出範囲拡張) で継続。 |
 | REV-018 | done | P1 | P1-4 `contrast_ratio` の auto-fix を before/after 比較でスライド単位に採否確定する | REV-017 と同時消化済 (`pptx_fix --rules contrast` が両 check を一括処理)。`p0-rev-017-low-contrast-fixed.pptx` 上で XML / rendered lint 双方 0 件確認済。本 REV は独立作業を持たない。 |
-| REV-019 | doing | P1 | P2-12 `card_grid_consistency` の 4 件を visual UI 経由で人間判定する | 全 4 件が `fixability=manual_required` (`repeated card repair requires template grouping intent review`) で auto-fix 対象外。visual UI (`/visual/?deck=260329-seminar-curriculum-proposal&rev=019&observation=P2-12`) で finding drawer から `review_status` (`accepted` / `fix_required` / `out_of_scope`) と `judgement_reason` (`intentional_template_design` / `master_template_fix` / `requires_design_decision` 等) を 4 件分付ける。送信後に `fetch-reviews.py --apply` で `rev-019-finding-judgements.json` を取り込み、REV-016 観点別判定表の `P2-12` を `done` (= 全 finding に review_status が付いている状態) に更新する。PPTX 修正は行わない。 |
+| REV-019 | done | P1 | P2-12 `card_grid_consistency` の 4 件を auto-fix で適用 | 完了。`pptx_fix --rules card_grid` の保守的修正 (= 子要素の bbox 保持 + container 内平行移動のみ) を 6 container に適用、children が inner box を超える 4 container は manual_required skip。視覚変化は微小だが画像破壊なし。レビューで全採用 (`rev-019-compare.tsv`)。賢い修正候補は `FIX-008` で継続。 |
 | FIX-001 | todo | P1 | `wrap_break_changes_meaning` に widen-to-fit 候補と auto-fix を追加する | shape を safe area 内で広げて 1 行に収まる場合、lint が `candidate_values` に widen 後 bbox を出し、`pptx_fix.py` が幾何修正として適用できる。検証 deck の根拠は `claude-manual-visual-fixes-2026-05-10.md` の slide 15 / 47 |
 | FIX-002 | todo | P1 | badge コンテナ内テキストの中央揃えを検出・修正する | 単一短文を含む正方形/円形 shape の水平・垂直中央揃えのズレを新規 check で検出し、`fixability=auto_fix_candidate` の `candidate_values` (CENTER / MIDDLE) を出して `pptx_fix.py` が適用できる。検証 deck の根拠は同レポートの slide 3 / 40 |
 | FIX-003 | todo | P2 | 孤立装飾 line / connector / arrow の検出を追加する | semantic group に属さない短い水平・垂直 line shape や孤立 connector / arrow を `decorative_review` finding として検出し、`fixability=manual_required` で残す。自動削除はしない。検証 deck の根拠は同レポートの slide 12 / 44 |
@@ -395,6 +413,7 @@ REV-017 完了条件の「判断記録」は、以下の二箇所のいずれか
 | WEB-008 | done | P1 | 視覚レビューに finding 一覧パネルを追加し、bbox 無し finding も含めて drawer に到達可能にする | スライドギャラリーの下 (or タブ切替) に「現観点の全 finding 一覧」をリスト表示する。各行は `slide N / shape 名 / check_id / 簡易 message / 判定状態バッジ` を持ち、タップで `openFinding` を呼んで drawer を開く。`bboxPt` を持たない finding (タップ可能 SVG が無いタイプ) でも一覧から drawer に飛べる。スライド上の「このスライドには finding がありません。」表示には「下の一覧から確認できます」の案内を添える |
 | FIX-006 | todo | P0 | `low_contrast` の auto-fix 修復候補を広げ、灰色置換以外のパターンも機械適用できるようにする | 現状の `pptx_fix.py --rules contrast` は `#999999` 等の薄い灰色 → 1 段濃い灰色 への単純置換しか auto 適用できず、結果として `p0-p2-17-contrast-fixed.pptx` の差分はページ番号系のみだった。DS-001 の color repair policy を活かし、(1) 赤背景の白文字 / 淡色背景の中間色テキストなどのパターンに対しても `candidate_values` を出す、(2) 各 finding の前景色と背景色から DS-001 の同系色から WCAG コントラスト充足する候補を選ぶ、(3) `pptx_fix.py` が候補を確実に適用、(4) REV-017 で再度 auto-fix を流し、after PPTX に 21 件分のコントラスト修正が反映されている状態を作る |
 | FIX-007 | todo | P1 | finding 単位判定 (judgement_reason=auto_fixable) を `pptx_fix.py` に反映する経路を作る | 現状 lint の `fixability=auto_fix_candidate` だけが `pptx_fix.py` に拾われ、人間が web UI で `auto_fixable` と判定した finding は反映されない。`scripts/fetch-reviews.py --apply` で取り込んだ `rev-NNN-finding-judgements.json` を読み、`judgement_reason=auto_fixable` の finding を `pptx_fix.py --findings-json` に注入できる経路 (中間 lint JSON への昇格 or 直接呼び出し) を作る |
+| FIX-008 | todo | P1 | `card_grid_consistency` の auto-fix を「保守的平行移動のみ」から shape kind 別の賢い修正に進化させる | 現状 (REV-019 で採用された v3) は children の bbox を完全保持し container 内で平行移動するだけ。**視覚的変化が極めて小さい** ため card grid が揃って見える効果が出ない。v1 では children width を一律 `target_child_width` に拡大したため image が壊れて全件 reject された。両者の中間として shape kind 別の処理を実装すべき。<br>**設計案**:<br>(1) text / shape (= 図形フレーム) は width を `target_child_width` に揃え、ラップ調整 (= テンプレ意図に近い);<br>(2) image / picture は **縦横比を維持** したまま inner box の `padding_left + 中央寄せ` で再配置、widening は禁止;<br>(3) icon (= 小さい正方形 image) は元のサイズを保ち、container 内のグループ相対位置だけ調整;<br>(4) shape kind を `kind` field (= lint detail.inconsistent_containers[].children[].kind が `image` / `text` / `shape` を持つ) で判定;<br>(5) 失敗判定は container 単位 (= 既に v3 で実装済) を踏襲し、安全弁を残す。<br>**検証**: REV-019 と同じ 4 finding (slide 2, 7, 13, 20) を再走し、image が破綻しないこと + 視覚的に「カード端の text 列が揃って見える」効果が出ることを compare UI で確認する。 |
 
 ### LINT-007 evidence schema 方針
 
