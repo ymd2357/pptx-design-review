@@ -4,7 +4,6 @@
   "threshold_ae_pixels": 1000,
   "changed_slides": [
     2,
-    7,
     13,
     20
   ],
@@ -16,7 +15,7 @@
     },
     {
       "slide_no": 2,
-      "ae_pixels": 50547,
+      "ae_pixels": 1052,
       "changed": true
     },
     {
@@ -41,8 +40,8 @@
     },
     {
       "slide_no": 7,
-      "ae_pixels": 19540,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 8,
@@ -51,7 +50,7 @@
     },
     {
       "slide_no": 9,
-      "ae_pixels": 869,
+      "ae_pixels": 0,
       "changed": false
     },
     {
@@ -71,7 +70,7 @@
     },
     {
       "slide_no": 13,
-      "ae_pixels": 89562,
+      "ae_pixels": 1608,
       "changed": true
     },
     {
@@ -91,12 +90,12 @@
     },
     {
       "slide_no": 17,
-      "ae_pixels": 948,
+      "ae_pixels": 0,
       "changed": false
     },
     {
       "slide_no": 18,
-      "ae_pixels": 640,
+      "ae_pixels": 0,
       "changed": false
     },
     {
@@ -106,7 +105,7 @@
     },
     {
       "slide_no": 20,
-      "ae_pixels": 36439,
+      "ae_pixels": 1611,
       "changed": true
     }
   ]

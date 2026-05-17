@@ -301,6 +301,52 @@ def _valid_bbox(value: Any) -> bool:
     )
 
 
+def _card_grid_group_bbox(children: Sequence[Any]) -> Optional[tuple[float, float, float, float]]:
+    boxes = [
+        child.get("bbox_pt")
+        for child in children
+        if isinstance(child, dict) and _valid_bbox(child.get("bbox_pt"))
+    ]
+    if not boxes:
+        return None
+    left = min(float(box[0]) for box in boxes)
+    top = min(float(box[1]) for box in boxes)
+    right = max(float(box[0]) + float(box[2]) for box in boxes)
+    bottom = max(float(box[1]) + float(box[3]) for box in boxes)
+    return (left, top, right - left, bottom - top)
+
+
+def _card_grid_item_manual_reasons(item: dict, medians: dict) -> list[str]:
+    container = item.get("container") or {}
+    container_bbox = container.get("bbox_pt") or []
+    if not _valid_bbox(container_bbox):
+        return ["invalid_card_grid_container_bbox"]
+    child_group = _card_grid_group_bbox(item.get("children") or [])
+    if child_group is None:
+        return ["missing_card_grid_child_bbox"]
+
+    target_width = float(medians.get("width", container_bbox[2]))
+    target_height = float(medians.get("height", container_bbox[3]))
+    padding = item.get("padding_pt") if isinstance(item.get("padding_pt"), dict) else {}
+    padding_left = float(medians.get("padding_left", padding.get("left", 0)))
+    padding_right = float(medians.get("padding_right", padding.get("right", 0)))
+    padding_top = float(medians.get("padding_top", padding.get("top", 0)))
+    padding_bottom = float(medians.get("padding_bottom", padding.get("bottom", 0)))
+    target_inner_width = target_width - padding_left - padding_right
+    target_inner_height = target_height - padding_top - padding_bottom
+    if child_group[2] > target_inner_width + 1.0 or child_group[3] > target_inner_height + 1.0:
+        container_id = container.get("shape_id")
+        return [
+            (
+                "card_grid_child_group_exceeds_inner_box"
+                f": container_id={container_id}"
+                f", child_group={child_group[2]:.2f}x{child_group[3]:.2f}pt"
+                f", inner={target_inner_width:.2f}x{target_inner_height:.2f}pt"
+            )
+        ]
+    return []
+
+
 def _shape_bbox_from_detail(prs, detail: dict) -> Optional[tuple[float, float, float, float]]:
     actual = detail.get("actual_bbox_pt")
     if _valid_bbox(actual):
@@ -1107,7 +1153,7 @@ def _apply_matching_finding_fixability(
     return action
 
 
-def _detect_finding_action(prs, finding: Any) -> Optional[FixAction]:
+def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAction]]:
     check = _finding_field(finding, "check")
     rule = _finding_rule(finding)
     detail = _finding_detail(finding)
@@ -1358,19 +1404,34 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction]:
         )
 
     if rule == "card_grid":
-        medians = detail.get("group_medians") or {}
+        candidate_values = detail.get("candidate_values") if isinstance(detail.get("candidate_values"), dict) else {}
+        medians = detail.get("group_medians") or candidate_values.get("group_medians") or {}
         inconsistent = detail.get("inconsistent_containers") or []
         if not isinstance(medians, dict) or not inconsistent:
             return None
-        return FixAction(
-            rule=rule,
-            slide_index=int(_finding_field(finding, "slide_index") or 1),
-            slide_id=_finding_field(finding, "slide_id"),
-            shape_id=None,
-            shape_name=None,
-            before={"inconsistent_containers": inconsistent},
-            after={"group_medians": medians},
-        )
+        actions: list[FixAction] = []
+        for item in inconsistent:
+            if not isinstance(item, dict):
+                continue
+            container = item.get("container") or {}
+            action = FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=container.get("shape_id"),
+                shape_name=None,
+                before={"inconsistent_containers": [item]},
+                after={
+                    "group_medians": medians,
+                    "child_policy": "position_only_preserve_size",
+                },
+            )
+            reasons = _card_grid_item_manual_reasons(item, medians)
+            if reasons:
+                action.status = "manual_required"
+                action.reasons = reasons
+            actions.append(action)
+        return actions or None
 
     if rule == "text_vertical_balance":
         if shape is None or not getattr(shape, "has_text_frame", False):
@@ -1517,6 +1578,7 @@ def _apply_finding_action(prs, action: FixAction) -> None:
             target_left_norm = float(container_bbox[0])
             target_top_norm = float(container_bbox[1])
             target_width_norm = float(container_bbox[2])
+            target_height_norm = float(container_bbox[3])
             if "top" in medians:
                 target_top_norm = float(medians["top"])
                 geometry["top"] = target_top_norm * sy
@@ -1524,8 +1586,8 @@ def _apply_finding_action(prs, action: FixAction) -> None:
                 target_width_norm = float(medians["width"])
                 geometry["width"] = target_width_norm * sx
             if "height" in medians:
-                geometry["height"] = float(medians["height"]) * sy
-            _apply_geometry(shape, geometry)
+                target_height_norm = float(medians["height"])
+                geometry["height"] = target_height_norm * sy
             children = item.get("children") or []
             child_boxes = [
                 child.get("bbox_pt")
@@ -1534,20 +1596,32 @@ def _apply_finding_action(prs, action: FixAction) -> None:
             ]
             if not child_boxes:
                 continue
+            child_group_left = min(float(box[0]) for box in child_boxes)
             child_group_top = min(float(box[1]) for box in child_boxes)
+            child_group_right = max(float(box[0]) + float(box[2]) for box in child_boxes)
+            child_group_bottom = max(float(box[1]) + float(box[3]) for box in child_boxes)
             padding_left = float(medians.get("padding_left", item.get("padding_pt", {}).get("left", 0)))
             padding_right = float(medians.get("padding_right", item.get("padding_pt", {}).get("right", 0)))
             padding_top = float(medians.get("padding_top", item.get("padding_pt", {}).get("top", 0)))
-            target_child_width = max(1.0, target_width_norm - padding_left - padding_right)
+            padding_bottom = float(medians.get("padding_bottom", item.get("padding_pt", {}).get("bottom", 0)))
+            target_inner_width = target_width_norm - padding_left - padding_right
+            target_inner_height = target_height_norm - padding_top - padding_bottom
+            child_group_width = child_group_right - child_group_left
+            child_group_height = child_group_bottom - child_group_top
+            if child_group_width > target_inner_width + 1.0 or child_group_height > target_inner_height + 1.0:
+                continue
+            dx_norm = target_left_norm + padding_left - child_group_left
+            dy_norm = target_top_norm + padding_top - child_group_top
+            _apply_geometry(shape, geometry)
             for child in children:
                 child_shape = _shape_by_id(slide, child.get("shape_id"))
                 child_bbox = child.get("bbox_pt")
                 if child_shape is None or not _valid_bbox(child_bbox):
                     continue
-                child_geometry = _shape_geometry_pt(child_shape)
-                child_geometry["left"] = (target_left_norm + padding_left) * sx
-                child_geometry["top"] = (target_top_norm + padding_top + (float(child_bbox[1]) - child_group_top)) * sy
-                child_geometry["width"] = target_child_width * sx
+                child_geometry = {
+                    "left": (float(child_bbox[0]) + dx_norm) * sx,
+                    "top": (float(child_bbox[1]) + dy_norm) * sy,
+                }
                 _apply_geometry(child_shape, child_geometry)
         return
 

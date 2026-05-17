@@ -19,8 +19,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+from PIL import Image
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_AUTO_SIZE, MSO_VERTICAL_ANCHOR, PP_ALIGN
 from pptx.util import Emu, Pt
 
@@ -189,6 +191,69 @@ def _build_text_overlap_fixture(out: Path) -> tuple[int, int]:
     return ids
 
 
+def _build_card_grid_picture_fixture(out: Path, tmp_dir: Path) -> tuple[dict, tuple[int, int, int]]:
+    img = tmp_dir / "card-grid-picture.png"
+    Image.new("RGB", (64, 64), (30, 120, 180)).save(img)
+
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    card = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(90), Pt(250), Pt(300), Pt(200))
+    pic = slide.shapes.add_picture(str(img), Pt(120), Pt(290), width=Pt(31.5), height=Pt(31.5))
+    title = slide.shapes.add_textbox(Pt(160), Pt(280), Pt(180), Pt(40))
+    title.text_frame.text = "Card title"
+    body = slide.shapes.add_textbox(Pt(120), Pt(340), Pt(240), Pt(60))
+    body.text_frame.text = "Card body"
+    prs.save(str(out))
+
+    finding = {
+        "check": "card_grid_consistency",
+        "slide_index": 1,
+        "slide_id": 256,
+        "detail": {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "card_grid",
+            "candidate_values": {
+                "group_medians": {
+                    "top": 229.5,
+                    "width": 298.0,
+                    "height": 218.67,
+                    "padding_left": 28.5,
+                    "padding_right": 16.32,
+                    "padding_top": 28.5,
+                    "padding_bottom": 28.5,
+                }
+            },
+            "group_medians": {
+                "top": 229.5,
+                "width": 298.0,
+                "height": 218.67,
+                "padding_left": 28.5,
+                "padding_right": 16.32,
+                "padding_top": 28.5,
+                "padding_bottom": 28.5,
+            },
+            "inconsistent_containers": [
+                {
+                    "container": {
+                        "shape_id": card.shape_id,
+                        "kind": "shape",
+                        "bbox_pt": [90.0, 250.0, 300.0, 200.0],
+                    },
+                    "children": [
+                        {"shape_id": pic.shape_id, "kind": "image", "bbox_pt": [120.0, 290.0, 31.5, 31.5]},
+                        {"shape_id": title.shape_id, "kind": "text", "bbox_pt": [160.0, 280.0, 180.0, 40.0]},
+                        {"shape_id": body.shape_id, "kind": "text", "bbox_pt": [120.0, 340.0, 240.0, 60.0]},
+                    ],
+                    "padding_pt": {"left": 30.0, "right": 30.0, "top": 30.0, "bottom": 50.0},
+                }
+            ],
+        },
+    }
+    return finding, (pic.shape_id, title.shape_id, body.shape_id)
+
+
 def main() -> int:
     failures: list = []
 
@@ -333,6 +398,29 @@ def main() -> int:
         remaining_overlap = [f for f in pptx_lint.lint_pptx(overlap) if f.check == "text_overlap"]
         if remaining_overlap:
             failures.append(f"text_overlap remained after fix: {len(remaining_overlap)}")
+
+        # --- card_grid preserves child sizes, especially pictures ---
+        card_grid = tmp_dir / "card-grid-picture.pptx"
+        card_grid_finding, (pic_id, title_id, body_id) = _build_card_grid_picture_fixture(card_grid, tmp_dir)
+        prs = Presentation(str(card_grid))
+        shapes = {shape.shape_id: shape for shape in prs.slides[0].shapes}
+        before = {sid: pptx_fix._shape_geometry_pt(shapes[sid]) for sid in (pic_id, title_id, body_id)}
+        actions = pptx_fix.fix_pptx(
+            card_grid,
+            apply=True,
+            rules=("card_grid",),
+            findings=[card_grid_finding],
+        )
+        if not any(a.rule == "card_grid" and a.status == "apply" for a in actions):
+            failures.append("card_grid fixer did not report an apply action")
+        prs = Presentation(str(card_grid))
+        shapes = {shape.shape_id: shape for shape in prs.slides[0].shapes}
+        after = {sid: pptx_fix._shape_geometry_pt(shapes[sid]) for sid in (pic_id, title_id, body_id)}
+        for sid, label in ((pic_id, "picture"), (title_id, "title text"), (body_id, "body text")):
+            if after[sid]["width"] != before[sid]["width"] or after[sid]["height"] != before[sid]["height"]:
+                failures.append(f"card_grid changed {label} size: before={before[sid]} after={after[sid]}")
+        if abs((after[title_id]["left"] - after[pic_id]["left"]) - (before[title_id]["left"] - before[pic_id]["left"])) > 0.01:
+            failures.append("card_grid did not preserve child horizontal offsets")
 
         # --- backup must preserve the oldest saved state ---
         backup_deck = tmp_dir / "backup.pptx"
