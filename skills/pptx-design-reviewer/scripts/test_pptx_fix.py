@@ -154,6 +154,33 @@ def _build_contrast_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_bg_mode_contrast_fixture(out: Path) -> int:
+    """White text inside a light-gray-filled rectangle.
+
+    Foreground swap would change white→dark (huge luminance flip), so
+    `_contrast_candidate` should prefer the background-mode strategy:
+    keep the white run and darken the rectangle's fill to a passing color.
+    """
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(120), Pt(120), Pt(400), Pt(80))
+    rect.fill.solid()
+    rect.fill.fore_color.rgb = RGBColor.from_string("EBEBEB")
+    rect.line.fill.background()
+    tf = rect.text_frame
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    para = tf.paragraphs[0]
+    run = para.add_run()
+    run.text = "White on light gray"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    run.font.color.rgb = RGBColor.from_string("FFFFFF")
+    prs.save(str(out))
+    return rect.shape_id
+
+
 def _build_text_color_allowlist_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -366,6 +393,62 @@ def main() -> int:
         )
         if residual:
             failures.append(f"contrast verify reported residual: {len(residual)}")
+
+        # --- bg-mode contrast fix: white run + light-fill rect → fill is darkened ---
+        bg_mode_pptx = tmp_dir / "contrast-bg-mode.pptx"
+        rect_id = _build_bg_mode_contrast_fixture(bg_mode_pptx)
+        bg_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(bg_mode_pptx)
+            if f.check in {"low_contrast", "contrast_ratio"}
+        ]
+        if not bg_findings:
+            failures.append("bg-mode fixture did not trigger any contrast finding")
+        else:
+            cv = bg_findings[0]["detail"].get("candidate_values") or {}
+            if cv.get("preferred_strategy") != "background":
+                failures.append(
+                    "bg-mode fixture expected preferred_strategy=background; "
+                    f"got {cv.get('preferred_strategy')}"
+                )
+            if bg_findings[0]["detail"].get("fixability") != "auto_fix_candidate":
+                failures.append(
+                    "bg-mode contrast finding was not marked auto_fix_candidate: "
+                    f"{bg_findings[0]['detail']}"
+                )
+            bg_rules = pptx_fix.auto_rules_from_findings(bg_findings)
+            bg_actions = pptx_fix.fix_pptx(
+                bg_mode_pptx,
+                apply=True,
+                rules=bg_rules,
+                findings=bg_findings,
+            )
+            applied = [a for a in bg_actions if a.rule == "contrast" and a.status == "apply"]
+            if not applied:
+                failures.append("bg-mode contrast was not applied as a fill change")
+            else:
+                updates = applied[0].after.get("updates", []) or []
+                if not any(u.get("mode") == "background_fill" for u in updates):
+                    failures.append(
+                        "bg-mode update did not record background_fill mode: "
+                        f"{updates}"
+                    )
+            prs = Presentation(str(bg_mode_pptx))
+            shapes_by_id = {s.shape_id: s for s in prs.slides[0].shapes}
+            target_rect = shapes_by_id.get(rect_id)
+            if target_rect is None:
+                failures.append("bg-mode fixture rectangle disappeared after fix")
+            else:
+                new_fill = pptx_fix._shape_solid_fill_hex(target_rect)
+                if new_fill == "#EBEBEB":
+                    failures.append("bg-mode contrast did not change the rectangle fill")
+                else:
+                    run = target_rect.text_frame.paragraphs[0].runs[0]
+                    if str(run.font.color.rgb).upper() != "FFFFFF":
+                        failures.append(
+                            "bg-mode contrast must keep the original white run color; "
+                            f"got #{run.font.color.rgb}"
+                        )
 
         # --- finding-driven text_overlap fixes the detected shape_b only ---
         overlap = tmp_dir / "text-overlap.pptx"

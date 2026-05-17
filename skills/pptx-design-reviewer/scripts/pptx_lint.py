@@ -243,6 +243,86 @@ CONTRAST_REPAIR_COLOR_FAMILIES = (
     ),
 )
 
+# Background-side hue families (sorted light→dark within each family) for fill repair.
+FILL_REPAIR_COLOR_FAMILIES = (
+    (
+        "neutral_black",
+        (
+            "#FFFFFF",
+            "#F7F7F7",
+            "#EEEEEE",
+            "#EBEBEB",
+            "#DDDDDD",
+            "#D6D6D6",
+            "#C2C2C2",
+            "#ADADAD",
+            "#999999",
+            "#858585",
+            "#707070",
+            "#5C5C5C",
+            "#474747",
+            "#333333",
+            "#1E112D",
+        ),
+    ),
+    (
+        "red",
+        (
+            "#FF5757",
+            "#E6033D",
+            "#D55E00",
+        ),
+    ),
+    (
+        "magenta",
+        (
+            "#F6E9F0",
+            "#EDD2E2",
+            "#E4BCD3",
+            "#DBA5C5",
+            "#D28FB6",
+            "#C978A7",
+            "#C06299",
+            "#B74B8A",
+            "#AE357C",
+            "#A51E6D",
+        ),
+    ),
+    (
+        "blue",
+        (
+            "#56B4E9",
+            "#32BED2",
+            "#0072B2",
+        ),
+    ),
+    (
+        "green",
+        (
+            "#E6F4F2",
+            "#CDEAE4",
+            "#B3DFD7",
+            "#9AD5C9",
+            "#81CABC",
+            "#68BFAE",
+            "#4FB5A1",
+            "#35AA93",
+            "#1CA086",
+            "#039578",
+            "#009E73",
+        ),
+    ),
+    (
+        "gold",
+        (
+            "#FFF9CF",
+            "#FFE177",
+            "#FFBC2A",
+            "#E69F00",
+        ),
+    ),
+)
+
 ALLOWED_FILL_COLORS_HEX = {
     "#FFFFFF",  # background.base / neutral.n0
     "#F7F7F7",  # background.muted / neutral.n100
@@ -826,7 +906,24 @@ def _contrast_repair_family(foreground_hex: str) -> tuple[str, tuple[str, ...]]:
     return best[1], best[2]
 
 
-def _contrast_candidate(
+def _fill_repair_family(background_hex: str) -> tuple[str, tuple[str, ...]]:
+    source = _hex_to_rgb(background_hex)
+    best: tuple[float, str, tuple[str, ...]] | None = None
+    for family_name, colors in FILL_REPAIR_COLOR_FAMILIES:
+        for color in colors:
+            distance = _rgb_distance(source, _hex_to_rgb(color))
+            if best is None or distance < best[0]:
+                best = (distance, family_name, colors)
+    if best is None:
+        return ("neutral_black", FILL_REPAIR_COLOR_FAMILIES[0][1])
+    return best[1], best[2]
+
+
+def _luminance_delta(a_hex: str, b_hex: str) -> float:
+    return abs(_relative_luminance(a_hex) - _relative_luminance(b_hex))
+
+
+def _contrast_foreground_option(
     foreground_hex: str,
     background_hex: str,
     required_ratio: float,
@@ -838,6 +935,7 @@ def _contrast_candidate(
         if color in ALLOWED_TEXT_COLORS_HEX
         and _contrast_ratio(color, background_hex) >= required_ratio
     ]
+    candidate_group = f"hue_family:{family_name}"
     if not passing:
         neutral_family = CONTRAST_REPAIR_COLOR_FAMILIES[0][1]
         passing = [
@@ -849,17 +947,96 @@ def _contrast_candidate(
         if not passing:
             return None
         candidate_group = "neutral_fallback"
-    else:
-        candidate_group = f"hue_family:{family_name}"
     candidate = _nearest_color_hex(foreground_hex, passing)
     return {
-        "foreground_hex": candidate,
-        "foreground_token": TEXT_COLOR_TOKEN_BY_HEX.get(candidate),
-        "background_hex": background_hex,
+        "from_hex": foreground_hex,
+        "to_hex": candidate,
+        "to_token": TEXT_COLOR_TOKEN_BY_HEX.get(candidate),
         "recalculated_ratio": round(_contrast_ratio(candidate, background_hex), 2),
-        "required_ratio": required_ratio,
+        "luminance_delta": round(_luminance_delta(foreground_hex, candidate), 4),
         "repair_candidate_group": candidate_group,
-        "selection_policy": "rules.color.repair_candidates.text.hue_preserving_low_contrast",
+    }
+
+
+def _contrast_background_option(
+    foreground_hex: str,
+    background_hex: str,
+    required_ratio: float,
+) -> Optional[dict]:
+    family_name, family_colors = _fill_repair_family(background_hex)
+    passing = [
+        color
+        for color in family_colors
+        if color in ALLOWED_FILL_COLORS_HEX
+        and _contrast_ratio(foreground_hex, color) >= required_ratio
+    ]
+    candidate_group = f"hue_family:{family_name}"
+    if not passing:
+        neutral_family = FILL_REPAIR_COLOR_FAMILIES[0][1]
+        passing = [
+            color
+            for color in neutral_family
+            if color in ALLOWED_FILL_COLORS_HEX
+            and _contrast_ratio(foreground_hex, color) >= required_ratio
+        ]
+        if not passing:
+            return None
+        candidate_group = "neutral_fallback"
+    candidate = _nearest_color_hex(background_hex, passing)
+    return {
+        "from_hex": background_hex,
+        "to_hex": candidate,
+        "to_token": FILL_COLOR_TOKEN_BY_HEX.get(candidate),
+        "recalculated_ratio": round(_contrast_ratio(foreground_hex, candidate), 2),
+        "luminance_delta": round(_luminance_delta(background_hex, candidate), 4),
+        "repair_candidate_group": candidate_group,
+    }
+
+
+def _contrast_candidate(
+    foreground_hex: str,
+    background_hex: str,
+    required_ratio: float,
+) -> Optional[dict]:
+    fg_option = _contrast_foreground_option(foreground_hex, background_hex, required_ratio)
+    bg_option = _contrast_background_option(foreground_hex, background_hex, required_ratio)
+    if not fg_option and not bg_option:
+        return None
+
+    if fg_option and bg_option:
+        preferred = (
+            "foreground"
+            if fg_option["luminance_delta"] <= bg_option["luminance_delta"]
+            else "background"
+        )
+    elif fg_option:
+        preferred = "foreground"
+    else:
+        preferred = "background"
+
+    if preferred == "foreground":
+        top_fg = fg_option["to_hex"]
+        top_bg = background_hex
+        top_ratio = fg_option["recalculated_ratio"]
+        top_group = fg_option["repair_candidate_group"]
+    else:
+        top_fg = foreground_hex
+        top_bg = bg_option["to_hex"]
+        top_ratio = bg_option["recalculated_ratio"]
+        top_group = bg_option["repair_candidate_group"]
+
+    return {
+        "foreground_hex": top_fg,
+        "foreground_token": TEXT_COLOR_TOKEN_BY_HEX.get(top_fg),
+        "background_hex": top_bg,
+        "background_token": FILL_COLOR_TOKEN_BY_HEX.get(top_bg),
+        "recalculated_ratio": top_ratio,
+        "required_ratio": required_ratio,
+        "repair_candidate_group": top_group,
+        "preferred_strategy": preferred,
+        "foreground_option": fg_option,
+        "background_option": bg_option,
+        "selection_policy": "rules.color.repair_candidates.hue_preserving_min_luminance_delta",
     }
 
 

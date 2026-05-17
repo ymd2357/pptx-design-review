@@ -863,6 +863,111 @@ def _contrast_candidate_hex(finding: Any) -> Optional[str]:
     )
 
 
+def _contrast_repair_spec(finding: Any) -> Optional[dict]:
+    """Resolve preferred strategy + target colors from candidate_values.
+
+    Returns dict with keys:
+      mode: "foreground" | "background"
+      to_hex: target hex
+      from_hex: original hex (foreground for fg-mode, background for bg-mode)
+      background_source: source label from finding evidence (informational)
+    """
+    detail = _finding_detail(finding)
+    candidates = detail.get("candidate_values")
+    if not isinstance(candidates, dict):
+        return None
+    preferred = candidates.get("preferred_strategy")
+    bg_source = detail.get("background_source")
+    if preferred == "background":
+        option = candidates.get("background_option") or {}
+        to_hex = _normalize_hex(option.get("to_hex"))
+        from_hex = _normalize_hex(option.get("from_hex") or detail.get("background_hex"))
+        if not to_hex or not from_hex:
+            return None
+        return {
+            "mode": "background",
+            "to_hex": to_hex,
+            "from_hex": from_hex,
+            "background_source": bg_source,
+        }
+    # default = foreground (backward compatible: missing preferred_strategy)
+    option = candidates.get("foreground_option") or {}
+    to_hex = (
+        _normalize_hex(option.get("to_hex"))
+        or _normalize_hex(candidates.get("foreground_hex"))
+        or _normalize_hex(candidates.get("color_hex"))
+    )
+    if not to_hex:
+        return None
+    return {
+        "mode": "foreground",
+        "to_hex": to_hex,
+        "from_hex": None,
+        "background_source": bg_source,
+    }
+
+
+def _shape_solid_fill_hex(shape) -> Optional[str]:
+    fill = getattr(shape, "fill", None)
+    if fill is None:
+        return None
+    try:
+        fore = fill.fore_color
+    except (AttributeError, TypeError, ValueError):
+        return None
+    try:
+        if fore.type != MSO_COLOR_TYPE.RGB:
+            return None
+    except (AttributeError, TypeError, ValueError):
+        return None
+    try:
+        rgb = fore.rgb
+    except (AttributeError, TypeError, ValueError):
+        return None
+    if rgb is None:
+        return None
+    return f"#{str(rgb).upper()}"
+
+
+def _find_bg_repair_target(text_shape, slide, from_hex_bg: str, background_source: Optional[str]):
+    """Locate the shape whose solid fill should be repaired for bg-mode contrast fix.
+
+    Currently supports `shape_solid_fill` (text shape's own fill) and
+    `behind_solid_fill:<label>` (smallest enclosing shape with matching fill).
+    Returns the shape, or None if not found.
+    """
+    own_hex = _shape_solid_fill_hex(text_shape)
+    if own_hex and own_hex.upper() == from_hex_bg.upper():
+        return text_shape
+    if slide is None:
+        return None
+    if not (background_source or "").startswith("behind_solid_fill"):
+        return None
+    text_left = float(getattr(text_shape, "left", 0) or 0)
+    text_top = float(getattr(text_shape, "top", 0) or 0)
+    text_width = float(getattr(text_shape, "width", 0) or 0)
+    text_height = float(getattr(text_shape, "height", 0) or 0)
+    cx = text_left + text_width / 2.0
+    cy = text_top + text_height / 2.0
+    best = None
+    for candidate in slide.shapes:
+        if candidate is text_shape:
+            continue
+        cand_hex = _shape_solid_fill_hex(candidate)
+        if not cand_hex or cand_hex.upper() != from_hex_bg.upper():
+            continue
+        c_left = float(getattr(candidate, "left", 0) or 0)
+        c_top = float(getattr(candidate, "top", 0) or 0)
+        c_w = float(getattr(candidate, "width", 0) or 0)
+        c_h = float(getattr(candidate, "height", 0) or 0)
+        if not (c_left <= cx <= c_left + c_w and c_top <= cy <= c_top + c_h):
+            continue
+        area = c_w * c_h
+        if best is None or area < best[0]:
+            best = (area, candidate)
+    return best[1] if best else None
+
+
 def _contrast_original_hexes(finding: Any) -> set[str]:
     detail = _finding_detail(finding)
     originals: set[str] = set()
@@ -947,9 +1052,44 @@ def _detect_contrast(
             reasons.append(rejection)
             continue
 
-        target_hex = _contrast_candidate_hex(finding)
+        spec = _contrast_repair_spec(finding)
+        if spec is None:
+            reasons.append("missing_contrast_original_or_candidate")
+            continue
+
+        if spec["mode"] == "background":
+            target_shape = _find_bg_repair_target(
+                shape, slide, spec["from_hex"], spec.get("background_source")
+            )
+            if target_shape is None:
+                reasons.append("background_repair_target_not_found")
+                continue
+            key = (
+                "background_fill",
+                getattr(target_shape, "shape_id", None),
+                spec["from_hex"],
+                spec["to_hex"],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            updates.append(
+                {
+                    "mode": "background_fill",
+                    "kind": "shape_fill",
+                    "shape_id": getattr(target_shape, "shape_id", None),
+                    "shape_name": getattr(target_shape, "name", None),
+                    "before_hex": spec["from_hex"],
+                    "after_hex": spec["to_hex"],
+                    "check": _finding_field(finding, "check"),
+                }
+            )
+            continue
+
+        # foreground mode (default)
+        target_hex = spec["to_hex"]
         originals = _contrast_original_hexes(finding)
-        if not target_hex or not originals:
+        if not originals:
             reasons.append("missing_contrast_original_or_candidate")
             continue
 
@@ -974,6 +1114,7 @@ def _detect_contrast(
                         continue
                     seen.add(key)
                     update = {
+                        "mode": "foreground_run",
                         "kind": container["kind"],
                         "paragraph": p_idx,
                         "run": r_idx,
@@ -998,8 +1139,17 @@ def _detect_contrast(
         shape_name=getattr(shape, "name", None),
         status="manual_required" if reasons and not updates else "apply",
         reasons=sorted(set(reasons)),
-        before={"runs": [{"color_hex": u["before_hex"], "text": u["text"]} for u in updates]},
-        after={"runs": [{"color_hex": u["after_hex"], "text": u["text"]} for u in updates], "updates": updates},
+        before={"runs": [
+            {"color_hex": u["before_hex"], "text": u.get("text", "")}
+            for u in updates if u.get("mode") == "foreground_run"
+        ]},
+        after={
+            "runs": [
+                {"color_hex": u["after_hex"], "text": u.get("text", "")}
+                for u in updates if u.get("mode") == "foreground_run"
+            ],
+            "updates": updates,
+        },
     )
 
 
@@ -1459,7 +1609,7 @@ def _backup_once(path: Path) -> None:
     shutil.copy2(path, backup_path)
 
 
-def _apply_action(shape, action: FixAction) -> None:
+def _apply_action(shape, action: FixAction, slide=None) -> None:
     if action.status != "apply":
         return
     if action.rule == "autofit":
@@ -1488,6 +1638,28 @@ def _apply_action(shape, action: FixAction) -> None:
                 para.alignment = PP_ALIGN.LEFT
     elif action.rule == "contrast":
         for update in action.after.get("updates", []):
+            mode = update.get("mode") or (
+                "foreground_run" if "paragraph" in update else None
+            )
+            if mode == "background_fill":
+                target_id = update.get("shape_id")
+                if target_id is not None and target_id == getattr(shape, "shape_id", None):
+                    target = shape
+                elif slide is not None:
+                    target = _shape_by_id(slide, target_id)
+                else:
+                    target = None
+                if target is None:
+                    continue
+                try:
+                    target.fill.solid()
+                    target.fill.fore_color.rgb = RGBColor.from_string(
+                        update["after_hex"].lstrip("#")
+                    )
+                except (AttributeError, TypeError, ValueError):
+                    continue
+                continue
+            # foreground_run (default)
             if update["kind"] == "shape":
                 tf = shape.text_frame
             else:
@@ -1686,7 +1858,7 @@ def fix_pptx(
                 action = _apply_matching_finding_fixability(action, findings)
             actions.append(action)
             if action.status == "apply":
-                _apply_action(shape, action)
+                _apply_action(shape, action, slide=slide)
 
     if findings:
         for finding in findings:
