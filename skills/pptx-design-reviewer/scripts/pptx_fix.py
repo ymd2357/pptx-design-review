@@ -316,83 +316,6 @@ def _card_grid_group_bbox(children: Sequence[Any]) -> Optional[tuple[float, floa
     return (left, top, right - left, bottom - top)
 
 
-def _card_grid_slot_medians(row_containers: Sequence[Any]) -> dict[str, dict[str, float]]:
-    """Aggregate per-slot medians across the row's cards.
-
-    `source_order_index` is globally unique within a slide, so it cannot be
-    used to group same-role children across cards. Instead we use each child's
-    **position within its card** after sorting siblings by (top, left). This
-    aligns the i-th child of card A with the i-th child of card B as long as
-    the cards follow the same template (leading_icon → title → body → ...).
-
-    For each slot index (0-based), compute:
-      - kind  : dominant child kind in that slot ("image" | "text" | "shape" | ...)
-      - width / height : median width / height across cards
-      - rel_left / rel_top : median offset relative to its own container
-    Returns mapping with **string** index keys so it can survive JSON round-trips.
-    """
-    if not isinstance(row_containers, Sequence):
-        return {}
-    slot_samples: dict[int, list[dict]] = {}
-    for container in row_containers:
-        if not isinstance(container, dict):
-            continue
-        container_bbox = container.get("bbox_pt") or []
-        if not _valid_bbox(container_bbox):
-            continue
-        c_left = float(container_bbox[0])
-        c_top = float(container_bbox[1])
-        children = [
-            child for child in (container.get("children") or [])
-            if isinstance(child, dict) and _valid_bbox(child.get("bbox_pt"))
-        ]
-        children.sort(
-            key=lambda c: (
-                float(c["bbox_pt"][1]),
-                float(c["bbox_pt"][0]),
-                int(c.get("source_order_index") or 0),
-            )
-        )
-        for slot_index, child in enumerate(children):
-            bbox = child["bbox_pt"]
-            slot_samples.setdefault(slot_index, []).append(
-                {
-                    "kind": child.get("kind"),
-                    "width": float(bbox[2]),
-                    "height": float(bbox[3]),
-                    "rel_left": float(bbox[0]) - c_left,
-                    "rel_top": float(bbox[1]) - c_top,
-                }
-            )
-
-    def _median(values: list[float]) -> float:
-        ordered = sorted(values)
-        n = len(ordered)
-        mid = n // 2
-        if n % 2 == 1:
-            return ordered[mid]
-        return (ordered[mid - 1] + ordered[mid]) / 2.0
-
-    result: dict[str, dict[str, Any]] = {}
-    for slot_index, samples in slot_samples.items():
-        # Only emit slots with >= 2 samples (median needs cross-card evidence).
-        if len(samples) < 2:
-            continue
-        kinds = [s.get("kind") for s in samples if s.get("kind")]
-        dominant_kind = max(set(kinds), key=kinds.count) if kinds else None
-        kind_consistent = bool(kinds) and all(k == dominant_kind for k in kinds)
-        result[str(slot_index)] = {
-            "kind": dominant_kind,
-            "kind_consistent": kind_consistent,
-            "width": _median([s["width"] for s in samples]),
-            "height": _median([s["height"] for s in samples]),
-            "rel_left": _median([s["rel_left"] for s in samples]),
-            "rel_top": _median([s["rel_top"] for s in samples]),
-            "sample_count": len(samples),
-        }
-    return result
-
-
 def _card_grid_item_manual_reasons(item: dict, medians: dict) -> list[str]:
     container = item.get("container") or {}
     container_bbox = container.get("bbox_pt") or []
@@ -1636,8 +1559,6 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         inconsistent = detail.get("inconsistent_containers") or []
         if not isinstance(medians, dict) or not inconsistent:
             return None
-        row_containers = detail.get("row_containers") or []
-        slot_medians = _card_grid_slot_medians(row_containers)
         actions: list[FixAction] = []
         for item in inconsistent:
             if not isinstance(item, dict):
@@ -1652,12 +1573,7 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 before={"inconsistent_containers": [item]},
                 after={
                     "group_medians": medians,
-                    "slot_medians_by_source_order": slot_medians,
-                    "child_policy": (
-                        "slot_aware_text_width_align"
-                        if slot_medians
-                        else "position_only_preserve_size"
-                    ),
+                    "child_policy": "position_only_preserve_size",
                 },
             )
             reasons = _card_grid_item_manual_reasons(item, medians)
@@ -1822,7 +1738,6 @@ def _apply_finding_action(prs, action: FixAction) -> None:
     if action.rule == "card_grid":
         sx, sy = _slide_scale_xy(prs)
         medians = action.after.get("group_medians") or {}
-        slot_medians_by_index = action.after.get("slot_medians_by_source_order") or {}
         for item in action.before.get("inconsistent_containers", []):
             container = item.get("container") or {}
             shape = _shape_by_id(slide, container.get("shape_id"))
@@ -1867,56 +1782,18 @@ def _apply_finding_action(prs, action: FixAction) -> None:
             child_group_height = child_group_bottom - child_group_top
             if child_group_width > target_inner_width + 1.0 or child_group_height > target_inner_height + 1.0:
                 continue
-            container_left_norm = float(container_bbox[0])
-            container_top_norm = float(container_bbox[1])
             dx_norm = target_left_norm + padding_left - child_group_left
             dy_norm = target_top_norm + padding_top - child_group_top
             _apply_geometry(shape, geometry)
-            # Sort children in the same order used to compute slot medians so
-            # the i-th child of THIS card maps to slot_medians[str(i)].
-            sortable_children = [
-                child for child in children
-                if isinstance(child, dict) and _valid_bbox(child.get("bbox_pt"))
-            ]
-            sortable_children.sort(
-                key=lambda c: (
-                    float(c["bbox_pt"][1]),
-                    float(c["bbox_pt"][0]),
-                    int(c.get("source_order_index") or 0),
-                )
-            )
-            for slot_index, child in enumerate(sortable_children):
+            for child in children:
                 child_shape = _shape_by_id(slide, child.get("shape_id"))
                 child_bbox = child.get("bbox_pt")
                 if child_shape is None or not _valid_bbox(child_bbox):
                     continue
-                slot = slot_medians_by_index.get(str(slot_index))
-                cur_left_norm = float(child_bbox[0])
-                cur_top_norm = float(child_bbox[1])
-                cur_width_norm = float(child_bbox[2])
-                cur_height_norm = float(child_bbox[3])
-                child_kind = (child.get("kind") or "").lower()
-                if not slot or not slot.get("kind_consistent", True):
-                    # No slot data or mixed kinds → conservative translate.
-                    child_geometry = {
-                        "left": (cur_left_norm + dx_norm) * sx,
-                        "top": (cur_top_norm + dy_norm) * sy,
-                    }
-                else:
-                    rel_left = float(slot.get("rel_left", cur_left_norm - container_left_norm))
-                    rel_top = float(slot.get("rel_top", cur_top_norm - container_top_norm))
-                    target_child_left = target_left_norm + rel_left
-                    target_child_top = target_top_norm + rel_top
-                    child_geometry = {
-                        "left": target_child_left * sx,
-                        "top": target_child_top * sy,
-                    }
-                    if child_kind == "text":
-                        slot_width = float(slot.get("width", cur_width_norm))
-                        if abs(slot_width - cur_width_norm) > 1.0:
-                            child_geometry["width"] = slot_width * sx
-                    # image / shape kinds: never resize (icons + decorations
-                    # keep aspect, v1 regression avoided).
+                child_geometry = {
+                    "left": (float(child_bbox[0]) + dx_norm) * sx,
+                    "top": (float(child_bbox[1]) + dy_norm) * sy,
+                }
                 _apply_geometry(child_shape, child_geometry)
         return
 

@@ -2588,20 +2588,7 @@ def check_card_grid_consistency(slide_idx, slide_id, records: list[ShapeRecord],
                 {
                     "evidence_source": "structure_json",
                     "evidence_confidence": "medium",
-                    "row_containers": [
-                        {
-                            **_shape_record_detail(item["container"]),
-                            "children": [
-                                _shape_record_detail(child)
-                                for child in item["children"]
-                            ],
-                            "padding_pt": {
-                                side: round(value, 2)
-                                for side, value in item["padding"].items()
-                            },
-                        }
-                        for item in row_metrics
-                    ],
+                    "row_containers": [_shape_record_detail(card) for card in row],
                     "group_medians": {key: round(value, 2) for key, value in medians.items()},
                     "inconsistent_containers": inconsistent,
                     "thresholds": {
