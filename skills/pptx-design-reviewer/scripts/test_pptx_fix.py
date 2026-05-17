@@ -450,6 +450,72 @@ def main() -> int:
                             f"got #{run.font.color.rgb}"
                         )
 
+        # --- FIX-007: judgement_reason=auto_fixable promotes manual to auto ---
+        red_text = tmp_dir / "red-text.pptx"
+        _build_text_color_allowlist_fixture(red_text)
+        red_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(red_text)
+            if f.check == "text_color_allowlist"
+        ]
+        if not red_findings:
+            failures.append("text_color_allowlist fixture did not trigger a finding")
+        else:
+            base = red_findings[0]
+            if base["detail"].get("fixability") != "manual_required":
+                failures.append(
+                    "text_color_allowlist should default to manual_required; got "
+                    f"{base['detail'].get('fixability')}"
+                )
+            check = base["check"]
+            slide_index = base["slide_index"]
+            shape_id = base.get("shape_id")
+            judgement_key = pptx_fix._judgement_finding_key(
+                check, slide_index, shape_id
+            )
+            judgements_data = {
+                "deck": "synthetic",
+                "rev": "test",
+                "judgements": {
+                    judgement_key: {
+                        "review_status": "fixed",
+                        "judgement_reason": "auto_fixable",
+                    }
+                },
+            }
+            promoted = pptx_fix.apply_finding_judgements_overrides(
+                red_findings, judgements_data
+            )
+            if promoted != 1:
+                failures.append(f"expected 1 judgement promotion; got {promoted}")
+            if red_findings[0]["detail"].get("fixability") != "auto_fix_candidate":
+                failures.append(
+                    "judgement promotion did not flip fixability to auto_fix_candidate"
+                )
+            promoted_rules = pptx_fix.auto_rules_from_findings(red_findings)
+            if "text_color" not in promoted_rules:
+                failures.append(
+                    "auto_rules_from_findings did not pick up text_color after "
+                    f"promotion; got {promoted_rules}"
+                )
+            actions = pptx_fix.fix_pptx(
+                red_text,
+                apply=True,
+                rules=promoted_rules,
+                findings=red_findings,
+            )
+            applied = [a for a in actions if a.rule == "text_color" and a.status == "apply"]
+            if not applied:
+                failures.append(
+                    "FIX-007 promotion did not trigger any text_color apply action"
+                )
+            prs = Presentation(str(red_text))
+            run = prs.slides[0].shapes[0].text_frame.paragraphs[0].runs[0]
+            if str(run.font.color.rgb).upper() == "FF0000":
+                failures.append(
+                    "judgement-promoted text_color fix did not replace #FF0000"
+                )
+
         # --- finding-driven text_overlap fixes the detected shape_b only ---
         overlap = tmp_dir / "text-overlap.pptx"
         first_id, second_id = _build_text_overlap_fixture(overlap)

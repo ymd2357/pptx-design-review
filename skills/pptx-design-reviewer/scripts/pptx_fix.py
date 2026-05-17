@@ -2040,6 +2040,74 @@ def load_findings_json(path: Path) -> list[Any]:
     raise ValueError("findings JSON must be a lint JSON array or an object with findings[]")
 
 
+def _judgement_finding_key(check: Any, slide_index: Any, shape_id: Any) -> Optional[str]:
+    """Reproduce the SPA's fallbackKey(check, slideIndex, shapeId) format.
+
+    The web UI uses `${check}:${slideIndex}:${shapeId ?? "unknown"}` whenever a
+    finding lacks an explicit `group_key` field, and finding-judgements.json
+    is keyed by that same string.
+    """
+    if not isinstance(check, str) or not check:
+        return None
+    if slide_index is None:
+        return None
+    sid = shape_id if shape_id is not None else "unknown"
+    return f"{check}:{slide_index}:{sid}"
+
+
+def apply_finding_judgements_overrides(
+    findings: Sequence[Any],
+    judgements_data: Any,
+) -> int:
+    """Promote `fixability=manual_required` to `auto_fix_candidate` when a
+    reviewer judgement says `judgement_reason=auto_fixable`.
+
+    Mutates the matched finding dicts in place. `judgements_data` is the parsed
+    JSON object from `doc/reviews/<deck>/rev-<rev>-finding-judgements.json`
+    (shape: `{"deck": ..., "rev": ..., "judgements": {key: {...}}}`).
+    Returns the number of findings whose fixability was promoted.
+
+    Only structural-XML lint findings carry stable group_key strings the UI
+    can echo; rendered-image findings without `group_key`/`shape_id` fall back
+    to `:unknown` and will not collide.
+    """
+    if not isinstance(judgements_data, dict):
+        return 0
+    raw_judgements = judgements_data.get("judgements")
+    if not isinstance(raw_judgements, dict) or not raw_judgements:
+        return 0
+    promoted = 0
+    for finding in findings:
+        check = _finding_field(finding, "check")
+        slide_index = _finding_field(finding, "slide_index")
+        shape_id = _finding_field(finding, "shape_id")
+        # Prefer explicit group_key if the JSON carries one.
+        detail = _finding_detail(finding) or {}
+        key = (
+            (detail.get("group_key") if isinstance(detail, dict) else None)
+            or _judgement_finding_key(check, slide_index, shape_id)
+        )
+        if not key:
+            continue
+        judgement = raw_judgements.get(key)
+        if not isinstance(judgement, dict):
+            continue
+        if judgement.get("judgement_reason") != "auto_fixable":
+            continue
+        if detail.get("fixability") == "auto_fix_candidate":
+            continue
+        detail["fixability"] = "auto_fix_candidate"
+        detail.setdefault(
+            "fixability_reason",
+            "promoted by reviewer judgement_reason=auto_fixable",
+        )
+        detail.setdefault("manual_required_reason", None)
+        if isinstance(finding, dict):
+            finding["detail"] = detail
+        promoted += 1
+    return promoted
+
+
 def auto_rules_from_findings(findings: Sequence[Any]) -> tuple[str, ...]:
     """Return fixer rules that can be attempted from lint evidence.
 
@@ -2108,6 +2176,15 @@ def main(argv: List[str]) -> int:
             "required for --rules contrast"
         ),
     )
+    ap.add_argument(
+        "--finding-judgements-json",
+        type=Path,
+        help=(
+            "reviewer judgement JSON (doc/reviews/<deck>/rev-<rev>-finding-judgements.json); "
+            "promotes manual_required → auto_fix_candidate for findings whose "
+            "judgement_reason is auto_fixable"
+        ),
+    )
     args = ap.parse_args(argv)
 
     if not args.pptx.exists():
@@ -2147,6 +2224,32 @@ def main(argv: List[str]) -> int:
                 rendered_image_dir=args.rendered_image_dir,
             )
             findings = [pptx_lint.finding_to_json_dict(finding) for finding in raw_findings]
+
+    if args.finding_judgements_json:
+        if findings is None:
+            print(
+                "--finding-judgements-json requires --findings-json or --auto",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            judgements_data = json.loads(
+                args.finding_judgements_json.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            print(
+                f"failed to load --finding-judgements-json: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        promoted = apply_finding_judgements_overrides(findings, judgements_data)
+        if promoted:
+            print(
+                f"promoted {promoted} finding(s) to auto_fix_candidate via judgement_reason",
+                file=sys.stderr,
+            )
+
+    if args.auto:
         rules = list(auto_rules_from_findings(findings))
 
     if "contrast" in rules and findings is None:
