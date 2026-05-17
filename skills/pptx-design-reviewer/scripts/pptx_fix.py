@@ -1693,13 +1693,15 @@ def fix_pptx(
             rule = _finding_rule(finding)
             if rule not in active_rules or rule not in FINDING_DRIVEN_RULES:
                 continue
-            action = _detect_finding_action(prs, finding)
-            if action is None:
+            detected = _detect_finding_action(prs, finding)
+            if detected is None:
                 continue
-            action = _apply_finding_fixability(action, finding)
-            actions.append(action)
-            if action.status == "apply":
-                _apply_finding_action(prs, action)
+            detected_actions = detected if isinstance(detected, list) else [detected]
+            for action in detected_actions:
+                action = _apply_finding_fixability(action, finding)
+                actions.append(action)
+                if action.status == "apply":
+                    _apply_finding_action(prs, action)
 
     if apply and actions:
         if backup:

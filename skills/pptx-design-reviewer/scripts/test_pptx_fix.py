@@ -422,6 +422,36 @@ def main() -> int:
         if abs((after[title_id]["left"] - after[pic_id]["left"]) - (before[title_id]["left"] - before[pic_id]["left"])) > 0.01:
             failures.append("card_grid did not preserve child horizontal offsets")
 
+        unsafe_card_grid = tmp_dir / "card-grid-picture-unsafe.pptx"
+        unsafe_finding, (unsafe_pic_id, unsafe_title_id, unsafe_body_id) = _build_card_grid_picture_fixture(
+            unsafe_card_grid,
+            tmp_dir,
+        )
+        unsafe_finding["detail"]["group_medians"]["height"] = 120.0
+        unsafe_finding["detail"]["candidate_values"]["group_medians"]["height"] = 120.0
+        prs = Presentation(str(unsafe_card_grid))
+        shapes = {shape.shape_id: shape for shape in prs.slides[0].shapes}
+        unsafe_before = {
+            sid: pptx_fix._shape_geometry_pt(shapes[sid])
+            for sid in (unsafe_pic_id, unsafe_title_id, unsafe_body_id)
+        }
+        unsafe_actions = pptx_fix.fix_pptx(
+            unsafe_card_grid,
+            apply=True,
+            rules=("card_grid",),
+            findings=[unsafe_finding],
+        )
+        if not any(a.rule == "card_grid" and a.status == "manual_required" for a in unsafe_actions):
+            failures.append("unsafe card_grid fixer did not report manual_required")
+        prs = Presentation(str(unsafe_card_grid))
+        shapes = {shape.shape_id: shape for shape in prs.slides[0].shapes}
+        unsafe_after = {
+            sid: pptx_fix._shape_geometry_pt(shapes[sid])
+            for sid in (unsafe_pic_id, unsafe_title_id, unsafe_body_id)
+        }
+        if unsafe_after != unsafe_before:
+            failures.append("manual_required card_grid changed child geometry")
+
         # --- backup must preserve the oldest saved state ---
         backup_deck = tmp_dir / "backup.pptx"
         make_examples.make_bad(backup_deck)
