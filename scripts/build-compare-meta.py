@@ -39,10 +39,17 @@ ADDED_COLOR = (60, 180, 60)     # green = content present only in `after`
 BASE_FADE_RATIO = 0.4           # base.png contributes 40 %; remaining 60 % white
 
 
-def compare_and_write_diff(before_path: Path, after_path: Path, diff_path: Path) -> int:
+def compare_and_maybe_write_diff(
+    before_path: Path,
+    after_path: Path,
+    diff_path: Path,
+    threshold: int,
+) -> tuple[int, bool]:
     """Count differing pixels (luminance-thresholded) and write a red/green
-    diff PNG with the before image faded as background. Returns the diff
-    pixel count.
+    diff PNG **only when the count exceeds `threshold`**. Returns
+    `(diff_pixel_count, wrote_diff)`. Unchanged slides skip the diff write
+    entirely (= no compute + storage waste on slides whose fix didn't touch
+    them).
     """
     base_rgb = np.array(Image.open(before_path).convert("RGB"))
     after_rgb = np.array(Image.open(after_path).convert("RGB"))
@@ -61,11 +68,14 @@ def compare_and_write_diff(before_path: Path, after_path: Path, diff_path: Path)
     added_mask = base_luma > (after_luma + PIXEL_DIFF_LUMINANCE_THRESHOLD)
     diff_count = int(np.count_nonzero(removed_mask | added_mask))
 
+    if diff_count <= threshold:
+        return diff_count, False
+
     faded = (base_rgb * BASE_FADE_RATIO + 255 * (1 - BASE_FADE_RATIO)).astype(np.uint8)
     faded[removed_mask] = REMOVED_COLOR
     faded[added_mask] = ADDED_COLOR
     Image.fromarray(faded).save(diff_path)
-    return diff_count
+    return diff_count, True
 
 
 def main() -> int:
@@ -95,11 +105,22 @@ def main() -> int:
         after = after_dir / before.name
         if not after.is_file():
             continue
-        ae = compare_and_write_diff(before, after, diff_dir / before.name)
+        diff_path = diff_dir / before.name
+        ae, wrote_diff = compare_and_maybe_write_diff(
+            before, after, diff_path, args.threshold,
+        )
         changed = ae > args.threshold
         slide_diffs.append({"slide_no": slide_no, "ae_pixels": ae, "changed": changed})
         if changed:
             changed_slides.append(slide_no)
+        else:
+            # Unchanged: before is the only image we need. Drop any stale
+            # after / diff PNGs so the snapshot doesn't carry redundant
+            # bytes (= REV-033 onwards saves ~17/20 PNG slots on a typical
+            # deck where most slides are untouched).
+            after.unlink(missing_ok=True)
+            if not wrote_diff:
+                diff_path.unlink(missing_ok=True)
 
     meta = {
         "deck": args.deck,

@@ -753,6 +753,22 @@ textarea {
   background: #fafbfc;
 }
 
+.compare-card.unchanged {
+  opacity: 0.85;
+}
+
+.compare-unchanged-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef0f3;
+  color: #666;
+  font-size: 12px;
+  font-weight: 400;
+  vertical-align: middle;
+}
+
 .compare-form {
   display: grid;
   gap: 8px;

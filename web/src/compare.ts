@@ -127,13 +127,12 @@ function renderLoaded(): void {
 function renderSlideCard(slide: SlideEntry): HTMLElement {
   const card = document.createElement("article");
   card.className = "compare-card";
+  if (!slide.changed) card.classList.add("unchanged");
 
   const header = document.createElement("header");
   header.className = "compare-card-header";
-  header.innerHTML = `<h3>スライド ${slide.slideNo}</h3>`;
-
-  const tabs = document.createElement("div");
-  tabs.className = "compare-tabs";
+  const changedLabel = slide.changed ? "" : ' <span class="compare-unchanged-tag">変更なし</span>';
+  header.innerHTML = `<h3>スライド ${slide.slideNo}${changedLabel}</h3>`;
 
   const view = document.createElement("div");
   view.className = "compare-view";
@@ -144,6 +143,23 @@ function renderSlideCard(slide: SlideEntry): HTMLElement {
   missingNote.className = "compare-missing-image";
   missingNote.hidden = true;
   view.append(img, missingNote);
+
+  // Unchanged slides only render the `before` image (= after / diff are
+  // intentionally not produced for them; the snapshot omits those files).
+  if (!slide.changed) {
+    img.src = slide.beforeUrl;
+    img.onerror = () => {
+      img.onerror = null;
+      img.hidden = true;
+      missingNote.hidden = false;
+      missingNote.textContent = "画像が見つかりません。";
+    };
+    card.append(header, view);
+    return card;
+  }
+
+  const tabs = document.createElement("div");
+  tabs.className = "compare-tabs";
 
   let currentMode: "before" | "after" | "diff" = "after";
   const buttons: Record<string, HTMLButtonElement> = {};
