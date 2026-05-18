@@ -24,7 +24,9 @@ import design_system_review as DSR  # noqa: E402
 EXPECTED_COUNTS = {
     "palette_family_tier_gap": 0,
     "repair_candidate_family_overlap": 0,
-    "repair_candidate_palette_drift": 1,  # data_series.series_6 (list-vs-dict)
+    "repair_candidate_palette_drift": 0,   # data_series.series_7 now resolves via dict-form palette
+    "palette_token_usage_uncovered": 14,   # brand.black.b50..b900 + neutral.n500/600/700/900
+    "contrast_pair_unclassified": 8,       # muted/alt_dark text on various backgrounds
 }
 
 

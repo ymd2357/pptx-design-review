@@ -37,6 +37,9 @@ DEFAULT_GUIDELINE_PATH = REPO_ROOT / "doc" / "slide-guideline-v1.yml"
 EXPECTED_BRAND_TIERS = (50, 100, 200, 300, 400, 500, 600, 700, 800, 900)
 BRAND_FAMILY_PREFIX = {"primary": "p", "black": "b", "secondary": "s"}
 
+# Token namespace prefix that wraps every allowlist reference.
+TOKEN_NAMESPACE_PREFIX = "tokens.semantic.color."
+
 
 @dataclass
 class Finding:
@@ -209,6 +212,145 @@ def _check_repair_candidate_palette_drift(
     return findings
 
 
+def _collect_allowlist_token_refs(node: Any, out: set[str]) -> None:
+    """Walk the allowlist subtree and collect every `tokens.semantic.color.*`
+    reference (both exact tokens and family prefixes), stripped of the
+    namespace prefix so they line up with palette token paths.
+    """
+    if isinstance(node, dict):
+        for value in node.values():
+            _collect_allowlist_token_refs(value, out)
+    elif isinstance(node, list):
+        for item in node:
+            _collect_allowlist_token_refs(item, out)
+    elif isinstance(node, str) and node.startswith(TOKEN_NAMESPACE_PREFIX):
+        out.add(node[len(TOKEN_NAMESPACE_PREFIX):])
+
+
+def _token_is_covered(token: str, refs: set[str]) -> str | None:
+    """Return the matching reference (exact or family prefix) or None."""
+    parts = token.split(".")
+    for i in range(len(parts), 0, -1):
+        candidate = ".".join(parts[:i])
+        if candidate in refs:
+            return candidate
+    return None
+
+
+def _check_palette_token_usage_coverage(
+    palette_tokens: dict[str, str], allowlist: dict
+) -> list[Finding]:
+    """Every palette token should be reachable via the allowlist either
+    by exact match or by a family prefix (e.g. `brand.primary` covers
+    `brand.primary.p500`). Bare `data_series.<index>` indices are skipped
+    because they are list positions, not allowlist-style tokens.
+    """
+    findings: list[Finding] = []
+    refs: set[str] = set()
+    _collect_allowlist_token_refs(allowlist or {}, refs)
+    for token, hex_value in sorted(palette_tokens.items()):
+        if token.startswith("data_series."):
+            continue
+        if _token_is_covered(token, refs) is None:
+            findings.append(
+                Finding(
+                    check="palette_token_usage_uncovered",
+                    severity="warn",
+                    message=(
+                        f"palette token '{token}' ({hex_value}) has no "
+                        f"allowlist coverage; downstream consumers cannot tell "
+                        f"where this color is permitted"
+                    ),
+                    evidence={
+                        "token": token,
+                        "hex": hex_value,
+                    },
+                    manual_required_reason=(
+                        "Either add an allowlist entry referencing this token "
+                        "(or a covering family prefix), or remove the color from "
+                        "the palette if it is unused."
+                    ),
+                )
+            )
+    return findings
+
+
+def _check_contrast_pair_coverage(allowlist: dict) -> list[Finding]:
+    """Every (text_hex, background_hex) pair built from allowed text
+    grays and allowed background surfaces should be classified — either
+    listed under `text_on_background` with a contrast ratio, or under
+    `prohibited.text_on_background`. Pairs that appear in neither list
+    are silent gaps where future drift could go undetected.
+    """
+    findings: list[Finding] = []
+    grays_text = (allowlist.get("grays") or {}).get("text") or []
+    backgrounds = (allowlist.get("backgrounds") or {})
+    bg_entries: list[dict] = []
+    for category in ("page", "surface"):
+        for entry in backgrounds.get(category) or []:
+            if isinstance(entry, dict):
+                bg_entries.append({"category": category, **entry})
+
+    classified_pairs: set[tuple[str, str]] = set()
+    for entry in (allowlist.get("text_on_background") or []):
+        if isinstance(entry, dict):
+            t = str(entry.get("text_hex", "")).upper()
+            b = str(entry.get("background_hex", "")).upper()
+            if t and b:
+                classified_pairs.add((t, b))
+    prohibited_roles: set[str] = set()
+    for entry in (
+        (allowlist.get("prohibited") or {}).get("text_on_background") or []
+    ):
+        if isinstance(entry, dict) and entry.get("role"):
+            prohibited_roles.add(str(entry["role"]))
+
+    for text_entry in grays_text:
+        text_hex = str(text_entry.get("hex", "")).upper()
+        text_role = str(text_entry.get("role", ""))
+        if not text_hex:
+            continue
+        for bg_entry in bg_entries:
+            bg_hex = str(bg_entry.get("hex", "")).upper()
+            bg_role = str(bg_entry.get("role", ""))
+            if not bg_hex:
+                continue
+            if (text_hex, bg_hex) in classified_pairs:
+                continue
+            # Check prohibited pairs by role naming convention
+            # (`<text_role>_on_<bg_role>` or `<text_role>_on_<bg_category>`).
+            candidate_roles = {
+                f"{text_role}_on_{bg_role}",
+                f"{text_role}_on_{bg_entry.get('category', '')}",
+            }
+            if candidate_roles & prohibited_roles:
+                continue
+            findings.append(
+                Finding(
+                    check="contrast_pair_unclassified",
+                    severity="warn",
+                    message=(
+                        f"text {text_role} ({text_hex}) on background "
+                        f"{bg_role} ({bg_hex}) is in neither text_on_background "
+                        f"nor prohibited.text_on_background"
+                    ),
+                    evidence={
+                        "text_role": text_role,
+                        "text_hex": text_hex,
+                        "background_role": bg_role,
+                        "background_hex": bg_hex,
+                        "background_category": bg_entry.get("category"),
+                    },
+                    manual_required_reason=(
+                        "Add this pair to allowlist.text_on_background with "
+                        "its measured contrast ratio, or document the gap in "
+                        "allowlist.prohibited.text_on_background."
+                    ),
+                )
+            )
+    return findings
+
+
 def review_design_system(yaml_path: Path | str | None = None) -> list[Finding]:
     path = Path(yaml_path) if yaml_path is not None else DEFAULT_GUIDELINE_PATH
     with path.open("r", encoding="utf-8") as fh:
@@ -216,6 +358,7 @@ def review_design_system(yaml_path: Path | str | None = None) -> list[Finding]:
 
     color_rules = data.get("rules", {}).get("color", {}) or {}
     palette = color_rules.get("palette", {}) or {}
+    allowlist = color_rules.get("allowlist", {}) or {}
     palette_tokens: dict[str, str] = {}
     _walk_palette((), palette, palette_tokens)
 
@@ -231,6 +374,8 @@ def review_design_system(yaml_path: Path | str | None = None) -> list[Finding]:
     findings.extend(_check_palette_family_tier_gap(palette))
     findings.extend(_check_repair_candidate_family_overlap(repair_families))
     findings.extend(_check_repair_candidate_palette_drift(repair_families, palette_tokens))
+    findings.extend(_check_palette_token_usage_coverage(palette_tokens, allowlist))
+    findings.extend(_check_contrast_pair_coverage(allowlist))
     return findings
 
 

@@ -1502,14 +1502,14 @@ rules:
         danger: "#D55E00"
         info: "#0072B2"
       data_series:
-        - "#A51E6D"
-        - "#1E112D"
-        - "#0072B2"
-        - "#009E73"
-        - "#E69F00"
-        - "#D55E00"
-        - "#56B4E9"
-        - "#CC79A7"
+        series_1: "#A51E6D"
+        series_2: "#1E112D"
+        series_3: "#0072B2"
+        series_4: "#009E73"
+        series_5: "#E69F00"
+        series_6: "#D55E00"
+        series_7: "#56B4E9"
+        series_8: "#CC79A7"
 
     allowlist:
       mode: "recommended"
@@ -1723,7 +1723,7 @@ rules:
               - token: "accent.magenta"
                 hex: "#A51E6D"
             blue:
-              - token: "data_series.series_6"
+              - token: "data_series.series_7"
                 hex: "#56B4E9"
               - token: "brand.gradient.cyan"
                 hex: "#32BED2"
