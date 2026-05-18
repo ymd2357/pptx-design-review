@@ -2,8 +2,13 @@
 """Build tmp/review-snapshot/<deck>/rev-<rev>/meta.json from before/after PNGs.
 
 For each slide-NN.png that exists in BOTH images/before/ and images/after/,
-runs `magick compare -metric AE` to count the pixels that differ, and emits
-a `meta.json` with the list of changed slides (count > threshold).
+computes how many pixels differ between before and after **above a luminance
+threshold** (= anti-aliasing noise is ignored), writes a two-color diff PNG
+into `images/diff/`, and emits a `meta.json` with the list of changed slides.
+
+The diff PNG shows REMOVED content in red (= content that was in `before`
+but not in `after`) and ADDED content in green (= content present only in
+`after`). The background is a faded version of `before` to keep context.
 
 Usage:
     python3 scripts/build-compare-meta.py --deck 260329-seminar-curriculum-proposal --rev 019 [--threshold 1000]
@@ -14,22 +19,53 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+
+import numpy as np
+from PIL import Image
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT_ROOT = REPO_ROOT / "tmp" / "review-snapshot"
 
+# Per-pixel luminance threshold for treating a pixel as "actually different"
+# vs "anti-aliasing noise". Empirically PowerPoint render noise is in the
+# single-digit luminance range; 20/255 leaves clear margin.
+PIXEL_DIFF_LUMINANCE_THRESHOLD = 20
 
-def compare_ae(a: Path, b: Path, diff: Path | None = None) -> int:
-    proc = subprocess.run(
-        ["magick", "compare", "-metric", "AE", str(a), str(b), str(diff) if diff else "null:"],
-        capture_output=True,
-    )
-    text = proc.stderr.decode(errors="replace").strip()
-    match = re.search(r"^(\d+)", text)
-    return int(match.group(1)) if match else 0
+# Colors for the two-tone diff (RGB).
+REMOVED_COLOR = (220, 60, 60)   # red = content was in `before` but not `after`
+ADDED_COLOR = (60, 180, 60)     # green = content present only in `after`
+BASE_FADE_RATIO = 0.4           # base.png contributes 40 %; remaining 60 % white
+
+
+def compare_and_write_diff(before_path: Path, after_path: Path, diff_path: Path) -> int:
+    """Count differing pixels (luminance-thresholded) and write a red/green
+    diff PNG with the before image faded as background. Returns the diff
+    pixel count.
+    """
+    base_rgb = np.array(Image.open(before_path).convert("RGB"))
+    after_rgb = np.array(Image.open(after_path).convert("RGB"))
+    if base_rgb.shape != after_rgb.shape:
+        # Resize after to before's resolution if PowerPoint rendered them
+        # slightly differently.
+        after_img = Image.open(after_path).convert("RGB").resize(
+            (base_rgb.shape[1], base_rgb.shape[0]), Image.BILINEAR
+        )
+        after_rgb = np.array(after_img)
+
+    base_luma = base_rgb.mean(axis=2).astype(np.int16)
+    after_luma = after_rgb.mean(axis=2).astype(np.int16)
+
+    removed_mask = base_luma < (after_luma - PIXEL_DIFF_LUMINANCE_THRESHOLD)
+    added_mask = base_luma > (after_luma + PIXEL_DIFF_LUMINANCE_THRESHOLD)
+    diff_count = int(np.count_nonzero(removed_mask | added_mask))
+
+    faded = (base_rgb * BASE_FADE_RATIO + 255 * (1 - BASE_FADE_RATIO)).astype(np.uint8)
+    faded[removed_mask] = REMOVED_COLOR
+    faded[added_mask] = ADDED_COLOR
+    Image.fromarray(faded).save(diff_path)
+    return diff_count
 
 
 def main() -> int:
@@ -59,7 +95,7 @@ def main() -> int:
         after = after_dir / before.name
         if not after.is_file():
             continue
-        ae = compare_ae(before, after, diff_dir / before.name)
+        ae = compare_and_write_diff(before, after, diff_dir / before.name)
         changed = ae > args.threshold
         slide_diffs.append({"slide_no": slide_no, "ae_pixels": ae, "changed": changed})
         if changed:
