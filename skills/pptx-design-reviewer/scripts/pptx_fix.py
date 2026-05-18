@@ -316,6 +316,234 @@ def _card_grid_group_bbox(children: Sequence[Any]) -> Optional[tuple[float, floa
     return (left, top, right - left, bottom - top)
 
 
+def _card_classify_role(child: dict, container: dict) -> str:
+    """Classify a card child into one of the FIX-012 role categories.
+
+    Returns one of: `leading_icon`, `header`, `body`, `badge_bg`, `badge_text`,
+    `illustration`, `decorative`, `unknown`. The classifier intentionally
+    refuses to guess when evidence is mixed (= `unknown`), so the alignment
+    solver can skip rather than touch.
+
+    Heuristics use relative position within the container (= card) plus the
+    extended attributes the lint side now emits (`solid_fill_hex`,
+    `vertical_anchor`, `has_text`, `text_length`).
+    """
+    kind = (child.get("kind") or "").lower()
+    bbox = child.get("bbox_pt") or []
+    container_bbox = container.get("bbox_pt") or []
+    if len(bbox) != 4 or len(container_bbox) != 4:
+        return "unknown"
+    x, y, w, h = [float(v) for v in bbox]
+    cx, cy, cw, ch = [float(v) for v in container_bbox]
+    if cw <= 0 or ch <= 0:
+        return "unknown"
+    rel_top = (y - cy) / ch
+    rel_h = h / ch
+    rel_w = w / cw
+    has_fill = bool(child.get("solid_fill_hex"))
+    has_text = bool(child.get("has_text"))
+    anchor = (child.get("vertical_anchor") or "").upper()
+
+    if kind == "image":
+        if rel_h < 0.25 and rel_w < 0.3 and rel_top < 0.55:
+            return "leading_icon"
+        return "illustration"
+
+    if kind == "shape":
+        if has_fill and rel_top >= 0.45 and rel_h < 0.3:
+            return "badge_bg"
+        return "decorative"
+
+    if kind == "text" and has_text:
+        # Badge text: anchored MIDDLE in lower portion of card.
+        if anchor == "MIDDLE" and rel_top >= 0.45 and rel_h < 0.3:
+            return "badge_text"
+        # Zone-based classification by the child's TOP (not height): the row
+        # may have headers of varying line counts whose bbox.h differs, but
+        # they all start at the same rel_top within the card.
+        if rel_top < 0.25:
+            return "header"
+        if rel_top < 0.6:
+            return "body"
+        return "decorative"
+
+    return "unknown"
+
+
+def _card_pair_badge_shapes(roles_by_index: dict[int, str], children: list[dict]) -> dict[int, str]:
+    """If `badge_bg` and `badge_text` share an identical bbox, treat both as a
+    coherent `badge` group. This avoids splitting the pair across the solver.
+    Returns a new role map with paired entries reset to role=`badge`.
+    """
+    out = dict(roles_by_index)
+    for i, ci in enumerate(children):
+        if out.get(i) != "badge_bg":
+            continue
+        for j, cj in enumerate(children):
+            if i == j or out.get(j) != "badge_text":
+                continue
+            if ci.get("bbox_pt") and ci["bbox_pt"] == cj.get("bbox_pt"):
+                out[i] = "badge"
+                out[j] = "badge"
+    return out
+
+
+def _card_role_map(container: dict) -> dict[int, str]:
+    """Build child-index → role map for a single card container record."""
+    children = container.get("children") or []
+    raw = {i: _card_classify_role(child, container) for i, child in enumerate(children)}
+    return _card_pair_badge_shapes(raw, children)
+
+
+def _card_grid_alignment_moves(row_containers: list[dict]) -> dict:
+    """Solve cross-card alignment targets and emit per-card-per-child moves.
+
+    Returns a dict keyed by `(card_index, child_index)` whose value is a
+    `(target_left, target_top)` tuple in guideline pt. Only children that
+    actually need to move are included.
+
+    Rules (anchored to observation, see doc/tasks.md FIX-012):
+      - `leading_icon`: icon.center_y = header.first_line.center_y of the
+        SAME card (Option B from the FIX-012 design discussion). When the
+        card has no header, no move is emitted for icon.
+      - `header`: not moved.
+      - `body`: body.top = max(card.top + padding + header.h) across the row
+        (= 上揃え driven by tallest header).
+      - `badge` / `badge_bg` / `badge_text`: badge.bottom = card.bottom
+        − min(observed badge padding_bottom across the row). Tightest
+        observed padding becomes the row target so under-spaced badges
+        (e.g. slide 13 card 1) move down without crowding overflowing
+        bodies in other cards.
+      - `illustration` / `decorative` / `unknown`: not moved.
+    """
+    moves: dict[tuple[int, int], tuple[float, float]] = {}
+    if not row_containers:
+        return moves
+
+    role_maps: list[dict[int, str]] = []
+    for container in row_containers:
+        if not isinstance(container, dict):
+            role_maps.append({})
+        else:
+            role_maps.append(_card_role_map(container))
+
+    # Header height per card (used by body 上揃え).
+    header_heights: list[float] = []
+    for container, role_map in zip(row_containers, role_maps):
+        children = container.get("children") or [] if isinstance(container, dict) else []
+        header_h = 0.0
+        for idx, role in role_map.items():
+            if role != "header":
+                continue
+            bbox = children[idx].get("bbox_pt") or []
+            if len(bbox) == 4:
+                header_h = max(header_h, float(bbox[3]))
+        header_heights.append(header_h)
+
+    max_header_h = max(header_heights) if header_heights else 0.0
+
+    # Header first-line center per card (= card.top + padding_top + line_h / 2,
+    # where line_h ≈ header bbox height / line count; for our deck headers are
+    # top-aligned so line_h equals the smallest header height in the row
+    # whenever the row has a 1-line header. Fallback: header.h / 2).
+    one_line_header_h = (
+        min(h for h in header_heights if h > 0) if any(h > 0 for h in header_heights) else 0.0
+    )
+
+    def _header_first_line_center_y(container, role_map):
+        children = container.get("children") or []
+        for idx, role in role_map.items():
+            if role != "header":
+                continue
+            bbox = children[idx].get("bbox_pt") or []
+            if len(bbox) != 4:
+                continue
+            top = float(bbox[1])
+            line_h = one_line_header_h or float(bbox[3])
+            return top + line_h / 2.0
+        return None
+
+    # body.top target (上揃え): card_with_max_header's natural body.top.
+    body_top_target: float | None = None
+    for container, role_map in zip(row_containers, role_maps):
+        children = container.get("children") or [] if isinstance(container, dict) else []
+        for idx, role in role_map.items():
+            if role != "body":
+                continue
+            bbox = children[idx].get("bbox_pt") or []
+            if len(bbox) != 4:
+                continue
+            header_h_here = 0.0
+            for jdx, r2 in role_map.items():
+                if r2 == "header":
+                    hb = children[jdx].get("bbox_pt") or []
+                    if len(hb) == 4:
+                        header_h_here = max(header_h_here, float(hb[3]))
+            if abs(header_h_here - max_header_h) < 0.5:
+                # This card's body is at the natural lowest position.
+                body_top_target = float(bbox[1])
+                break
+        if body_top_target is not None:
+            break
+
+    # badge target: card.bottom − min(observed badge padding_bottom).
+    badge_paddings: list[float] = []
+    for container, role_map in zip(row_containers, role_maps):
+        if not isinstance(container, dict):
+            continue
+        cbbox = container.get("bbox_pt") or []
+        if len(cbbox) != 4:
+            continue
+        card_bottom = float(cbbox[1]) + float(cbbox[3])
+        children = container.get("children") or []
+        badge_bottoms: list[float] = []
+        for idx, role in role_map.items():
+            if role not in {"badge", "badge_bg", "badge_text"}:
+                continue
+            bbox = children[idx].get("bbox_pt") or []
+            if len(bbox) == 4:
+                badge_bottoms.append(float(bbox[1]) + float(bbox[3]))
+        if badge_bottoms:
+            badge_paddings.append(card_bottom - max(badge_bottoms))
+    badge_padding_target = min(badge_paddings) if badge_paddings else None
+
+    # Apply moves per card.
+    for card_idx, (container, role_map) in enumerate(zip(row_containers, role_maps)):
+        if not isinstance(container, dict):
+            continue
+        cbbox = container.get("bbox_pt") or []
+        if len(cbbox) != 4:
+            continue
+        card_top = float(cbbox[1])
+        card_bottom = card_top + float(cbbox[3])
+        children = container.get("children") or []
+        header_center = _header_first_line_center_y(container, role_map)
+
+        for idx, role in role_map.items():
+            bbox = children[idx].get("bbox_pt") or []
+            if len(bbox) != 4:
+                continue
+            cur_left = float(bbox[0])
+            cur_top = float(bbox[1])
+            cur_h = float(bbox[3])
+
+            target_top = cur_top
+
+            if role == "leading_icon" and header_center is not None:
+                target_top = header_center - cur_h / 2.0
+            elif role == "body" and body_top_target is not None:
+                target_top = body_top_target
+            elif role in {"badge", "badge_bg", "badge_text"} and badge_padding_target is not None:
+                target_top = card_bottom - badge_padding_target - cur_h
+            else:
+                continue
+
+            if abs(target_top - cur_top) > 0.5:
+                moves[(card_idx, idx)] = (cur_left, target_top)
+
+    return moves
+
+
 def _card_grid_item_manual_reasons(item: dict, medians: dict) -> list[str]:
     container = item.get("container") or {}
     container_bbox = container.get("bbox_pt") or []
@@ -1559,24 +1787,74 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         inconsistent = detail.get("inconsistent_containers") or []
         if not isinstance(medians, dict) or not inconsistent:
             return None
+
+        row_containers = detail.get("row_containers") or []
+        # FIX-012: compute role-aware per-child moves across the whole row.
+        # Falls back to the v3 conservative behaviour (= container geometry
+        # equalization, no child role inference) when row_containers is
+        # missing (= older lint JSON).
+        all_moves: dict[tuple[int, int], tuple[float, float]] = {}
+        container_id_to_row_index: dict[Any, int] = {}
+        if row_containers:
+            all_moves = _card_grid_alignment_moves(row_containers)
+            for i, rc in enumerate(row_containers):
+                if isinstance(rc, dict):
+                    cid = rc.get("shape_id")
+                    if cid is not None:
+                        container_id_to_row_index[cid] = i
+
         actions: list[FixAction] = []
         for item in inconsistent:
             if not isinstance(item, dict):
                 continue
             container = item.get("container") or {}
+            cid = container.get("shape_id")
+
+            child_moves: list[dict] = []
+            row_idx = container_id_to_row_index.get(cid)
+            if row_idx is not None:
+                row_children = row_containers[row_idx].get("children") or []
+                for (ci, chi), (target_left, target_top) in sorted(all_moves.items()):
+                    if ci != row_idx:
+                        continue
+                    if chi >= len(row_children):
+                        continue
+                    child = row_children[chi]
+                    child_moves.append(
+                        {
+                            "shape_id": child.get("shape_id"),
+                            "role": _card_role_map(row_containers[row_idx]).get(chi),
+                            "before_bbox_pt": list(child.get("bbox_pt") or []),
+                            "after_left_pt": float(target_left),
+                            "after_top_pt": float(target_top),
+                        }
+                    )
+
             action = FixAction(
                 rule=rule,
                 slide_index=int(_finding_field(finding, "slide_index") or 1),
                 slide_id=_finding_field(finding, "slide_id"),
-                shape_id=container.get("shape_id"),
+                shape_id=cid,
                 shape_name=None,
                 before={"inconsistent_containers": [item]},
                 after={
                     "group_medians": medians,
-                    "child_policy": "position_only_preserve_size",
+                    "child_moves": child_moves,
+                    "child_policy": (
+                        "role_aware_top_alignment"
+                        if child_moves
+                        else "container_equalize_only"
+                    ),
                 },
             )
-            reasons = _card_grid_item_manual_reasons(item, medians)
+            # The v3 "child_group_exceeds_inner_box" guard assumes the
+            # container will be shrunk to row-median size. FIX-012 keeps
+            # container sizes (medians equalization only adjusts mismatched
+            # ones) and moves individual children based on role, so the
+            # guard is only relevant when no role-aware moves are emitted.
+            reasons = (
+                _card_grid_item_manual_reasons(item, medians) if not child_moves else []
+            )
             if reasons:
                 action.status = "manual_required"
                 action.reasons = reasons
@@ -1738,6 +2016,8 @@ def _apply_finding_action(prs, action: FixAction) -> None:
     if action.rule == "card_grid":
         sx, sy = _slide_scale_xy(prs)
         medians = action.after.get("group_medians") or {}
+
+        # 1. Container geometry equalization to row medians (v3 behavior).
         for item in action.before.get("inconsistent_containers", []):
             container = item.get("container") or {}
             shape = _shape_by_id(slide, container.get("shape_id"))
@@ -1747,54 +2027,31 @@ def _apply_finding_action(prs, action: FixAction) -> None:
             if not _valid_bbox(container_bbox):
                 continue
             geometry = _shape_geometry_pt(shape)
-            target_left_norm = float(container_bbox[0])
-            target_top_norm = float(container_bbox[1])
-            target_width_norm = float(container_bbox[2])
-            target_height_norm = float(container_bbox[3])
             if "top" in medians:
-                target_top_norm = float(medians["top"])
-                geometry["top"] = target_top_norm * sy
+                geometry["top"] = float(medians["top"]) * sy
             if "width" in medians:
-                target_width_norm = float(medians["width"])
-                geometry["width"] = target_width_norm * sx
+                geometry["width"] = float(medians["width"]) * sx
             if "height" in medians:
-                target_height_norm = float(medians["height"])
-                geometry["height"] = target_height_norm * sy
-            children = item.get("children") or []
-            child_boxes = [
-                child.get("bbox_pt")
-                for child in children
-                if _valid_bbox(child.get("bbox_pt"))
-            ]
-            if not child_boxes:
-                continue
-            child_group_left = min(float(box[0]) for box in child_boxes)
-            child_group_top = min(float(box[1]) for box in child_boxes)
-            child_group_right = max(float(box[0]) + float(box[2]) for box in child_boxes)
-            child_group_bottom = max(float(box[1]) + float(box[3]) for box in child_boxes)
-            padding_left = float(medians.get("padding_left", item.get("padding_pt", {}).get("left", 0)))
-            padding_right = float(medians.get("padding_right", item.get("padding_pt", {}).get("right", 0)))
-            padding_top = float(medians.get("padding_top", item.get("padding_pt", {}).get("top", 0)))
-            padding_bottom = float(medians.get("padding_bottom", item.get("padding_pt", {}).get("bottom", 0)))
-            target_inner_width = target_width_norm - padding_left - padding_right
-            target_inner_height = target_height_norm - padding_top - padding_bottom
-            child_group_width = child_group_right - child_group_left
-            child_group_height = child_group_bottom - child_group_top
-            if child_group_width > target_inner_width + 1.0 or child_group_height > target_inner_height + 1.0:
-                continue
-            dx_norm = target_left_norm + padding_left - child_group_left
-            dy_norm = target_top_norm + padding_top - child_group_top
+                geometry["height"] = float(medians["height"]) * sy
             _apply_geometry(shape, geometry)
-            for child in children:
-                child_shape = _shape_by_id(slide, child.get("shape_id"))
-                child_bbox = child.get("bbox_pt")
-                if child_shape is None or not _valid_bbox(child_bbox):
-                    continue
-                child_geometry = {
-                    "left": (float(child_bbox[0]) + dx_norm) * sx,
-                    "top": (float(child_bbox[1]) + dy_norm) * sy,
-                }
-                _apply_geometry(child_shape, child_geometry)
+
+        # 2. FIX-012: role-aware child moves (new in v5).
+        for move in action.after.get("child_moves") or []:
+            child_shape = _shape_by_id(slide, move.get("shape_id"))
+            if child_shape is None:
+                continue
+            before_bbox = move.get("before_bbox_pt") or []
+            if len(before_bbox) != 4:
+                continue
+            target_left_norm = float(move.get("after_left_pt", before_bbox[0]))
+            target_top_norm = float(move.get("after_top_pt", before_bbox[1]))
+            _apply_geometry(
+                child_shape,
+                {
+                    "left": target_left_norm * sx,
+                    "top": target_top_norm * sy,
+                },
+            )
         return
 
     shape = _shape_by_id(slide, action.shape_id)

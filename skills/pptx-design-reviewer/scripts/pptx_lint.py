@@ -782,6 +782,32 @@ def _shape_record_detail(record: ShapeRecord) -> dict:
     }
 
 
+def _shape_record_detail_for_card_role(record: ShapeRecord) -> dict:
+    """Card-grid-flavored detail: includes fill / anchor / text length so the
+    fix-side role classifier (icon / header / body / badge / decorative) has
+    enough information without re-reading the PPTX.
+    """
+    base = _shape_record_detail(record)
+    shape = record.shape
+    if record.kind in {"shape", "text"}:
+        try:
+            base["solid_fill_hex"] = _solid_shape_fill_rgb_hex(shape)
+        except (AttributeError, TypeError, ValueError):
+            base["solid_fill_hex"] = None
+    if getattr(shape, "has_text_frame", False):
+        text = _shape_text(shape)
+        base["has_text"] = bool(text)
+        base["text_length"] = len(text)
+        try:
+            base["vertical_anchor"] = _vertical_anchor_name(shape.text_frame.vertical_anchor)
+        except (AttributeError, TypeError, ValueError):
+            base["vertical_anchor"] = None
+    else:
+        base["has_text"] = False
+        base["text_length"] = 0
+    return base
+
+
 def _structure_relation_detail(relation: StructureRelation) -> dict:
     detail = {
         "relation": relation.relation,
@@ -2558,8 +2584,11 @@ def check_card_grid_consistency(slide_idx, slide_id, records: list[ShapeRecord],
             if triggered:
                 inconsistent.append(
                     {
-                        "container": _shape_record_detail(card),
-                        "children": [_shape_record_detail(child) for child in item["children"]],
+                        "container": _shape_record_detail_for_card_role(card),
+                        "children": [
+                            _shape_record_detail_for_card_role(child)
+                            for child in item["children"]
+                        ],
                         "padding_pt": {side: round(value, 2) for side, value in item["padding"].items()},
                         "deltas_from_group_median_pt": deltas,
                         "first_child_relative_bbox_pt": (
@@ -2588,7 +2617,20 @@ def check_card_grid_consistency(slide_idx, slide_id, records: list[ShapeRecord],
                 {
                     "evidence_source": "structure_json",
                     "evidence_confidence": "medium",
-                    "row_containers": [_shape_record_detail(card) for card in row],
+                    "row_containers": [
+                        {
+                            **_shape_record_detail_for_card_role(item["container"]),
+                            "children": [
+                                _shape_record_detail_for_card_role(child)
+                                for child in item["children"]
+                            ],
+                            "padding_pt": {
+                                side: round(value, 2)
+                                for side, value in item["padding"].items()
+                            },
+                        }
+                        for item in row_metrics
+                    ],
                     "group_medians": {key: round(value, 2) for key, value in medians.items()},
                     "inconsistent_containers": inconsistent,
                     "thresholds": {
