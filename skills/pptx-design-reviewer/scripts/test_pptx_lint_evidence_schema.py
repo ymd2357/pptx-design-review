@@ -48,6 +48,7 @@ def _make_schema_fixture(out: Path) -> None:
     text.fill.solid()
     text.fill.fore_color.rgb = RGBColor.from_string("FFFFFF")
     text.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+    make_examples._set_norm_autofit_font_scale(text, 65000)
     run = text.text_frame.paragraphs[0].add_run()
     run.text = "Low contrast bad font"
     run.font.name = "Arial"
