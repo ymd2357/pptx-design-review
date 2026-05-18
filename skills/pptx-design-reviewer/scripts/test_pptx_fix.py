@@ -181,6 +181,38 @@ def _build_bg_mode_contrast_fixture(out: Path) -> int:
     return rect.shape_id
 
 
+def _build_behind_solid_fill_contrast_fixture(out: Path) -> tuple[int, int]:
+    """White textbox sitting on top of a separate red-fill rectangle.
+
+    Differs from `_build_bg_mode_contrast_fixture` (= white text *inside*
+    the rect → `shape_solid_fill`) by putting the text in its own shape
+    *above* the rect, with no own fill. Lint must report
+    `background_source = behind_solid_fill:<rect-label>` and fix must
+    repaint the *rect* fill while leaving the textbox run color white.
+    Returns `(rect_id, textbox_id)`.
+    """
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    rect = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(120), Pt(120), Pt(400), Pt(120))
+    rect.fill.solid()
+    rect.fill.fore_color.rgb = RGBColor.from_string("FF5757")
+    rect.line.fill.background()
+
+    textbox = slide.shapes.add_textbox(Pt(140), Pt(150), Pt(360), Pt(60))
+    textbox.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = textbox.text_frame.paragraphs[0].add_run()
+    run.text = "White on red"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    run.font.color.rgb = RGBColor.from_string("FFFFFF")
+
+    prs.save(str(out))
+    return rect.shape_id, textbox.shape_id
+
+
 def _build_text_color_allowlist_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -449,6 +481,78 @@ def main() -> int:
                             "bg-mode contrast must keep the original white run color; "
                             f"got #{run.font.color.rgb}"
                         )
+
+        # --- FIX-010: behind_solid_fill bg-mode contrast (textbox on top of rect) ---
+        behind_pptx = tmp_dir / "contrast-behind-solid-fill.pptx"
+        behind_rect_id, behind_textbox_id = _build_behind_solid_fill_contrast_fixture(behind_pptx)
+        behind_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(behind_pptx)
+            if f.check in {"low_contrast", "contrast_ratio"}
+        ]
+        if not behind_findings:
+            failures.append("behind_solid_fill fixture did not trigger any contrast finding")
+        else:
+            bg_source = behind_findings[0]["detail"].get("background_source") or ""
+            if not bg_source.startswith("behind_solid_fill"):
+                failures.append(
+                    "behind_solid_fill fixture expected background_source="
+                    f"behind_solid_fill:*; got {bg_source}"
+                )
+            cv = behind_findings[0]["detail"].get("candidate_values") or {}
+            if cv.get("preferred_strategy") != "background":
+                failures.append(
+                    "behind_solid_fill fixture expected preferred_strategy=background; "
+                    f"got {cv.get('preferred_strategy')}"
+                )
+            if behind_findings[0]["detail"].get("fixability") != "auto_fix_candidate":
+                failures.append(
+                    "behind_solid_fill contrast finding was not marked auto_fix_candidate: "
+                    f"{behind_findings[0]['detail']}"
+                )
+            behind_rules = pptx_fix.auto_rules_from_findings(behind_findings)
+            behind_actions = pptx_fix.fix_pptx(
+                behind_pptx,
+                apply=True,
+                rules=behind_rules,
+                findings=behind_findings,
+            )
+            applied = [a for a in behind_actions if a.rule == "contrast" and a.status == "apply"]
+            if not applied:
+                failures.append("behind_solid_fill contrast was not applied as a fill change")
+            else:
+                updates = applied[0].after.get("updates", []) or []
+                if not any(u.get("mode") == "background_fill" for u in updates):
+                    failures.append(
+                        "behind_solid_fill update did not record background_fill mode: "
+                        f"{updates}"
+                    )
+            prs = Presentation(str(behind_pptx))
+            shapes_by_id = {s.shape_id: s for s in prs.slides[0].shapes}
+            rect_after = shapes_by_id.get(behind_rect_id)
+            textbox_after = shapes_by_id.get(behind_textbox_id)
+            if rect_after is None:
+                failures.append("behind_solid_fill fixture rectangle disappeared after fix")
+            else:
+                new_fill = pptx_fix._shape_solid_fill_hex(rect_after)
+                if not new_fill or new_fill.upper() == "#FF5757":
+                    failures.append(
+                        "behind_solid_fill bg-mode did not change the rectangle fill: "
+                        f"{new_fill}"
+                    )
+            if textbox_after is None:
+                failures.append("behind_solid_fill fixture textbox disappeared after fix")
+            else:
+                run = textbox_after.text_frame.paragraphs[0].runs[0]
+                if str(run.font.color.rgb).upper() != "FFFFFF":
+                    failures.append(
+                        "behind_solid_fill must keep the original white run color; "
+                        f"got #{run.font.color.rgb}"
+                    )
+                if pptx_fix._shape_solid_fill_hex(textbox_after):
+                    failures.append(
+                        "behind_solid_fill must not give the textbox a new solid fill"
+                    )
 
         # --- FIX-007: judgement_reason=auto_fixable promotes manual to auto ---
         red_text = tmp_dir / "red-text.pptx"
