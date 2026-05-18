@@ -4,6 +4,11 @@
       "Bash(python3 skills/pptx-design-reviewer/scripts/pptx_lint.py *)",
       "Bash(python3 skills/pptx-design-reviewer/scripts/test_pptx_lint.py)",
       "Bash(python3 skills/pptx-design-reviewer/scripts/test_pptx_lint.py *)"
+    ],
+    "deny": [
+      "Bash(gh pr create)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr create:*)"
     ]
   }
 }
