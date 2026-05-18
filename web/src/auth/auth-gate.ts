@@ -3,7 +3,21 @@ const PIN_SHA256_HEX =
 const storageKey = "pptx-review:pin-passed";
 
 export async function requireAuth(app: HTMLElement): Promise<void> {
-  if (sessionStorage.getItem(storageKey) === "1") return;
+  if (sessionStorage.getItem(storageKey) === "1") {
+    stripPinFromUrl();
+    return;
+  }
+
+  const params = new URLSearchParams(location.search);
+  const urlPin = params.get("pin");
+  if (urlPin) {
+    const ok = await verifyPin(urlPin);
+    stripPinFromUrl();
+    if (ok) {
+      sessionStorage.setItem(storageKey, "1");
+      return;
+    }
+  }
 
   return new Promise<void>((resolve) => {
     const card = renderGateCard(async (pin, onResult) => {
@@ -18,6 +32,19 @@ export async function requireAuth(app: HTMLElement): Promise<void> {
     });
     app.replaceChildren(card);
   });
+}
+
+function stripPinFromUrl(): void {
+  try {
+    const url = new URL(location.href);
+    if (!url.searchParams.has("pin")) return;
+    url.searchParams.delete("pin");
+    const search = url.searchParams.toString();
+    const next = `${url.pathname}${search ? `?${search}` : ""}${url.hash}`;
+    history.replaceState(null, "", next);
+  } catch {
+    // Ignore: older browsers without URL constructor will keep the param.
+  }
 }
 
 async function verifyPin(pin: string): Promise<boolean> {

@@ -108,6 +108,10 @@ npm run dev
   orphan push する。GitHub Pages は `review-pages` ブランチを source として配信。
 - 画面ゲート用 PIN は SPA に SHA-256 のみを埋め込んでおり、平文はリポジトリには
   記載しない。Claude (アシスタント) が URL を案内する際に併記する運用。
+- `?pin=XXXXXX` を URL に付けて開くと、PIN 入力画面を出さずに自動解錠 →
+  解錠成功後は `history.replaceState` で URL から `pin` パラメータを除去する
+  (= 履歴・タブタイトルに残らない)。Claude が URL を提示するときに自動入力版
+  (`...&pin=XXXXXX`) も併記する。
 
 ## ガイドライン文書
 
