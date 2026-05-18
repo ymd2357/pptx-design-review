@@ -24,6 +24,11 @@ type SlideEntry = {
   changed: boolean;
 };
 
+type CompareMeta = {
+  changed_slides?: number[];
+  slide_diffs?: Array<{ slide_no?: number }>;
+};
+
 const draftKey = `pptx-review:compare:${deck}:${rev}`;
 let slides: SlideEntry[] = [];
 const decisions = new Map<number, SlideDecision>();
@@ -135,7 +140,10 @@ function renderSlideCard(slide: SlideEntry): HTMLElement {
   const img = document.createElement("img");
   img.alt = `スライド ${slide.slideNo}`;
   img.loading = "lazy";
-  view.append(img);
+  const missingNote = document.createElement("p");
+  missingNote.className = "compare-missing-image";
+  missingNote.hidden = true;
+  view.append(img, missingNote);
 
   let currentMode: "before" | "after" | "diff" = "after";
   const buttons: Record<string, HTMLButtonElement> = {};
@@ -154,8 +162,26 @@ function renderSlideCard(slide: SlideEntry): HTMLElement {
   }
 
   function updateImage(): void {
-    img.src =
-      currentMode === "before" ? slide.beforeUrl : currentMode === "after" ? slide.afterUrl : slide.diffUrl;
+    const url =
+      currentMode === "before"
+        ? slide.beforeUrl
+        : currentMode === "after"
+          ? slide.afterUrl
+          : slide.diffUrl;
+    img.hidden = false;
+    missingNote.hidden = true;
+    img.onerror = () => {
+      img.onerror = null;
+      img.hidden = true;
+      missingNote.hidden = false;
+      missingNote.textContent =
+        currentMode === "diff"
+          ? "差分画像は生成されていません。"
+          : currentMode === "after"
+            ? "修正後画像が見つかりません。"
+            : "修正前画像が見つかりません。";
+    };
+    img.src = url;
   }
   function updateTabs(): void {
     for (const mode of Object.keys(buttons)) {
@@ -283,35 +309,59 @@ async function discoverSlides(deckId: string, revId: string): Promise<SlideEntry
   const basePath = `${revBase}/images`;
   const meta = await fetchMeta(`${revBase}/meta.json`);
   const changedSet = new Set(meta?.changed_slides ?? []);
+  const metaSlideNos = meta?.slide_diffs
+    ?.map((slide) => slide.slide_no)
+    .filter(
+      (slideNo): slideNo is number =>
+        typeof slideNo === "number" && Number.isInteger(slideNo) && slideNo > 0,
+    )
+    .sort((a, b) => a - b);
+  if (metaSlideNos?.length) {
+    return metaSlideNos.map((slideNo) => buildSlideEntry(basePath, slideNo, changedSet.has(slideNo)));
+  }
+
   const results: SlideEntry[] = [];
   for (let i = 1; i <= 99; i += 1) {
-    const num = String(i).padStart(2, "0");
-    const beforeUrl = `${basePath}/before/slide-${num}.png`;
-    const afterUrl = `${basePath}/after/slide-${num}.png`;
-    const diffUrl = `${basePath}/diff/slide-${num}.png`;
+    const beforeUrl = slideImageUrl(basePath, "before", i);
     const beforeExists = await assetExists(beforeUrl);
     if (!beforeExists) {
       if (results.length > 0) break;
       continue;
     }
-    const afterExists = await assetExists(afterUrl);
-    const diffExists = await assetExists(diffUrl);
+    // Always reference the real URL; if the file is absent the slide card's
+    // <img> handler shows an explicit "image not generated" notice rather
+    // than silently falling back to the before image.
     results.push({
       slideNo: i,
       beforeUrl,
-      afterUrl: afterExists ? afterUrl : beforeUrl,
-      diffUrl: diffExists ? diffUrl : beforeUrl,
+      afterUrl: slideImageUrl(basePath, "after", i),
+      diffUrl: slideImageUrl(basePath, "diff", i),
       changed: meta ? changedSet.has(i) : true,
     });
   }
   return results;
 }
 
-async function fetchMeta(url: string): Promise<{ changed_slides?: number[] } | undefined> {
+function buildSlideEntry(basePath: string, slideNo: number, changed: boolean): SlideEntry {
+  return {
+    slideNo,
+    beforeUrl: slideImageUrl(basePath, "before", slideNo),
+    afterUrl: slideImageUrl(basePath, "after", slideNo),
+    diffUrl: slideImageUrl(basePath, "diff", slideNo),
+    changed,
+  };
+}
+
+function slideImageUrl(basePath: string, kind: "before" | "after" | "diff", slideNo: number): string {
+  const num = String(slideNo).padStart(2, "0");
+  return `${basePath}/${kind}/slide-${num}.png`;
+}
+
+async function fetchMeta(url: string): Promise<CompareMeta | undefined> {
   try {
     const res = await fetch(url);
     if (!res.ok) return undefined;
-    return (await res.json()) as { changed_slides?: number[] };
+    return (await res.json()) as CompareMeta;
   } catch {
     return undefined;
   }

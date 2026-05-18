@@ -22,9 +22,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SNAPSHOT_ROOT = REPO_ROOT / "tmp" / "review-snapshot"
 
 
-def compare_ae(a: Path, b: Path) -> int:
+def compare_ae(a: Path, b: Path, diff: Path | None = None) -> int:
     proc = subprocess.run(
-        ["magick", "compare", "-metric", "AE", str(a), str(b), "null:"],
+        ["magick", "compare", "-metric", "AE", str(a), str(b), str(diff) if diff else "null:"],
         capture_output=True,
     )
     text = proc.stderr.decode(errors="replace").strip()
@@ -43,9 +43,11 @@ def main() -> int:
     base = SNAPSHOT_ROOT / args.deck / f"rev-{args.rev}"
     before_dir = base / "images" / "before"
     after_dir = base / "images" / "after"
+    diff_dir = base / "images" / "diff"
     if not before_dir.is_dir() or not after_dir.is_dir():
         print(f"missing before/after dirs under {base}", file=sys.stderr)
         return 2
+    diff_dir.mkdir(parents=True, exist_ok=True)
 
     slide_diffs: list[dict] = []
     changed_slides: list[int] = []
@@ -57,7 +59,7 @@ def main() -> int:
         after = after_dir / before.name
         if not after.is_file():
             continue
-        ae = compare_ae(before, after)
+        ae = compare_ae(before, after, diff_dir / before.name)
         changed = ae > args.threshold
         slide_diffs.append({"slide_no": slide_no, "ae_pixels": ae, "changed": changed})
         if changed:

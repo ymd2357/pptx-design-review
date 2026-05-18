@@ -742,6 +742,17 @@ textarea {
   border-radius: 6px;
 }
 
+.compare-missing-image {
+  margin: 0;
+  padding: 24px 16px;
+  border: 1px dashed #d7dde5;
+  border-radius: 6px;
+  color: #666;
+  text-align: center;
+  font-size: 14px;
+  background: #fafbfc;
+}
+
 .compare-form {
   display: grid;
   gap: 8px;
