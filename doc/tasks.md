@@ -87,7 +87,7 @@ Pn は finding 数ではなく、納品物への影響度で決める。
 | ID | 状態 | 優先度 | 内容 | 完了条件 |
 | --- | --- | --- | --- | --- |
 | DS-001 | done | P0 | 色tokenを raw palette / semantic role / usage policy / pair policy / repair policy に分離する | `low_contrast` / `contrast_ratio` の修復候補が、元色に最も近いデザインシステム色の同系色からコントラストを満たす色を選ぶ |
-| DS-002 | todo | P1 | design-system loader を作り、lint/fix のハードコード色定数を guideline YAML 参照へ移す | `pptx_lint.py` と `pptx_fix.py` が YAML の color policy を読み込んで候補選定する |
+| DS-002 | partial | P1 | design-system loader を作り、lint/fix のハードコード色定数を guideline YAML 参照へ移す | **両バージョン並走 + env switch を実装**。`doc/slide-guideline-v1.yml` の `rules.color.lint_palette` 節に 5 構造 (allowed_text/fill, *_color_token_by_hex, contrast_repair / fill_repair families) を明示。`design_system_loader.py` が `LintPalette` データクラスに読み込み、`pptx_lint.py` は `PPTX_PALETTE_SOURCE=yaml` 時に hardcoded 値を YAML 由来で置換 (default は hardcoded のまま)。`test_design_system_loader.py` が両 source の完全一致を assert、`test_pptx_lint` / `test_pptx_lint_evidence_schema` / `test_pptx_fix` / `test_pptx_fix_evidence_schema` も両 source で pass。**残り**: pptx_fix.py 側のハードコード定数 (まだ無いが今後参照するかも) の取り込み、hardcoded path 退役の判断 (= guideline 改訂時の運用フローが固まってから)。 |
 | DS-003 | todo | P1 | design-system 自体のレビューを追加する | 色系列、用途、contrast pair、repair candidate の欠落や混線を `design_system_review` として検出する |
 
 ## 260329 seminar deck 現状メモ

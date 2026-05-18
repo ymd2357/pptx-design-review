@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from collections import Counter, defaultdict
@@ -424,6 +425,25 @@ FILL_COLOR_TOKEN_BY_HEX = {
     "#E69F00": "state.warning",
     "#D55E00": "state.danger",
 }
+
+# ---- Optional YAML palette override (DS-002) ------------------------------
+#
+# When env var `PPTX_PALETTE_SOURCE=yaml` is set, replace the 5 hardcoded
+# color constants above with values loaded from `doc/slide-guideline-v1.yml`
+# → `rules.color.lint_palette`. Default keeps the hardcoded path. The two
+# sources are intended to be identical; the YAML version is the migration
+# target and the hardcoded version is the safety net until full cutover.
+
+if os.environ.get("PPTX_PALETTE_SOURCE", "hardcoded").lower() == "yaml":
+    from design_system_loader import load_lint_palette as _load_lint_palette
+
+    _yaml_palette = _load_lint_palette()
+    ALLOWED_TEXT_COLORS_HEX = set(_yaml_palette.allowed_text_colors_hex)
+    ALLOWED_FILL_COLORS_HEX = set(_yaml_palette.allowed_fill_colors_hex)
+    TEXT_COLOR_TOKEN_BY_HEX = dict(_yaml_palette.text_color_token_by_hex)
+    FILL_COLOR_TOKEN_BY_HEX = dict(_yaml_palette.fill_color_token_by_hex)
+    CONTRAST_REPAIR_COLOR_FAMILIES = _yaml_palette.contrast_repair_color_families
+    FILL_REPAIR_COLOR_FAMILIES = _yaml_palette.fill_repair_color_families
 
 # Tolerance for fp comparisons in pt. Geometry rounding policy is 0.5pt.
 TOL_PT = 0.5
