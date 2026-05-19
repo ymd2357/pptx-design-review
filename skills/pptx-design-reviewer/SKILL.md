@@ -13,30 +13,70 @@ description: >-
 This skill enables visual inspection and validation of PPTX slide deck design
 quality, identifying and fixing issues at the source slide deck level.
 
-## ⚠ Visual export — PowerPoint Mac only, NOT LibreOffice
+## ⚠ Visual export — vscode-pptx-viewer (PPTX → PNG direct)
 
-**Always render slides via Microsoft PowerPoint Mac. LibreOffice is forbidden
-for any visual evidence in this project.** LibreOffice and PowerPoint render
-PPTX differently (fonts, line breaks, autofit, gradient/shadow handling), and
-review decisions made against a LibreOffice export do not transfer to the
-final PowerPoint output the deck is actually shipped from.
+**Render slides directly from the `.pptx` via the vscode-pptx-viewer
+Chromium pipeline. Do NOT route through PDF, and do NOT use LibreOffice.**
 
-Use this script when you need PNGs of slides for before/after comparison:
+- **PDF detour is forbidden.** PowerPoint's "save as PDF" rasterizes
+  gradients, shadows, transparency, and certain text effects, so any PNG
+  produced from that PDF (via `sips`, `pdftoppm`, etc.) carries lossy
+  visual artifacts that invalidate review evidence. The legacy script
+  `scripts/capture-pp-mac.sh` is a PDF-based pipeline and must not be used
+  for new evidence.
+- **LibreOffice is forbidden.** It renders PPTX differently from
+  PowerPoint (fonts, line breaks, autofit, gradient/shadow handling), so
+  review decisions made against a LibreOffice export do not carry over to
+  the PowerPoint output the deck ships from.
+
+The supported path: open the PPTX in vscode-pptx-viewer's HTML viewer,
+then drive headless Chromium (Playwright) to screenshot each slide at 2×
+device pixel ratio. Two scripts compose the pipeline:
 
 ```bash
-scripts/capture-pp-mac.sh path/to/DECK.pptx path/to/output/<name>
-# emits <name>-slide-01.png, <name>-slide-02.png, ...
+# 1. PPTX → viewer-dir (slides.json + index.html + webview assets)
+node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \
+  path/to/DECK.pptx path/to/viewer-dir
+
+# 2. viewer-dir → slide-NN.png in render-dir (Playwright headless Chromium)
+node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \
+  path/to/viewer-dir path/to/render-dir
 ```
 
-Sandbox caveat: PowerPoint Mac only writes into folders it has already been
-granted access to. Reuse an existing approved directory and namespace runs by
-filename prefix — creating a brand-new sibling subfolder triggers a fresh
-sandbox prompt that PowerPoint handles unreliably (stalls / -1712 / -9074).
+`pptx_review_orchestrator.py:_render_pptx` already wraps both calls, so
+prefer that when generating before/after evidence for a review.
 
-Do **not** use `scripts/make_review_images.py` (it shells out to `soffice` /
-LibreOffice and is kept only for legacy reproduction). Do **not** invoke
-`soffice` / `libreoffice` directly. If PowerPoint Mac is unavailable in your
-environment, stop and ask before substituting any other renderer.
+Requirements:
+
+- `vscode-pptx-viewer` repo must be present locally so `playwright` resolves
+  via `createRequire`. The capture script currently hardcodes
+  `/Users/yamadakenichi/workspace/GitHub/vscode-pptx-viewer/package.json`;
+  update this if the repo lives elsewhere.
+- `node` 18+ and a Playwright Chromium install (`npx playwright install
+  chromium` inside the vscode-pptx-viewer repo).
+
+Known caveat (scripts location): `render_with_vscode_pptx_viewer.js` and
+`capture_vscode_pptx_viewer.js` live under
+`tmp/review/260329-seminar-curriculum-proposal/scripts/`, which is
+gitignored. They were grown as deck-specific helpers but are now part of
+the project-wide pipeline (`pptx_review_orchestrator.py:_render_pptx`
+hardcodes the paths). Promoting them to a tracked location (e.g.
+`skills/pptx-design-reviewer/scripts/` or repo-root `scripts/`) is
+recommended but not yet done; until then keep the working copies in
+sync manually if you edit them.
+
+What NOT to use:
+
+- `scripts/capture-pp-mac.sh` — PDF detour. Kept only for archaeological
+  reproduction of legacy `*-powerpoint-review-images/` artifacts.
+- `scripts/make_review_images.py` — wraps LibreOffice (`soffice`); same
+  prohibition.
+- Direct `osascript … save as save as PNG …` against `Microsoft
+  PowerPoint` — Microsoft 365 silently no-ops this enum in current
+  builds, and UI-automation fallbacks require Accessibility permission.
+
+If the vscode-pptx-viewer pipeline is unavailable in your environment,
+stop and ask before substituting any other renderer.
 
 ## Scope of Application
 
@@ -52,11 +92,13 @@ environment, stop and ask before substituting any other renderer.
    - Local file path to `.pptx`
    - Exported PDF (for read-only review)
 
-2. **Slide viewing must be available**
-   - Microsoft PowerPoint (Mac) is required for any rendered evidence
-     (`scripts/capture-pp-mac.sh`). See the "Visual export" notice above.
-   - Google Slides / Keynote are acceptable only as authoring environments,
-     not as the renderer for review evidence.
+2. **Slide rendering pipeline must be available**
+   - `vscode-pptx-viewer` (PPTX → HTML viewer) + Playwright Chromium is
+     the required renderer for review evidence. See the "Visual export"
+     notice above.
+   - PowerPoint / Google Slides / Keynote may be used as authoring tools,
+     but their exports (PDF, JPEG, etc.) must not be used as review
+     evidence because of lossy rasterization.
    - LibreOffice is forbidden for visual evidence.
 
 3. **Access to source deck (when making fixes)**
@@ -294,18 +336,30 @@ questions or confirm fixes visually, export slides to images and compare.
 
 ### Script
 
-Use the PowerPoint Mac capture script for both Before and After (see the
-"Visual export" notice at the top of this file):
+Use the vscode-pptx-viewer pipeline for both Before and After (see the
+"Visual export" notice at the top of this file). The orchestrator's
+`_render_pptx` is the easiest entry point; for ad-hoc runs invoke the two
+node scripts directly:
 
 \`\`\`bash
-scripts/capture-pp-mac.sh path/to/BEFORE.pptx path/to/output/before
-scripts/capture-pp-mac.sh path/to/AFTER.pptx  path/to/output/after
+# Before
+node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \\
+  BEFORE.pptx review/before-viewer
+node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \\
+  review/before-viewer review/before
+
+# After
+node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \\
+  AFTER.pptx review/after-viewer
+node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \\
+  review/after-viewer review/after
 \`\`\`
 
-This emits \`before-slide-NN.png\` / \`after-slide-NN.png\`. Assemble a
-Before/After view by referencing those files (custom HTML, finder preview,
-or the review SPA). Do **not** fall back to \`scripts/make_review_images.py\`
-or \`soffice\`; LibreOffice renders are not acceptable evidence here.
+This emits \`review/before/slide-NN.png\` and \`review/after/slide-NN.png\`.
+Assemble a Before/After view (review SPA, custom HTML, or finder preview).
+Do **not** fall back to \`scripts/capture-pp-mac.sh\` (PDF detour) or
+\`scripts/make_review_images.py\` / \`soffice\` (LibreOffice); both are
+disallowed.
 
 ## Workflow Overview
 
