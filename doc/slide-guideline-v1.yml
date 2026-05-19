@@ -3288,6 +3288,22 @@ rules:
             - "proximity_threshold_pt"
           candidate_values: "None — never auto-removed. Reviewer decides keep or manual delete."
           manual_required_reason: "Isolated decorative lines/connectors/arrows may be intentional ornament; auto removal must not be proposed."
+        badge_alignment:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "auto_fix_candidate"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "misaligned"
+            - "aspect_ratio"
+            - "text_length"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "{alignment: CENTER, vertical_anchor: MIDDLE} - mechanical center alignment for badge."
 
     # PRI-001: priority 出力が参照する ID 別の正本テーブル。
     priority_catalog:
@@ -3573,6 +3589,16 @@ rules:
         impact_axis: "brand_template_divergence"
         issue_title: "孤立した装飾 line/connector/arrow が残っている"
         action: "意図した装飾なら残す、不要なら手動で削除する。自動削除は行わない。"
+      badge_alignment:
+        status: "implemented_lint"
+        priority: "P1"
+        axes:
+          - "brand_template_divergence"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "brand_template_divergence"
+        issue_title: "バッジ内テキストの中央揃えがずれている"
+        action: "短文 badge コンテナの paragraph alignment を CENTER、text_frame.vertical_anchor を MIDDLE に揃える。"
       text_vertical_balance:
         status: "implemented_lint"
         priority: "P2"
@@ -3749,6 +3775,17 @@ rules:
           proximity_pt_max: 24.0
           thin_bar_thickness_pt_max: 4.0
           thin_bar_length_pt_min: 20.0
+      badge_alignment:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.badge_alignment"
+        detection: "Detect shapes with a solid fill, short single-line text (length<=20), and a near-square / pill bounding box (aspect ratio between 0.5 and 2.5, max width 240pt, max height 120pt) whose paragraph alignment is not CENTER or whose text-frame vertical anchor is not MIDDLE. Emit an auto_fix_candidate with candidate_values={alignment:CENTER, vertical_anchor:MIDDLE}; alignment_left_top is suppressed on these shapes."
+        thresholds:
+          shape_max_width_pt: 240.0
+          shape_max_height_pt: 120.0
+          aspect_ratio_min: 0.5
+          aspect_ratio_max: 2.5
+          text_length_max: 20
       card_grid_consistency:
         severity: "warning"
         automation: "automated"

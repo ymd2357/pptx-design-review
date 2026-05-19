@@ -31,6 +31,7 @@ Checks
                                 structural containment
 - object_gap_too_small (warning) adjacent object gap is below minimum spacing
 - decorative_isolated_lines (warning) isolated decorative line/connector/arrow with no companion shape
+- badge_alignment      (warning) short-text badge container is not centered (paragraph CENTER + vertical MIDDLE)
 - inner_padding_imbalance (warning) child objects are unbalanced inside a container
 - card_grid_consistency (warning) repeated card containers have inconsistent sizing or internal layout
 - text_vertical_balance (warning) text fits but vertical padding/center balance is unnatural
@@ -119,6 +120,11 @@ CARD_GRID_CHILD_RELATIVE_TOL_PT = 14.0
 DECORATIVE_LINE_PROXIMITY_PT_MAX = 24.0
 DECORATIVE_THIN_BAR_THICKNESS_PT_MAX = 4.0
 DECORATIVE_THIN_BAR_LENGTH_PT_MIN = 20.0
+BADGE_SHAPE_MAX_WIDTH_PT = 240.0
+BADGE_SHAPE_MAX_HEIGHT_PT = 120.0
+BADGE_SHAPE_ASPECT_MIN = 0.5
+BADGE_SHAPE_ASPECT_MAX = 2.5
+BADGE_TEXT_LENGTH_MAX = 20
 COVER_BRAND_MARK_MAX_W_PT = 420.0
 COVER_BRAND_MARK_MAX_H_PT = 150.0
 COVER_BRAND_MARK_MAX_X_PT = 100.0
@@ -2028,6 +2034,9 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
         return
     if not shape.text_frame.text.strip():
         return
+    shape_bbox = shape_bbox_pt(shape)
+    if shape_bbox is not None and _is_badge_like_shape(shape, normalize_bbox(ctx, shape_bbox)):
+        return
     vertical = shape.text_frame.vertical_anchor
     if (
         ctx.policy.check_vertical_text_anchor
@@ -2065,6 +2074,88 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
                 },
             )
         )
+
+
+def _is_badge_like_shape(shape, bbox) -> bool:
+    if not getattr(shape, "has_text_frame", False):
+        return False
+    text = _shape_text(shape)
+    if not text or len(text) > BADGE_TEXT_LENGTH_MAX:
+        return False
+    if "\n" in text:
+        return False
+    try:
+        if shape.fill.type != MSO_FILL.SOLID:
+            return False
+    except (AttributeError, TypeError, ValueError):
+        return False
+    x, y, w, h = bbox
+    if w <= 0 or h <= 0:
+        return False
+    if w > BADGE_SHAPE_MAX_WIDTH_PT or h > BADGE_SHAPE_MAX_HEIGHT_PT:
+        return False
+    ratio = w / h
+    if not (BADGE_SHAPE_ASPECT_MIN <= ratio <= BADGE_SHAPE_ASPECT_MAX):
+        return False
+    return True
+
+
+def check_badge_alignment(ctx, slide_idx, slide_id, shape, bbox, findings):
+    if not _is_badge_like_shape(shape, bbox):
+        return
+    vertical = shape.text_frame.vertical_anchor
+    misaligned: list[dict[str, str]] = []
+    if vertical is None:
+        # PowerPoint default vertical anchor is TOP, which is not MIDDLE.
+        misaligned.append({"axis": "vertical_anchor", "actual": "TOP_default", "expected": "MIDDLE"})
+    elif vertical != MSO_VERTICAL_ANCHOR.MIDDLE:
+        misaligned.append({"axis": "vertical_anchor", "actual": str(vertical), "expected": "MIDDLE"})
+
+    horizontal_actual: Optional[str] = None
+    for para in shape.text_frame.paragraphs:
+        if not para.text.strip():
+            continue
+        if para.alignment is None:
+            horizontal_actual = "LEFT_default"
+        elif para.alignment != PP_ALIGN.CENTER:
+            horizontal_actual = str(para.alignment)
+        break
+    if horizontal_actual is not None:
+        misaligned.append({"axis": "alignment", "actual": horizontal_actual, "expected": "CENTER"})
+
+    if not misaligned:
+        return
+    findings.append(
+        make_finding(
+            "warning",
+            "badge_alignment",
+            slide_idx,
+            slide_id,
+            shape,
+            "badge container text is not centered (expected alignment=CENTER, vertical_anchor=MIDDLE)",
+            {
+                "shape_kind": "badge",
+                "bbox_pt": [round(v, 2) for v in bbox],
+                "text_excerpt": _text_excerpt(shape),
+                "text_length": len(_shape_text(shape)),
+                "aspect_ratio": round(bbox[2] / bbox[3], 3) if bbox[3] else None,
+                "misaligned": misaligned,
+                "evidence_source": "pptx_xml",
+                "evidence_confidence": "high",
+                "fixability": "auto_fix_candidate",
+                "fixability_reason": "badge_center_alignment",
+                "candidate_values": {
+                    "alignment": "CENTER",
+                    "vertical_anchor": "MIDDLE",
+                },
+                "measurement_confidence": "high",
+                "measured_value": len(misaligned),
+                "threshold": 0,
+                "delta": len(misaligned),
+                "unit": "misaligned_axes",
+            },
+        )
+    )
 
 
 def check_wrap_break_changes_meaning(ctx, slide_idx, slide_id, shape, bbox, findings):
@@ -3561,6 +3652,7 @@ def lint_pptx(
             check_font(ctx, idx, slide_id, shape, findings)
             check_line_height(ctx, idx, slide_id, shape, findings)
             check_alignment(ctx, idx, slide_id, shape, findings)
+            check_badge_alignment(ctx, idx, slide_id, shape, record.bbox_pt, findings)
             check_wrap_break_changes_meaning(ctx, idx, slide_id, shape, bbox, findings)
             check_color(
                 ctx,
@@ -3874,6 +3966,12 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
             "fixability_reason": reason,
             "manual_required_reason": reason,
         }
+    if check == "badge_alignment":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": "badge_alignment",
+            "fixability_reason": "mechanical paragraph CENTER and text-frame MIDDLE alignment change for badge container",
+        }
     if _contrast_auto_fixable(check, evidence):
         return {
             "fixability": "auto_fix_candidate",
@@ -3980,6 +4078,8 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         widen = _widen_to_fit_candidate(evidence)
         if widen is not None:
             return widen
+    if check == "badge_alignment":
+        return {"alignment": "CENTER", "vertical_anchor": "MIDDLE"}
     return None
 
 

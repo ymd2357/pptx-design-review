@@ -106,6 +106,26 @@ def _build_wrap_break_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_badge_alignment_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    badge = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Pt(200), Pt(200), Pt(120), Pt(48))
+    badge.fill.solid()
+    badge.fill.fore_color.rgb = RGBColor.from_string("A51E6D")
+    badge.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    badge.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.TOP
+    para = badge.text_frame.paragraphs[0]
+    para.alignment = PP_ALIGN.LEFT
+    run = para.add_run()
+    run.text = "Beta"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(20)
+    run.font.color.rgb = RGBColor.from_string("FFFFFF")
+    prs.save(str(out))
+
+
 def _build_wrap_break_widen_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -794,6 +814,44 @@ def main() -> int:
         residual_wrap = [f for f in pptx_lint.lint_pptx(wrap) if f.check == "wrap_break_changes_meaning"]
         if residual_wrap:
             failures.append(f"wrap_break_changes_meaning remained after fix: {len(residual_wrap)}")
+
+        # --- badge alignment fixer centers paragraph + vertical anchor [FIX-002] ---
+        badge = tmp_dir / "badge.pptx"
+        _build_badge_alignment_fixture(badge)
+        badge_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(badge)
+            if f.check == "badge_alignment"
+        ]
+        if not badge_findings:
+            failures.append("badge fixture did not trigger badge_alignment")
+        else:
+            actions = pptx_fix.fix_pptx(
+                badge, apply=True, rules=("badge_alignment",), findings=badge_findings
+            )
+            if not any(
+                a.rule == "badge_alignment" and a.status == "apply" for a in actions
+            ):
+                failures.append("badge_alignment fixer did not report an apply action")
+            prs = Presentation(str(badge))
+            sh = prs.slides[0].shapes[0]
+            if sh.text_frame.vertical_anchor != MSO_VERTICAL_ANCHOR.MIDDLE:
+                failures.append(
+                    "badge fixer: vertical anchor expected MIDDLE; "
+                    f"got {sh.text_frame.vertical_anchor!r}"
+                )
+            if sh.text_frame.paragraphs[0].alignment != PP_ALIGN.CENTER:
+                failures.append(
+                    "badge fixer: paragraph alignment expected CENTER; "
+                    f"got {sh.text_frame.paragraphs[0].alignment!r}"
+                )
+            residual = [
+                f for f in pptx_lint.lint_pptx(badge) if f.check == "badge_alignment"
+            ]
+            if residual:
+                failures.append(
+                    f"badge_alignment finding remained after fix: {len(residual)}"
+                )
 
         # --- wrap-break widen-to-fit candidate widens the shape [FIX-001] ---
         wrap_widen = tmp_dir / "wrap-break-widen.pptx"

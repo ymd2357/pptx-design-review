@@ -26,6 +26,7 @@ from pptx.dml.color import RGBColor  # noqa: E402
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE  # noqa: E402
 from pptx.enum.text import MSO_AUTO_SIZE  # noqa: E402
 from pptx.enum.text import MSO_VERTICAL_ANCHOR  # noqa: E402
+from pptx.enum.text import PP_ALIGN  # noqa: E402
 from pptx.util import Pt  # noqa: E402
 
 
@@ -72,6 +73,7 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "reading_order",
     "wrap_break_changes_meaning",
     "decorative_isolated_lines",
+    "badge_alignment",
 } | LINT005_CHECKS
 
 LINT004_POLICY = {
@@ -524,6 +526,46 @@ def _add_card_with_text(slide, *, x: int, y: int, width: int, height: int, child
     return card
 
 
+def _make_badge_alignment_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    badge = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Pt(200), Pt(200), Pt(120), Pt(48))
+    badge.fill.solid()
+    badge.fill.fore_color.rgb = RGBColor.from_string("A51E6D")
+    badge.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    badge.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.TOP
+    para = badge.text_frame.paragraphs[0]
+    para.alignment = PP_ALIGN.LEFT
+    run = para.add_run()
+    run.text = "Beta"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(20)
+    run.font.color.rgb = RGBColor.from_string("FFFFFF")
+    prs.save(str(out))
+
+
+def _make_badge_alignment_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    badge = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Pt(200), Pt(200), Pt(120), Pt(48))
+    badge.fill.solid()
+    badge.fill.fore_color.rgb = RGBColor.from_string("A51E6D")
+    badge.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    badge.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+    para = badge.text_frame.paragraphs[0]
+    para.alignment = PP_ALIGN.CENTER
+    run = para.add_run()
+    run.text = "Beta"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(20)
+    run.font.color.rgb = RGBColor.from_string("FFFFFF")
+    prs.save(str(out))
+
+
 def _make_decorative_isolated_line_bad(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -851,6 +893,8 @@ def main() -> int:
         decorative_line_with_companion_good = (
             tmp_dir / "decorative-line-with-companion-good.pptx"
         )
+        badge_alignment_bad = tmp_dir / "badge-alignment-bad.pptx"
+        badge_alignment_good = tmp_dir / "badge-alignment-good.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
         invisible_text_box_vertical_balance_good = (
             tmp_dir / "invisible-text-box-vertical-balance-good.pptx"
@@ -896,6 +940,8 @@ def main() -> int:
         _make_card_grid_consistency_bad(card_grid_consistency_bad)
         _make_decorative_isolated_line_bad(decorative_isolated_line_bad)
         _make_decorative_line_with_companion_good(decorative_line_with_companion_good)
+        _make_badge_alignment_bad(badge_alignment_bad)
+        _make_badge_alignment_good(badge_alignment_good)
         _make_text_vertical_balance_good(text_vertical_balance_good)
         _make_invisible_text_box_vertical_balance_good(invisible_text_box_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
@@ -1304,6 +1350,51 @@ def main() -> int:
             failures.append(
                 "decorative-line-with-companion-good.pptx incorrectly triggered decorative_isolated_lines:\n  "
                 + "\n  ".join(f.message for f in decorative_good_findings)
+            )
+
+        badge_bad_all = pptx_lint.lint_pptx(badge_alignment_bad)
+        badge_bad = [f for f in badge_bad_all if f.check == "badge_alignment"]
+        if not badge_bad:
+            failures.append(
+                "badge-alignment-bad.pptx did not trigger badge_alignment: "
+                + ", ".join(f.check for f in badge_bad_all)
+            )
+        else:
+            d = badge_bad[0].detail
+            if d.get("fixability") != "auto_fix_candidate":
+                failures.append(
+                    "badge_alignment finding must be auto_fix_candidate; "
+                    f"got {d.get('fixability')!r}"
+                )
+            cand = d.get("candidate_values")
+            if not (
+                isinstance(cand, dict)
+                and cand.get("alignment") == "CENTER"
+                and cand.get("vertical_anchor") == "MIDDLE"
+            ):
+                failures.append(
+                    f"badge_alignment candidate_values mismatch: {cand!r}"
+                )
+            axes = {entry.get("axis") for entry in d.get("misaligned") or []}
+            if axes != {"alignment", "vertical_anchor"}:
+                failures.append(
+                    f"badge_alignment expected misaligned axes={{alignment,vertical_anchor}}; got {axes}"
+                )
+
+        badge_bad_extra = [f for f in badge_bad_all if f.check == "alignment_left_top"]
+        if badge_bad_extra:
+            failures.append(
+                "badge container also raised alignment_left_top; expected suppression: "
+                + ", ".join(f.message for f in badge_bad_extra)
+            )
+
+        badge_good = [
+            f for f in pptx_lint.lint_pptx(badge_alignment_good) if f.check == "badge_alignment"
+        ]
+        if badge_good:
+            failures.append(
+                "badge-alignment-good.pptx incorrectly triggered badge_alignment:\n  "
+                + "\n  ".join(f.message for f in badge_good)
             )
 
         bad_findings = pptx_lint.lint_pptx(bad)

@@ -95,6 +95,7 @@ ALL_RULES = (
     "inner_padding",
     "card_grid",
     "text_vertical_balance",
+    "badge_alignment",
 )
 CHECK_TO_RULE = {
     "text_autofit_disabled": "autofit",
@@ -124,6 +125,7 @@ CHECK_TO_RULE = {
     "inner_padding_imbalance": "inner_padding",
     "card_grid_consistency": "card_grid",
     "text_vertical_balance": "text_vertical_balance",
+    "badge_alignment": "badge_alignment",
 }
 
 
@@ -736,6 +738,7 @@ FINDING_DRIVEN_RULES = {
     "heading_hierarchy",
     "inner_padding",
     "card_grid",
+    "badge_alignment",
     "text_vertical_balance",
 }
 
@@ -1750,6 +1753,29 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             after=after,
         )
 
+    if rule == "badge_alignment":
+        if shape is None or not getattr(shape, "has_text_frame", False):
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={
+                "vertical_anchor": str(shape.text_frame.vertical_anchor)
+                if shape.text_frame.vertical_anchor is not None
+                else None,
+                "first_paragraph_alignment": (
+                    str(shape.text_frame.paragraphs[0].alignment)
+                    if shape.text_frame.paragraphs
+                    and shape.text_frame.paragraphs[0].alignment is not None
+                    else None
+                ),
+            },
+            after={"alignment": "CENTER", "vertical_anchor": "MIDDLE"},
+        )
+
     if rule == "heading_hierarchy":
         title = _shape_from_finding(prs, finding, "title_candidate")
         body = _shape_from_finding(prs, finding, "largest_body_candidate")
@@ -2112,6 +2138,11 @@ def _apply_finding_action(prs, action: FixAction) -> None:
         _set_shape_text_size(body, float(action.after["body_size_pt"]))
     elif action.rule == "text_vertical_balance":
         shape.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+    elif action.rule == "badge_alignment":
+        shape.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+        for para in shape.text_frame.paragraphs:
+            if para.text.strip():
+                para.alignment = PP_ALIGN.CENTER
 
 
 # ---- Driver ----------------------------------------------------------------
