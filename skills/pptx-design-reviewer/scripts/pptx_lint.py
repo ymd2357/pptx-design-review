@@ -100,6 +100,15 @@ OBJECT_GAP_ELEMENT_MIN_PT = {
     "default": OBJECT_GAP_DEFAULT_MIN_PT,
     "peer_object": 8.0,  # Mirrors rules.slide.object_spacing.element_gap_pt_min.peer_object.
 }
+SEMANTIC_PAIR_GAP_PT = {
+    "title_subtitle": 8.0,
+    "label_group": 16.0,
+}
+SEMANTIC_TITLE_FONT_PT_MIN = 28.0
+SEMANTIC_SUBTITLE_FONT_PT_MAX = 24.0
+SEMANTIC_PAIR_X_ALIGN_TOL_PT = 24.0
+SEMANTIC_PAIR_Y_ALIGN_TOL_PT = 8.0
+SEMANTIC_LABEL_FONT_DIFF_PT_MAX = 1.5
 INNER_PADDING_RATIO_MIN = 0.5
 INNER_PADDING_RATIO_MAX = 2.0
 INNER_PADDING_SIDE_MIN_PT = 4.0
@@ -842,6 +851,59 @@ def _object_gap_threshold_pt(first: ShapeRecord, second: ShapeRecord) -> tuple[f
     first_threshold = OBJECT_GAP_ELEMENT_MIN_PT.get(first_element, OBJECT_GAP_DEFAULT_MIN_PT)
     second_threshold = OBJECT_GAP_ELEMENT_MIN_PT.get(second_element, OBJECT_GAP_DEFAULT_MIN_PT)
     return max(first_threshold, second_threshold), first_element, second_element
+
+
+def _shape_dominant_font_size_pt(ctx: LintContext, shape) -> Optional[float]:
+    if not getattr(shape, "has_text_frame", False):
+        return None
+    return _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
+
+
+def _semantic_pair_kind(
+    ctx: LintContext,
+    first: ShapeRecord,
+    second: ShapeRecord,
+    axis: str,
+) -> Optional[str]:
+    """Classify (first, second) into a known semantic gap pair when applicable.
+
+    Title-subtitle: a large-font text directly above a smaller-font text with
+    similar left-x; both must have visible text.
+    Label group: two text shapes with the same font size sitting in the same
+    horizontal row (vertically adjacent on the cross-axis), adjacent
+    horizontally. Used to enforce inter-label spacing.
+    """
+    if first.kind != "text" or second.kind != "text":
+        return None
+    if not _shape_text(first.shape) or not _shape_text(second.shape):
+        return None
+    size_a = _shape_dominant_font_size_pt(ctx, first.shape)
+    size_b = _shape_dominant_font_size_pt(ctx, second.shape)
+    if size_a is None or size_b is None:
+        return None
+
+    if axis == "vertical":
+        if first.bbox_pt[1] <= second.bbox_pt[1]:
+            upper_rec, upper_size, lower_rec, lower_size = first, size_a, second, size_b
+        else:
+            upper_rec, upper_size, lower_rec, lower_size = second, size_b, first, size_a
+        if (
+            upper_size >= SEMANTIC_TITLE_FONT_PT_MIN
+            and lower_size <= SEMANTIC_SUBTITLE_FONT_PT_MAX
+            and lower_size < upper_size
+            and abs(upper_rec.bbox_pt[0] - lower_rec.bbox_pt[0]) <= SEMANTIC_PAIR_X_ALIGN_TOL_PT
+        ):
+            return "title_subtitle"
+        return None
+
+    # axis == "horizontal" — same-row label peers.
+    if abs(size_a - size_b) > SEMANTIC_LABEL_FONT_DIFF_PT_MAX:
+        return None
+    cy_a = first.bbox_pt[1] + first.bbox_pt[3] / 2
+    cy_b = second.bbox_pt[1] + second.bbox_pt[3] / 2
+    if abs(cy_a - cy_b) > SEMANTIC_PAIR_Y_ALIGN_TOL_PT:
+        return None
+    return "label_group"
 
 
 def _bbox_contains(outer: tuple, inner: tuple, tolerance: float = TOL_PT) -> bool:
@@ -2496,7 +2558,7 @@ def extract_structure_relations(records: list[ShapeRecord]) -> list[StructureRel
     return relations
 
 
-def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], findings):
+def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], findings, ctx: Optional[LintContext] = None):
     for idx, first in enumerate(records):
         for second in records[idx + 1:]:
             overlap_bbox = _intersection_bbox(first.bbox_pt, second.bbox_pt)
@@ -2538,32 +2600,50 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
             vertical_gap = _axis_gap(ay1, ay2, by1, by2)
             horizontal_overlap = vertical_gap == 0.0
             vertical_overlap = horizontal_gap == 0.0
-            gap_threshold_pt, first_element, second_element = _object_gap_threshold_pt(first, second)
-            if gap_threshold_pt <= OBJECT_GAP_DEFAULT_MIN_PT:
-                continue
-            gap_candidates: list[tuple[str, float]] = []
-            if horizontal_overlap and 0 < horizontal_gap < gap_threshold_pt:
-                gap_candidates.append(("horizontal", horizontal_gap))
-            if vertical_overlap and 0 < vertical_gap < gap_threshold_pt:
-                gap_candidates.append(("vertical", vertical_gap))
-            for axis, gap in gap_candidates:
+            element_threshold_pt, first_element, second_element = _object_gap_threshold_pt(
+                first, second
+            )
+            for axis, gap, overlap_other_axis in (
+                ("horizontal", horizontal_gap, horizontal_overlap),
+                ("vertical", vertical_gap, vertical_overlap),
+            ):
+                if not overlap_other_axis or gap <= 0:
+                    continue
+                semantic_kind: Optional[str] = None
+                if ctx is not None:
+                    semantic_kind = _semantic_pair_kind(ctx, first, second, axis)
+                semantic_threshold = (
+                    SEMANTIC_PAIR_GAP_PT.get(semantic_kind, 0.0)
+                    if semantic_kind
+                    else 0.0
+                )
+                gap_threshold_pt = max(element_threshold_pt, semantic_threshold)
+                if gap_threshold_pt <= OBJECT_GAP_DEFAULT_MIN_PT:
+                    continue
+                if gap >= gap_threshold_pt:
+                    continue
+                detail = {
+                    "shape_a": _shape_record_detail(first),
+                    "shape_b": _shape_record_detail(second),
+                    "axis": axis,
+                    "gap_pt": round(gap, 2),
+                    "threshold_pt": gap_threshold_pt,
+                    "element_a": first_element,
+                    "element_b": second_element,
+                    "default_threshold_pt": OBJECT_GAP_DEFAULT_MIN_PT,
+                }
+                if semantic_kind:
+                    detail["semantic_pair_kind"] = semantic_kind
+                    detail["semantic_threshold_pt"] = SEMANTIC_PAIR_GAP_PT[semantic_kind]
                 findings.append(
                     make_finding(
                         "warning", "object_gap_too_small", slide_idx, slide_id, first.shape,
                         (
-                            f"{axis} gap {gap:.1f}pt is below {gap_threshold_pt:g}pt: "
-                            f"{_shape_label(first)} / {_shape_label(second)}"
+                            f"{axis} gap {gap:.1f}pt is below {gap_threshold_pt:g}pt"
+                            + (f" [{semantic_kind}]" if semantic_kind else "")
+                            + f": {_shape_label(first)} / {_shape_label(second)}"
                         ),
-                        {
-                            "shape_a": _shape_record_detail(first),
-                            "shape_b": _shape_record_detail(second),
-                            "axis": axis,
-                            "gap_pt": round(gap, 2),
-                            "threshold_pt": gap_threshold_pt,
-                            "element_a": first_element,
-                            "element_b": second_element,
-                            "default_threshold_pt": OBJECT_GAP_DEFAULT_MIN_PT,
-                        },
+                        detail,
                     )
                 )
 
@@ -3628,7 +3708,7 @@ def lint_pptx(
                 )
             )
         slide_type = _slide_type_detail(ctx, records)
-        check_object_relationships(idx, slide_id, records, findings)
+        check_object_relationships(idx, slide_id, records, findings, ctx=ctx)
         check_decorative_isolated_lines(idx, slide_id, records, findings)
         check_inner_padding_imbalance(idx, slide_id, records, findings)
         check_card_grid_consistency(idx, slide_id, records, findings)

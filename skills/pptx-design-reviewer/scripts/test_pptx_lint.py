@@ -526,6 +526,46 @@ def _add_card_with_text(slide, *, x: int, y: int, width: int, height: int, child
     return card
 
 
+def _make_semantic_title_subtitle_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    title = slide.shapes.add_textbox(Pt(120), Pt(180), Pt(900), Pt(48))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    t_run = title.text_frame.paragraphs[0].add_run()
+    t_run.text = "Title"
+    t_run.font.name = "Noto Sans JP"
+    t_run.font.size = Pt(40)
+    subtitle = slide.shapes.add_textbox(Pt(120), Pt(230), Pt(900), Pt(30))
+    subtitle.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    s_run = subtitle.text_frame.paragraphs[0].add_run()
+    s_run.text = "Subtitle"
+    s_run.font.name = "Noto Sans JP"
+    s_run.font.size = Pt(20)
+    prs.save(str(out))
+
+
+def _make_semantic_title_subtitle_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    title = slide.shapes.add_textbox(Pt(120), Pt(180), Pt(900), Pt(48))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    t_run = title.text_frame.paragraphs[0].add_run()
+    t_run.text = "Title"
+    t_run.font.name = "Noto Sans JP"
+    t_run.font.size = Pt(40)
+    subtitle = slide.shapes.add_textbox(Pt(120), Pt(240), Pt(900), Pt(30))
+    subtitle.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    s_run = subtitle.text_frame.paragraphs[0].add_run()
+    s_run.text = "Subtitle"
+    s_run.font.name = "Noto Sans JP"
+    s_run.font.size = Pt(20)
+    prs.save(str(out))
+
+
 def _make_badge_alignment_bad(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -895,6 +935,8 @@ def main() -> int:
         )
         badge_alignment_bad = tmp_dir / "badge-alignment-bad.pptx"
         badge_alignment_good = tmp_dir / "badge-alignment-good.pptx"
+        semantic_title_subtitle_bad = tmp_dir / "semantic-title-subtitle-bad.pptx"
+        semantic_title_subtitle_good = tmp_dir / "semantic-title-subtitle-good.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
         invisible_text_box_vertical_balance_good = (
             tmp_dir / "invisible-text-box-vertical-balance-good.pptx"
@@ -942,6 +984,8 @@ def main() -> int:
         _make_decorative_line_with_companion_good(decorative_line_with_companion_good)
         _make_badge_alignment_bad(badge_alignment_bad)
         _make_badge_alignment_good(badge_alignment_good)
+        _make_semantic_title_subtitle_bad(semantic_title_subtitle_bad)
+        _make_semantic_title_subtitle_good(semantic_title_subtitle_good)
         _make_text_vertical_balance_good(text_vertical_balance_good)
         _make_invisible_text_box_vertical_balance_good(invisible_text_box_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
@@ -1395,6 +1439,44 @@ def main() -> int:
             failures.append(
                 "badge-alignment-good.pptx incorrectly triggered badge_alignment:\n  "
                 + "\n  ".join(f.message for f in badge_good)
+            )
+
+        semantic_bad = [
+            f
+            for f in pptx_lint.lint_pptx(semantic_title_subtitle_bad)
+            if f.check == "object_gap_too_small"
+        ]
+        title_pair = [
+            f
+            for f in semantic_bad
+            if f.detail.get("semantic_pair_kind") == "title_subtitle"
+        ]
+        if not title_pair:
+            failures.append(
+                "semantic-title-subtitle-bad.pptx did not trigger title_subtitle gap: "
+                + ", ".join(f.message for f in semantic_bad)
+            )
+        else:
+            d = title_pair[0].detail
+            if d.get("threshold_pt") != 8.0:
+                failures.append(
+                    f"title_subtitle threshold expected 8.0pt; got {d.get('threshold_pt')!r}"
+                )
+            if d.get("axis") != "vertical":
+                failures.append(
+                    f"title_subtitle axis expected vertical; got {d.get('axis')!r}"
+                )
+
+        semantic_good = [
+            f
+            for f in pptx_lint.lint_pptx(semantic_title_subtitle_good)
+            if f.check == "object_gap_too_small"
+            and f.detail.get("semantic_pair_kind") == "title_subtitle"
+        ]
+        if semantic_good:
+            failures.append(
+                "semantic-title-subtitle-good.pptx (gap 12pt) incorrectly triggered title_subtitle: "
+                + ", ".join(f.message for f in semantic_good)
             )
 
         bad_findings = pptx_lint.lint_pptx(bad)

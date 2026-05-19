@@ -1149,8 +1149,23 @@ rules:
       element_gap_pt_min:
         default: 0
         peer_object: "tokens.semantic.layout.adjacent_object_gap_pt_min"
+      semantic_pair_gap_pt_min:
+        title_subtitle: 8.0
+        label_group: 16.0
+      semantic_pair_detection:
+        title_subtitle:
+          axis: "vertical"
+          upper_font_size_pt_min: 28.0
+          lower_font_size_pt_max: 24.0
+          x_align_tolerance_pt: 24.0
+          condition: "Two stacked text shapes with similar left-x where the upper shape has a title-scale font and the lower shape has a smaller subtitle-scale font."
+        label_group:
+          axis: "horizontal"
+          font_size_diff_pt_max: 1.5
+          y_align_tolerance_pt: 8.0
+          condition: "Two text shapes in the same row (vertical centers within tolerance) sharing nearly identical font sizes."
       applies_when: "Two normalized object bounding boxes are adjacent on one axis and overlap on the opposite axis."
-      rule_application: "Use element_gap_pt_min for PPTX objects marked with the matching ds:element value. Missing or unknown elements use default 0 and do not emit object_gap_too_small."
+      rule_application: "Take the maximum of element_gap_pt_min (from ds:element) and semantic_pair_gap_pt_min (from inferred title_subtitle / label_group pair) for the threshold. Missing or unknown elements default to 0 and do not emit object_gap_too_small unless a semantic pair is detected."
       excludes:
         - "intentional_grouping"
         - "intentional_overlap_or_layering"
@@ -3652,10 +3667,11 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.object_gap_too_small"
-        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below the design-system gap for their ds:element value while the opposite axis overlaps. Missing or unknown elements use default 0 and do not warn."
+        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below max(element_gap_pt_min by ds:element, semantic_pair_gap_pt_min by inferred title_subtitle / label_group pair) while the opposite axis overlaps. Missing or unknown elements default to 0 and do not warn unless a semantic pair is detected."
         thresholds:
           default_adjacent_gap_pt_min: "rules.slide.object_spacing.default_adjacent_gap_pt_min"
           element_gap_pt_min: "rules.slide.object_spacing.element_gap_pt_min"
+          semantic_pair_gap_pt_min: "rules.slide.object_spacing.semantic_pair_gap_pt_min"
       safe_text_area_text:
         severity: "warning"
         automation: "automated"
