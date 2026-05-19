@@ -31,6 +31,7 @@ from typing import Iterable
 
 FEEDBACK_ENDPOINT = "https://pptx-visual-review.pages.dev/api/feedback"
 AGE_KEY_PATH = Path.home() / ".config" / "pptx-design-review" / "age-key.txt"
+STATE_PATH = Path.home() / ".config" / "pptx-design-review" / "fetch-reviews-state.json"
 APP_NAMESPACE = "pptx-design-review"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,13 +105,46 @@ def render_decisions_tsv(rows: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_compare_tsv(slides: list[dict]) -> str:
+def read_existing_compare_memos(path: Path) -> dict[str, str]:
+    """Read the memo column from an existing compare TSV.
+
+    SPA payloads frequently arrive with an empty memo (the UI does not
+    require a free-text comment for adopt/reject), but a human reviewer may
+    have hand-edited memo on disk after a previous --apply run. Returning
+    the on-disk memos lets the caller preserve them when the new payload
+    is silent on memo. Returns {} when the file is missing or unreadable.
+    """
+    if not path.exists():
+        return {}
+    memos: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    for line in lines[1:]:  # skip header
+        if not line:
+            continue
+        cols = line.split("\t")
+        if len(cols) < 3:
+            continue
+        slide_no, _decision = cols[0], cols[1]
+        memo = "\t".join(cols[2:])
+        if memo:
+            memos[slide_no] = memo
+    return memos
+
+
+def render_compare_tsv(slides: list[dict], existing_memos: dict[str, str] | None = None) -> str:
     header = ["slide_no", "decision", "memo"]
     lines = ["\t".join(header)]
+    memos = existing_memos or {}
     for slide in slides:
+        slide_no = str(slide.get("slideNo", ""))
         decision = slide.get("decision") or ""
         memo = (slide.get("memo") or "").replace("\t", " ").replace("\n", " / ")
-        lines.append("\t".join([str(slide.get("slideNo", "")), decision, memo]))
+        if not memo and slide_no in memos:
+            memo = memos[slide_no]
+        lines.append("\t".join([slide_no, decision, memo]))
     return "\n".join(lines) + "\n"
 
 
@@ -133,7 +167,8 @@ def write_outputs(payload: dict, key: str, dry_run: bool) -> None:
             print(f"skip {key}: compare.slides not list", file=sys.stderr)
             return
         compare_path = out_dir / f"rev-{rev}-compare.tsv"
-        tsv = render_compare_tsv(slides)
+        existing_memos = read_existing_compare_memos(compare_path)
+        tsv = render_compare_tsv(slides, existing_memos)
         adopted = sum(1 for s in slides if s.get("decision") == "adopt")
         rejected = sum(1 for s in slides if s.get("decision") == "reject")
         undecided = sum(1 for s in slides if not s.get("decision"))
@@ -170,12 +205,34 @@ def write_outputs(payload: dict, key: str, dry_run: bool) -> None:
     judgements_path.write_text(judgements_text, encoding="utf-8")
 
 
+def load_processed_keys() -> set[str]:
+    if not STATE_PATH.exists():
+        return set()
+    try:
+        state = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    keys = state.get("processed_keys") or []
+    return set(keys) if isinstance(keys, list) else set()
+
+
+def save_processed_keys(processed: set[str]) -> None:
+    STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"processed_keys": sorted(processed)}
+    STATE_PATH.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--list", action="store_true", help="list pptx-design-review keys only")
     parser.add_argument("--apply", action="store_true", help="decrypt and write decisions/judgements files")
     parser.add_argument("--key", help="apply only the specified KV key (default: all)")
     parser.add_argument("--dry-run", action="store_true", help="show outputs without writing")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="reprocess KV keys even if they appear in the local processed-keys state",
+    )
     args = parser.parse_args()
 
     if not args.list and not args.apply:
@@ -193,17 +250,40 @@ def main() -> None:
         return
 
     if args.list:
+        processed = load_processed_keys()
         for key, payload in entries:
-            print(f"{key}\tdeck={payload.get('deck')}\trev={payload.get('rev')}")
+            mark = " (processed)" if key in processed else ""
+            print(f"{key}\tdeck={payload.get('deck')}\trev={payload.get('rev')}{mark}")
         return
 
+    processed = load_processed_keys()
+    if not processed and not args.force:
+        existing_tsvs = list((REPO_ROOT / "doc" / "reviews").glob("*/rev-*-compare.tsv"))
+        if existing_tsvs and not args.dry_run:
+            bootstrap_keys = {key for key, _ in entries}
+            save_processed_keys(bootstrap_keys)
+            print(
+                f"Bootstrap: found {len(existing_tsvs)} existing rev-*-compare.tsv "
+                f"file(s) but no processed-keys state. Marked all {len(bootstrap_keys)} "
+                f"KV key(s) as already processed to preserve local edits. "
+                f"Use --force --key <KV-KEY> to re-apply a specific entry."
+            )
+            return
+    newly_processed = set()
     for key, payload in entries:
+        if not args.force and key in processed:
+            print(f"skip {key}: already processed (use --force to re-apply)")
+            continue
         ciphertext = payload.get("ciphertext")
         if not ciphertext:
             print(f"skip {key}: missing ciphertext", file=sys.stderr)
             continue
         decrypted = decrypt(ciphertext)
         write_outputs(decrypted, key, args.dry_run)
+        if not args.dry_run:
+            newly_processed.add(key)
+    if newly_processed:
+        save_processed_keys(processed | newly_processed)
 
 
 if __name__ == "__main__":
