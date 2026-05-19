@@ -1616,6 +1616,99 @@ def make_finding(severity, check, slide_idx, slide_id, shape, message, detail=No
 # ---- Checks ----------------------------------------------------------------
 
 
+def _multi_step_overflow_candidates(ctx: LintContext, shape, normalized_bbox, out_sides) -> list[dict]:
+    """Build a ranked list of repair strategies for overflow_text findings.
+
+    Each entry is self-contained and can be consumed by pptx_fix.py. Order
+    reflects preference: minimal-disruption strategies come first.
+    """
+    x, y, w, h = normalized_bbox
+    candidates: list[dict] = []
+
+    # 1) Shrink height so the bbox bottom fits within the slide canvas.
+    bottom_overflow = next((amt for side, amt in out_sides if side == "bottom"), 0.0)
+    top_overflow = next((amt for side, amt in out_sides if side == "top"), 0.0)
+    if bottom_overflow > 0:
+        target_h = max(20.0, round(h - bottom_overflow, 2))
+        if target_h < h:
+            candidates.append(
+                {
+                    "strategy": "shrink_height",
+                    "geometry": {
+                        "left": round(x, 2),
+                        "top": round(y, 2),
+                        "width": round(w, 2),
+                        "height": target_h,
+                    },
+                    "reason": "trim height to fit slide bottom",
+                }
+            )
+
+    # 2) Move shape so its bbox sits inside the canvas (only addresses out-of-canvas, not text fit).
+    new_top = y
+    if top_overflow > 0:
+        new_top = max(0.0, y + top_overflow)
+    if bottom_overflow > 0 and h <= SLIDE_H_PT:
+        new_top = min(new_top, SLIDE_H_PT - h)
+    new_left = x
+    left_overflow = next((amt for side, amt in out_sides if side == "left"), 0.0)
+    right_overflow = next((amt for side, amt in out_sides if side == "right"), 0.0)
+    if left_overflow > 0:
+        new_left = max(0.0, x + left_overflow)
+    if right_overflow > 0 and w <= SLIDE_W_PT:
+        new_left = min(new_left, SLIDE_W_PT - w)
+    if (abs(new_top - y) > 0.1 or abs(new_left - x) > 0.1):
+        candidates.append(
+            {
+                "strategy": "move",
+                "geometry": {
+                    "left": round(new_left, 2),
+                    "top": round(new_top, 2),
+                    "width": round(w, 2),
+                    "height": round(h, 2),
+                },
+                "reason": "move shape inside the slide canvas",
+            }
+        )
+
+    # 3) Shrink font size to the next smaller allowed step.
+    if getattr(shape, "has_text_frame", False):
+        current_size = _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
+        if current_size is not None:
+            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < current_size]
+            if smaller:
+                target_size = smaller[-1]
+                candidates.append(
+                    {
+                        "strategy": "shrink_font_size",
+                        "font_size_pt": target_size,
+                        "from_pt": round(current_size, 2),
+                        "reason": "step down to nearest smaller allowed font size",
+                    }
+                )
+
+        # 4) Compress line height to next smaller allowed step.
+        line_heights = [
+            para.line_spacing.pt
+            for para in shape.text_frame.paragraphs
+            if para.line_spacing is not None and not isinstance(para.line_spacing, float)
+        ]
+        if line_heights:
+            current_lh = max(line_heights)
+            smaller_lh = [lh for lh in sorted(ALLOWED_LINE_HEIGHTS_PT) if lh < current_lh]
+            if smaller_lh:
+                candidates.append(
+                    {
+                        "strategy": "compress_line_height",
+                        "line_height_pt": smaller_lh[-1],
+                        "from_pt": round(current_lh, 2),
+                        "reason": "step down to nearest smaller allowed line height",
+                    }
+                )
+
+    return candidates
+
+
 def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     decorative_reason = _decorative_template_raster_reason(shape)
     normalized = normalize_bbox(ctx, bbox)
@@ -1641,15 +1734,19 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     else:
         check_id = "overflow_shapes"
     msg = "outside slide canvas: " + ", ".join(f"{s}+{a:.1f}pt" for s, a in out)
+    detail = {
+        "bbox_pt": [round(v, 2) for v in normalized],
+        "actual_bbox_pt": [round(v, 2) for v in bbox],
+        "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
+        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+    }
+    if check_id == "overflow_text":
+        multi_step = _multi_step_overflow_candidates(ctx, shape, normalized, out)
+        if multi_step:
+            detail["multi_step_candidates"] = multi_step
     findings.append(
         make_finding(
-            "error", check_id, slide_idx, slide_id, shape, msg,
-            {
-                "bbox_pt": [round(v, 2) for v in normalized],
-                "actual_bbox_pt": [round(v, 2) for v in bbox],
-                "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
-                "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
-            },
+            "error", check_id, slide_idx, slide_id, shape, msg, detail,
         )
     )
 
@@ -2558,6 +2655,89 @@ def extract_structure_relations(records: list[ShapeRecord]) -> list[StructureRel
     return relations
 
 
+def _multi_step_overlap_candidates(
+    ctx: Optional[LintContext],
+    first: ShapeRecord,
+    second: ShapeRecord,
+    overlap_bbox: tuple,
+) -> list[dict]:
+    candidates: list[dict] = []
+    ax, ay, aw, ah = first.bbox_pt
+    bx, by, bw, bh = second.bbox_pt
+    ox, oy, ow, oh = overlap_bbox
+
+    # 1) Move shape_b: nudge it past shape_a along the shorter overlap axis.
+    if ow <= oh:
+        # horizontal nudge
+        dx = aw - (ax + aw - bx) if bx >= ax else -(ax - (bx + bw))
+        new_left = bx + (ow + 4.0 if bx >= ax else -(ow + 4.0))
+        candidates.append(
+            {
+                "strategy": "move_shape_b",
+                "geometry": {
+                    "left": round(new_left, 2),
+                    "top": round(by, 2),
+                    "width": round(bw, 2),
+                    "height": round(bh, 2),
+                },
+                "reason": "horizontal nudge to clear overlap",
+            }
+        )
+    else:
+        new_top = by + (oh + 4.0 if by >= ay else -(oh + 4.0))
+        candidates.append(
+            {
+                "strategy": "move_shape_b",
+                "geometry": {
+                    "left": round(bx, 2),
+                    "top": round(new_top, 2),
+                    "width": round(bw, 2),
+                    "height": round(bh, 2),
+                },
+                "reason": "vertical nudge to clear overlap",
+            }
+        )
+
+    # 2) Shrink the larger shape's font size to release space.
+    if ctx is not None:
+        size_a = _shape_dominant_font_size_pt(ctx, first.shape)
+        size_b = _shape_dominant_font_size_pt(ctx, second.shape)
+        if size_a is not None and size_b is not None:
+            target_rec, target_size = (
+                (first, size_a) if size_a >= size_b else (second, size_b)
+            )
+            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < target_size]
+            if smaller:
+                candidates.append(
+                    {
+                        "strategy": "shrink_font_size",
+                        "target_shape_id": getattr(target_rec.shape, "shape_id", None),
+                        "font_size_pt": smaller[-1],
+                        "from_pt": round(target_size, 2),
+                        "reason": "smaller font size on the dominant shape may resolve overlap",
+                    }
+                )
+
+    # 3) Shrink shape_b height by overlap height if vertical overlap dominates.
+    if oh < bh and oh > 4.0:
+        new_h = max(20.0, round(bh - oh - 4.0, 2))
+        if new_h < bh:
+            candidates.append(
+                {
+                    "strategy": "shrink_shape_b_height",
+                    "geometry": {
+                        "left": round(bx, 2),
+                        "top": round(by, 2),
+                        "width": round(bw, 2),
+                        "height": new_h,
+                    },
+                    "reason": "reduce shape_b height to remove overlap area",
+                }
+            )
+
+    return candidates
+
+
 def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], findings, ctx: Optional[LintContext] = None):
     for idx, first in enumerate(records):
         for second in records[idx + 1:]:
@@ -2575,6 +2755,17 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
                         check_id = "object_overlap"
                         severity = "error"
                         subject = "objects"
+                    detail = {
+                        "shape_a": _shape_record_detail(first),
+                        "shape_b": _shape_record_detail(second),
+                        "overlap_area_pt2": round(overlap_area_pt2, 2),
+                        "overlap_bbox_pt": [round(v, 2) for v in overlap_bbox],
+                        "threshold_pt2": OBJECT_OVERLAP_AREA_PT2_MIN,
+                    }
+                    if check_id == "text_overlap":
+                        multi = _multi_step_overlap_candidates(ctx, first, second, overlap_bbox)
+                        if multi:
+                            detail["multi_step_candidates"] = multi
                     findings.append(
                         make_finding(
                             severity, check_id, slide_idx, slide_id, first.shape,
@@ -2583,13 +2774,7 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
                                 f"(>{OBJECT_OVERLAP_AREA_PT2_MIN:g}pt^2): "
                                 f"{_shape_label(first)} / {_shape_label(second)}"
                             ),
-                            {
-                                "shape_a": _shape_record_detail(first),
-                                "shape_b": _shape_record_detail(second),
-                                "overlap_area_pt2": round(overlap_area_pt2, 2),
-                                "overlap_bbox_pt": [round(v, 2) for v in overlap_bbox],
-                                "threshold_pt2": OBJECT_OVERLAP_AREA_PT2_MIN,
-                            },
+                            detail,
                         )
                     )
                 continue

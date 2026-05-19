@@ -1329,6 +1329,20 @@ def main() -> int:
                 f"object-relationships-bad.pptx did not trigger {sorted(missing_lint005)}; "
                 f"got {sorted(lint005_bad_check_set)}"
             )
+
+        text_overlap_findings = [
+            f
+            for f in pptx_lint.lint_pptx(object_relationships_bad)
+            if f.check == "text_overlap"
+        ]
+        if text_overlap_findings:
+            multi = text_overlap_findings[0].detail.get("multi_step_candidates") or []
+            strategies = {entry.get("strategy") for entry in multi if isinstance(entry, dict)}
+            if "move_shape_b" not in strategies:
+                failures.append(
+                    "text_overlap finding missing multi_step move_shape_b; "
+                    f"got strategies={sorted(s for s in strategies if s)}"
+                )
         unmarked_gap_findings = [
             f for f in pptx_lint.lint_pptx(unmarked_small_gap_good) if f.check == "object_gap_too_small"
         ]
@@ -1486,6 +1500,14 @@ def main() -> int:
             failures.append(
                 f"bad.pptx did not trigger {sorted(missing)}; got {sorted(bad_check_set)}"
             )
+        bad_overflow_text = [f for f in bad_findings if f.check == "overflow_text"]
+        if bad_overflow_text:
+            multi = bad_overflow_text[0].detail.get("multi_step_candidates") or []
+            strategies = {entry.get("strategy") for entry in multi if isinstance(entry, dict)}
+            if not strategies:
+                failures.append(
+                    "overflow_text finding missing multi_step_candidates strategies"
+                )
         bad_autofit = [f for f in bad_findings if f.check == "text_autofit_disabled"]
         if not bad_autofit:
             failures.append("bad.pptx did not trigger P1-14 actual text shrink")

@@ -3634,6 +3634,13 @@ rules:
         severity: "error"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.overflow_text"
+        multi_step_candidates:
+          ordered_strategies:
+            - "shrink_height"
+            - "move"
+            - "shrink_font_size"
+            - "compress_line_height"
+          rationale: "Reviewer chooses minimal-disruption step first; pptx_fix.py supports each via bbox_fit / font_size / line_height rules."
       overflow_shapes:
         severity: "error"
         automation: "automated"
@@ -3650,6 +3657,12 @@ rules:
         detection: "Detect normalized text-frame bbox pairs whose intersection area is greater than 1pt²."
         thresholds:
           overlap_area_pt2_min_exclusive: 1
+        multi_step_candidates:
+          ordered_strategies:
+            - "move_shape_b"
+            - "shrink_font_size"
+            - "shrink_shape_b_height"
+          rationale: "Nudge shape_b first; if overlap persists, smaller font on the dominant shape or shape_b height shrink are the next steps."
       object_overlap:
         severity: "error"
         automation: "automated"
