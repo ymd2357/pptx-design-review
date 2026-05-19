@@ -13,6 +13,31 @@ description: >-
 This skill enables visual inspection and validation of PPTX slide deck design
 quality, identifying and fixing issues at the source slide deck level.
 
+## ⚠ Visual export — PowerPoint Mac only, NOT LibreOffice
+
+**Always render slides via Microsoft PowerPoint Mac. LibreOffice is forbidden
+for any visual evidence in this project.** LibreOffice and PowerPoint render
+PPTX differently (fonts, line breaks, autofit, gradient/shadow handling), and
+review decisions made against a LibreOffice export do not transfer to the
+final PowerPoint output the deck is actually shipped from.
+
+Use this script when you need PNGs of slides for before/after comparison:
+
+```bash
+scripts/capture-pp-mac.sh path/to/DECK.pptx path/to/output/<name>
+# emits <name>-slide-01.png, <name>-slide-02.png, ...
+```
+
+Sandbox caveat: PowerPoint Mac only writes into folders it has already been
+granted access to. Reuse an existing approved directory and namespace runs by
+filename prefix — creating a brand-new sibling subfolder triggers a fresh
+sandbox prompt that PowerPoint handles unreliably (stalls / -1712 / -9074).
+
+Do **not** use `scripts/make_review_images.py` (it shells out to `soffice` /
+LibreOffice and is kept only for legacy reproduction). Do **not** invoke
+`soffice` / `libreoffice` directly. If PowerPoint Mac is unavailable in your
+environment, stop and ask before substituting any other renderer.
+
 ## Scope of Application
 
 - PPTX slide decks
@@ -28,8 +53,11 @@ quality, identifying and fixing issues at the source slide deck level.
    - Exported PDF (for read-only review)
 
 2. **Slide viewing must be available**
-   - PowerPoint / Google Slides / Keynote / LibreOffice
-   - Or a reliable export to images (one image per slide)
+   - Microsoft PowerPoint (Mac) is required for any rendered evidence
+     (`scripts/capture-pp-mac.sh`). See the "Visual export" notice above.
+   - Google Slides / Keynote are acceptable only as authoring environments,
+     not as the renderer for review evidence.
+   - LibreOffice is forbidden for visual evidence.
 
 3. **Access to source deck (when making fixes)**
    - The editable PPTX file must exist within the workspace
@@ -264,20 +292,20 @@ questions or confirm fixes visually, export slides to images and compare.
 2. Ask questions using the exported images (Before/After).
 3. Iterate: propose fixes, regenerate images, re-compare.
 
-### Script (optional)
+### Script
 
-If LibreOffice is available (\`soffice\` in PATH), you can generate a
-side-by-side HTML for Before/After:
+Use the PowerPoint Mac capture script for both Before and After (see the
+"Visual export" notice at the top of this file):
 
 \`\`\`bash
-python3 scripts/make_review_images.py \
-  --before BEFORE.pptx \
-  --after AFTER.pptx \
-  --outdir review-images \
-  --slides 5
+scripts/capture-pp-mac.sh path/to/BEFORE.pptx path/to/output/before
+scripts/capture-pp-mac.sh path/to/AFTER.pptx  path/to/output/after
 \`\`\`
 
-Open \`review-images/index.html\` and use the PNGs to ask questions.
+This emits \`before-slide-NN.png\` / \`after-slide-NN.png\`. Assemble a
+Before/After view by referencing those files (custom HTML, finder preview,
+or the review SPA). Do **not** fall back to \`scripts/make_review_images.py\`
+or \`soffice\`; LibreOffice renders are not acceptable evidence here.
 
 ## Workflow Overview
 
