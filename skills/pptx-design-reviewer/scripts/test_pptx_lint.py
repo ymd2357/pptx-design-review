@@ -23,7 +23,7 @@ import pptx_lint  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 from pptx import Presentation  # noqa: E402
 from pptx.dml.color import RGBColor  # noqa: E402
-from pptx.enum.shapes import MSO_SHAPE  # noqa: E402
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE  # noqa: E402
 from pptx.enum.text import MSO_AUTO_SIZE  # noqa: E402
 from pptx.enum.text import MSO_VERTICAL_ANCHOR  # noqa: E402
 from pptx.util import Pt  # noqa: E402
@@ -71,6 +71,7 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "missing_required_element",
     "reading_order",
     "wrap_break_changes_meaning",
+    "decorative_isolated_lines",
 } | LINT005_CHECKS
 
 LINT004_POLICY = {
@@ -523,6 +524,45 @@ def _add_card_with_text(slide, *, x: int, y: int, width: int, height: int, child
     return card
 
 
+def _make_decorative_isolated_line_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_connector(
+        MSO_CONNECTOR.STRAIGHT, Pt(200), Pt(200), Pt(500), Pt(200)
+    )
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(200), Pt(620), Pt(220), Pt(3))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = RGBColor.from_string("707070")
+    bar.line.fill.background()
+    box = slide.shapes.add_textbox(Pt(700), Pt(360), Pt(400), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "本文 (isolated lines are 240+pt away)"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
+def _make_decorative_line_with_companion_good(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(200), Pt(220), Pt(220), Pt(3))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = RGBColor.from_string("707070")
+    bar.line.fill.background()
+    label = slide.shapes.add_textbox(Pt(200), Pt(230), Pt(220), Pt(40))
+    label.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = label.text_frame.paragraphs[0].add_run()
+    run.text = "セクション名"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _make_card_grid_consistency_good(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -807,6 +847,10 @@ def main() -> int:
         unmarked_small_gap_good = tmp_dir / "unmarked-small-gap-good.pptx"
         card_grid_consistency_good = tmp_dir / "card-grid-consistency-good.pptx"
         card_grid_consistency_bad = tmp_dir / "card-grid-consistency-bad.pptx"
+        decorative_isolated_line_bad = tmp_dir / "decorative-isolated-line-bad.pptx"
+        decorative_line_with_companion_good = (
+            tmp_dir / "decorative-line-with-companion-good.pptx"
+        )
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
         invisible_text_box_vertical_balance_good = (
             tmp_dir / "invisible-text-box-vertical-balance-good.pptx"
@@ -850,6 +894,8 @@ def main() -> int:
         _make_unmarked_small_gap_good(unmarked_small_gap_good)
         _make_card_grid_consistency_good(card_grid_consistency_good)
         _make_card_grid_consistency_bad(card_grid_consistency_bad)
+        _make_decorative_isolated_line_bad(decorative_isolated_line_bad)
+        _make_decorative_line_with_companion_good(decorative_line_with_companion_good)
         _make_text_vertical_balance_good(text_vertical_balance_good)
         _make_invisible_text_box_vertical_balance_good(invisible_text_box_vertical_balance_good)
         _make_top_anchor_bottom_void_bad(top_anchor_bottom_void_bad)
@@ -1219,6 +1265,46 @@ def main() -> int:
         ]
         if not card_grid_bad_findings:
             failures.append("card-grid-consistency-bad.pptx did not trigger card_grid_consistency")
+
+        decorative_bad_findings = [
+            f
+            for f in pptx_lint.lint_pptx(decorative_isolated_line_bad)
+            if f.check == "decorative_isolated_lines"
+        ]
+        if len(decorative_bad_findings) < 2:
+            failures.append(
+                "decorative-isolated-line-bad.pptx did not raise both the connector and the thin bar; "
+                f"got {len(decorative_bad_findings)} finding(s)"
+            )
+        else:
+            labels = {f.detail.get("line_classification") for f in decorative_bad_findings}
+            if "connector_line" not in labels or "thin_decorative_bar" not in labels:
+                failures.append(
+                    "decorative-isolated-line-bad.pptx is missing expected classifications; "
+                    f"got {sorted(l for l in labels if l)}"
+                )
+            for f in decorative_bad_findings:
+                if f.detail.get("fixability") != "decorative_review":
+                    failures.append(
+                        "decorative_isolated_lines finding must use fixability=decorative_review; "
+                        f"got {f.detail.get('fixability')}"
+                    )
+                if not f.detail.get("candidate_values") == []:
+                    failures.append(
+                        "decorative_isolated_lines must never propose auto-removal candidates; "
+                        f"got {f.detail.get('candidate_values')!r}"
+                    )
+
+        decorative_good_findings = [
+            f
+            for f in pptx_lint.lint_pptx(decorative_line_with_companion_good)
+            if f.check == "decorative_isolated_lines"
+        ]
+        if decorative_good_findings:
+            failures.append(
+                "decorative-line-with-companion-good.pptx incorrectly triggered decorative_isolated_lines:\n  "
+                + "\n  ".join(f.message for f in decorative_good_findings)
+            )
 
         bad_findings = pptx_lint.lint_pptx(bad)
         bad_check_set = {f.check for f in bad_findings}

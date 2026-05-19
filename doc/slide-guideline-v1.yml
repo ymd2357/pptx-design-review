@@ -3275,6 +3275,19 @@ rules:
             - "unit"
           candidate_values: "font_size, line_height, text_box_height, internal_margin, and vertical_anchor options."
           manual_required_reason: "Five-axis visual balance requires comparing equivalent repair options."
+        decorative_isolated_lines:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "decorative_review"
+          required_target_fields:
+            - "shape"
+            - "bbox_pt"
+          required_measurement_fields:
+            - "line_classification"
+            - "nearest_neighbor_gap_pt"
+            - "proximity_threshold_pt"
+          candidate_values: "None — never auto-removed. Reviewer decides keep or manual delete."
+          manual_required_reason: "Isolated decorative lines/connectors/arrows may be intentional ornament; auto removal must not be proposed."
 
     # PRI-001: priority 出力が参照する ID 別の正本テーブル。
     priority_catalog:
@@ -3550,6 +3563,16 @@ rules:
         impact_axis: "micro_fix_impact"
         issue_title: "座標の微小な丸めズレがある"
         action: "見た目に問題がなければ後回しにし、テンプレート整備時に一括補正する。"
+      decorative_isolated_lines:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "孤立した装飾 line/connector/arrow が残っている"
+        action: "意図した装飾なら残す、不要なら手動で削除する。自動削除は行わない。"
       text_vertical_balance:
         status: "implemented_lint"
         priority: "P2"
@@ -3717,6 +3740,15 @@ rules:
             callout: "tokens.component.callout.padding_pt"
           padding_target_tolerance_pt: 4
           padding_policy: "left/top should match the component padding target within tolerance; right/bottom must not be below the target. Cases requiring child resize or semantic regrouping are manual."
+      decorative_isolated_lines:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.decorative_isolated_lines"
+        detection: "Detect MSO_SHAPE_TYPE.LINE / arrow- or line-named auto_shape / very thin rectangles (thickness<=4pt, length>=20pt) whose nearest neighbor bbox gap is >=24pt. Emit a decorative_review finding with fixability=decorative_review; auto removal is never proposed."
+        thresholds:
+          proximity_pt_max: 24.0
+          thin_bar_thickness_pt_max: 4.0
+          thin_bar_length_pt_min: 20.0
       card_grid_consistency:
         severity: "warning"
         automation: "automated"

@@ -30,6 +30,7 @@ Checks
 - object_overlap     (error)   non-text object bboxes overlap, excluding
                                 structural containment
 - object_gap_too_small (warning) adjacent object gap is below minimum spacing
+- decorative_isolated_lines (warning) isolated decorative line/connector/arrow with no companion shape
 - inner_padding_imbalance (warning) child objects are unbalanced inside a container
 - card_grid_consistency (warning) repeated card containers have inconsistent sizing or internal layout
 - text_vertical_balance (warning) text fits but vertical padding/center balance is unnatural
@@ -115,6 +116,9 @@ CARD_GRID_TOP_TOL_PT = 4.0
 CARD_GRID_SIZE_TOL_PT = 6.0
 CARD_GRID_PADDING_TOL_PT = 8.0
 CARD_GRID_CHILD_RELATIVE_TOL_PT = 14.0
+DECORATIVE_LINE_PROXIMITY_PT_MAX = 24.0
+DECORATIVE_THIN_BAR_THICKNESS_PT_MAX = 4.0
+DECORATIVE_THIN_BAR_LENGTH_PT_MIN = 20.0
 COVER_BRAND_MARK_MAX_W_PT = 420.0
 COVER_BRAND_MARK_MAX_H_PT = 150.0
 COVER_BRAND_MARK_MAX_X_PT = 100.0
@@ -2374,6 +2378,110 @@ def check_object_relationships(slide_idx, slide_id, records: list[ShapeRecord], 
                 )
 
 
+def _classify_decorative_line(record: ShapeRecord) -> str | None:
+    shape = record.shape
+    try:
+        shape_type = shape.shape_type
+    except (AttributeError, ValueError):
+        return None
+    if shape_type == MSO_SHAPE_TYPE.LINE:
+        return "connector_line"
+    if record.kind in {"text", "image", "table"}:
+        return None
+    try:
+        auto_shape_type = shape.auto_shape_type
+    except (AttributeError, ValueError):
+        auto_shape_type = None
+    if auto_shape_type is not None:
+        name = getattr(auto_shape_type, "name", None) or str(auto_shape_type)
+        upper = name.upper() if isinstance(name, str) else ""
+        if "ARROW" in upper:
+            return "arrow_autoshape"
+        if "LINE" in upper:
+            return "line_autoshape"
+    _, _, w, h = record.bbox_pt
+    thickness = min(w, h)
+    length = max(w, h)
+    if (
+        thickness <= DECORATIVE_THIN_BAR_THICKNESS_PT_MAX
+        and length >= DECORATIVE_THIN_BAR_LENGTH_PT_MIN
+    ):
+        return "thin_decorative_bar"
+    return None
+
+
+def _nearest_neighbor_gap_pt(target: ShapeRecord, others: Iterable[ShapeRecord]) -> float | None:
+    tx1, ty1, tx2, ty2 = _bbox_edges(target.bbox_pt)
+    best: float | None = None
+    for other in others:
+        if other is target:
+            continue
+        ox1, oy1, ox2, oy2 = _bbox_edges(other.bbox_pt)
+        hgap = _axis_gap(tx1, tx2, ox1, ox2)
+        vgap = _axis_gap(ty1, ty2, oy1, oy2)
+        gap = max(hgap, vgap)
+        if best is None or gap < best:
+            best = gap
+    return best
+
+
+def check_decorative_isolated_lines(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    classified: list[tuple[ShapeRecord, str]] = []
+    for record in records:
+        label = _classify_decorative_line(record)
+        if label is not None:
+            classified.append((record, label))
+    if not classified:
+        return
+    line_ids = {id(rec) for rec, _ in classified}
+    others = [r for r in records if id(r) not in line_ids]
+    for line, label in classified:
+        gap = _nearest_neighbor_gap_pt(line, others)
+        if gap is not None and gap < DECORATIVE_LINE_PROXIMITY_PT_MAX:
+            continue
+        gap_value: float | None = None if gap is None else round(gap, 2)
+        bbox_rounded = [round(v, 2) for v in line.bbox_pt]
+        detail = {
+            "shape": _shape_record_detail(line),
+            "line_classification": label,
+            "nearest_neighbor_gap_pt": gap_value,
+            "proximity_threshold_pt": DECORATIVE_LINE_PROXIMITY_PT_MAX,
+            "fixability": "decorative_review",
+            "fixability_reason": "decorative_isolated_line",
+            "manual_required_reason": (
+                "孤立した装飾 line/connector/arrow は意図的か削除候補かの判断が必要。"
+            ),
+            "candidate_values": [],
+            "measurement_confidence": "medium",
+            "evidence_source": "pptx_xml",
+            "evidence_confidence": "medium",
+            "evidence": {
+                "shape_kind": line.kind,
+                "bbox_pt": bbox_rounded,
+                "line_classification": label,
+                "nearest_neighbor_gap_pt": gap_value,
+                "proximity_threshold_pt": DECORATIVE_LINE_PROXIMITY_PT_MAX,
+            },
+        }
+        message = (
+            f"isolated decorative {label}: {_shape_label(line)} "
+            f"(nearest neighbor "
+            + (f"{gap_value:.1f}pt" if gap_value is not None else "n/a")
+            + f", threshold {DECORATIVE_LINE_PROXIMITY_PT_MAX:g}pt)"
+        )
+        findings.append(
+            make_finding(
+                "warning",
+                "decorative_isolated_lines",
+                slide_idx,
+                slide_id,
+                line.shape,
+                message,
+                detail,
+            )
+        )
+
+
 def _is_container_candidate(record: ShapeRecord) -> bool:
     if record.kind in {"text", "image", "table"}:
         return False
@@ -3331,6 +3439,7 @@ def lint_pptx(
             )
         slide_type = _slide_type_detail(ctx, records)
         check_object_relationships(idx, slide_id, records, findings)
+        check_decorative_isolated_lines(idx, slide_id, records, findings)
         check_inner_padding_imbalance(idx, slide_id, records, findings)
         check_card_grid_consistency(idx, slide_id, records, findings)
         check_missing_required_element(ctx, idx, slide_id, records, findings)
