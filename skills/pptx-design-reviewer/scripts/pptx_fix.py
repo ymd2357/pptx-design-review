@@ -1716,14 +1716,38 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
     if rule == "text_wrap":
         if shape is None or not getattr(shape, "has_text_frame", False):
             return None
+        candidates = detail.get("candidate_values")
+        widen: Optional[dict] = None
+        candidate_entries: list = []
+        if isinstance(candidates, list):
+            candidate_entries = candidates
+        elif isinstance(candidates, dict):
+            candidate_entries = [candidates]
+        for entry in candidate_entries:
+            if (
+                isinstance(entry, dict)
+                and entry.get("strategy") == "widen_to_fit"
+                and _valid_bbox(entry.get("bbox_pt"))
+            ):
+                widen = entry
+                break
+        after: dict = {"replace_breaks": True}
+        before_geometry = _shape_geometry_pt(shape)
+        if widen is not None:
+            sx, _ = _slide_scale_xy(prs)
+            after["widen_to_fit"] = {
+                "width_pt_norm": float(widen["bbox_pt"][2]),
+                "width_pt_actual": float(widen["bbox_pt"][2]) * sx,
+                "bbox_pt": list(widen["bbox_pt"]),
+            }
         return FixAction(
             rule=rule,
             slide_index=int(_finding_field(finding, "slide_index") or 1),
             slide_id=_finding_field(finding, "slide_id"),
             shape_id=getattr(shape, "shape_id", None),
             shape_name=getattr(shape, "name", None),
-            before={"text": shape.text_frame.text},
-            after={"replace_breaks": True},
+            before={"text": shape.text_frame.text, "geometry": before_geometry},
+            after=after,
         )
 
     if rule == "heading_hierarchy":
@@ -2075,6 +2099,12 @@ def _apply_finding_action(prs, action: FixAction) -> None:
             return
     elif action.rule == "text_wrap":
         _replace_text_breaks(shape)
+        widen = action.after.get("widen_to_fit") if isinstance(action.after, dict) else None
+        if isinstance(widen, dict):
+            try:
+                shape.width = Pt(float(widen["width_pt_actual"]))
+            except (KeyError, TypeError, ValueError):
+                pass
     elif action.rule == "heading_hierarchy":
         title = _shape_by_id(slide, action.before.get("title_shape_id"))
         body = _shape_by_id(slide, action.before.get("body_shape_id"))

@@ -636,6 +636,60 @@ def _text_excerpt(shape, limit: int = 80) -> str:
     return text[: limit - 3] + "..."
 
 
+def _estimate_text_width_pt(text: str, font_size_pt: float) -> float:
+    """Rough horizontal-extent estimate for mixed CJK + Latin text at a given
+    font size. CJK/Hiragana/Katakana glyphs count as full-width (1.0 × size);
+    everything else (Latin / digits / spaces / punctuation) as ~0.55× width.
+    The estimate is intentionally conservative on the wide side so that the
+    widen-to-fit auto-fix proposes a target wide enough for the real glyphs
+    rather than a value that ends up overflowing again.
+    """
+    if not text:
+        return 0.0
+    full = 0
+    half = 0
+    for ch in text:
+        if (
+            "぀" <= ch <= "ヿ"          # Hiragana + Katakana
+            or "㐀" <= ch <= "鿿"        # CJK Unified Ideographs
+            or "＀" <= ch <= "￯"        # Halfwidth/Fullwidth forms
+            or "　" <= ch <= "〿"        # CJK Symbols & Punctuation
+        ):
+            full += 1
+        else:
+            half += 1
+    return font_size_pt * (full + half * 0.55)
+
+
+def _text_frame_has_inline_break(text_frame) -> bool:
+    for para in text_frame.paragraphs:
+        for run in para.runs:
+            if "\n" in (run.text or "") or "\v" in (run.text or ""):
+                return True
+    return False
+
+
+def _text_frame_inline_joined_text(text_frame) -> str:
+    """Concatenate all inline (intra-run) break-separated text into a single
+    line, simulating what `_replace_text_breaks` would produce post-fix."""
+    parts: list[str] = []
+    for para in text_frame.paragraphs:
+        for run in para.runs:
+            raw = run.text or ""
+            collapsed = re.sub(r"[\n\v]+", " ", raw)
+            parts.append(collapsed)
+        parts.append(" ")
+    return "".join(parts).strip()
+
+
+def _text_frame_margin_pt(text_frame) -> tuple[float, float]:
+    left = text_frame.margin_left
+    right = text_frame.margin_right
+    left_pt = left.pt if left is not None else 0.0
+    right_pt = right.pt if right is not None else 0.0
+    return left_pt, right_pt
+
+
 def _text_frame_lines(text_frame) -> list[str]:
     lines: list[str] = []
     for para in text_frame.paragraphs:
@@ -2051,24 +2105,69 @@ def check_wrap_break_changes_meaning(ctx, slide_idx, slide_id, shape, bbox, find
         return
 
     normalized = normalize_bbox(ctx, bbox)
+    detail: dict[str, Any] = {
+        "evidence_source": "pptx_xml",
+        "evidence_confidence": "medium",
+        "text_excerpt": _text_excerpt(shape),
+        "line_count": len(lines),
+        "triggered_rules": triggered,
+        "bbox_pt": [round(v, 2) for v in normalized],
+        "actual_bbox_pt": [round(v, 2) for v in bbox],
+        "measured_value": len(triggered),
+        "threshold": 1,
+        "delta": len(triggered),
+        "unit": "line_break_risks",
+        "fixability": "manual_required",
+        "manual_required_reason": "意味を保つ折返しは内容判断が必要なので手動で確認する。",
+        "candidate_values": [],
+    }
+
+    if _text_frame_has_inline_break(shape.text_frame):
+        font_size_pt = _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
+        if font_size_pt and font_size_pt > 0:
+            joined = _text_frame_inline_joined_text(shape.text_frame)
+            margin_l, margin_r = _text_frame_margin_pt(shape.text_frame)
+            text_width_pt = _estimate_text_width_pt(joined, font_size_pt)
+            required_width_pt = text_width_pt + margin_l + margin_r + 1.0
+            current_x, current_y, current_w, current_h = normalized
+            safe_right_x = SLIDE_W_PT - SAFE_MARGIN_RIGHT_PT
+            available_width = safe_right_x - current_x
+            if (
+                required_width_pt <= available_width
+                and required_width_pt > current_w + 0.5
+            ):
+                target_width_pt = round(required_width_pt + 4.0, 2)
+                target_width_pt = min(target_width_pt, round(available_width, 2))
+                target_bbox_pt = [
+                    round(current_x, 2),
+                    round(current_y, 2),
+                    target_width_pt,
+                    round(current_h, 2),
+                ]
+                detail["candidate_values"] = [
+                    {
+                        "strategy": "widen_to_fit",
+                        "width_pt": target_width_pt,
+                        "bbox_pt": target_bbox_pt,
+                        "estimated_text_width_pt": round(text_width_pt, 2),
+                        "available_width_pt": round(available_width, 2),
+                        "font_size_pt": round(font_size_pt, 2),
+                        "joined_text_excerpt": (
+                            joined if len(joined) <= 80 else joined[:77] + "..."
+                        ),
+                        "replace_inline_breaks": True,
+                    }
+                ]
+                detail["fixability"] = "auto_fix_candidate"
+                detail["fixability_reason"] = "widen_to_fit_within_safe_area"
+                detail.pop("manual_required_reason", None)
+
     findings.append(
         make_finding(
             "warning", "wrap_break_changes_meaning", slide_idx, slide_id, shape,
             "explicit line break may split a semantic unit: "
             + ", ".join(item["rule"] for item in triggered),
-            {
-                "evidence_source": "pptx_xml",
-                "evidence_confidence": "medium",
-                "text_excerpt": _text_excerpt(shape),
-                "line_count": len(lines),
-                "triggered_rules": triggered,
-                "bbox_pt": [round(v, 2) for v in normalized],
-                "actual_bbox_pt": [round(v, 2) for v in bbox],
-                "measured_value": len(triggered),
-                "threshold": 1,
-                "delta": len(triggered),
-                "unit": "line_break_risks",
-            },
+            detail,
         )
     )
 
@@ -3760,6 +3859,21 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
             "fixability_rule": "alignment",
             "fixability_reason": "mechanical paragraph LEFT and text-frame TOP alignment change",
         }
+    if check == "wrap_break_changes_meaning":
+        widen_candidate = _widen_to_fit_candidate(evidence)
+        if widen_candidate is not None:
+            return {
+                "fixability": "auto_fix_candidate",
+                "fixability_rule": "text_wrap",
+                "fixability_reason": "widen_to_fit_within_safe_area",
+            }
+        reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
+        return {
+            "fixability": "manual_required",
+            "fixability_rule": "text_wrap",
+            "fixability_reason": reason,
+            "manual_required_reason": reason,
+        }
     if _contrast_auto_fixable(check, evidence):
         return {
             "fixability": "auto_fix_candidate",
@@ -3791,6 +3905,22 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
         "fixability_reason": reason,
         "manual_required_reason": reason,
     }
+
+
+def _widen_to_fit_candidate(evidence: dict) -> Optional[dict]:
+    candidates = evidence.get("candidate_values")
+    if not isinstance(candidates, list):
+        return None
+    for entry in candidates:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("strategy") != "widen_to_fit":
+            continue
+        bbox = entry.get("bbox_pt")
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            continue
+        return entry
+    return None
 
 
 def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
@@ -3846,6 +3976,10 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                 "container_count_to_align": len(inconsistent),
                 "selection_policy": "row_group_median",
             }
+    if check == "wrap_break_changes_meaning":
+        widen = _widen_to_fit_candidate(evidence)
+        if widen is not None:
+            return widen
     return None
 
 

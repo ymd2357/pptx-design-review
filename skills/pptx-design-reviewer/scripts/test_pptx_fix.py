@@ -106,6 +106,21 @@ def _build_wrap_break_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_wrap_break_widen_fixture(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(180), Pt(200), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.word_wrap = True
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Auto\nmation improves review speed"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _build_alignment_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(720)
@@ -779,6 +794,58 @@ def main() -> int:
         residual_wrap = [f for f in pptx_lint.lint_pptx(wrap) if f.check == "wrap_break_changes_meaning"]
         if residual_wrap:
             failures.append(f"wrap_break_changes_meaning remained after fix: {len(residual_wrap)}")
+
+        # --- wrap-break widen-to-fit candidate widens the shape [FIX-001] ---
+        wrap_widen = tmp_dir / "wrap-break-widen.pptx"
+        _build_wrap_break_widen_fixture(wrap_widen)
+        widen_findings_raw = [
+            f
+            for f in pptx_lint.lint_pptx(wrap_widen)
+            if f.check == "wrap_break_changes_meaning"
+        ]
+        if not widen_findings_raw:
+            failures.append("widen fixture did not trigger wrap_break_changes_meaning")
+        else:
+            widen_detail = widen_findings_raw[0].detail
+            cands = widen_detail.get("candidate_values") or []
+            widen_candidate = next(
+                (c for c in cands if isinstance(c, dict) and c.get("strategy") == "widen_to_fit"),
+                None,
+            )
+            if widen_candidate is None:
+                failures.append(
+                    "widen fixture: expected candidate_values.widen_to_fit; got "
+                    f"{cands!r}"
+                )
+            elif widen_detail.get("fixability") != "auto_fix_candidate":
+                failures.append(
+                    "widen fixture: expected fixability=auto_fix_candidate; got "
+                    f"{widen_detail.get('fixability')!r}"
+                )
+            else:
+                pre_prs = Presentation(str(wrap_widen))
+                pre_width = pre_prs.slides[0].shapes[0].width
+                widen_findings = [pptx_lint.finding_to_json_dict(f) for f in widen_findings_raw]
+                actions = pptx_fix.fix_pptx(
+                    wrap_widen, apply=True, rules=("text_wrap",), findings=widen_findings
+                )
+                if not any(a.rule == "text_wrap" and a.status == "apply" for a in actions):
+                    failures.append("widen fixture: text_wrap fixer did not apply")
+                post_prs = Presentation(str(wrap_widen))
+                post_shape = post_prs.slides[0].shapes[0]
+                post_width = post_shape.width
+                expected_pt = float(widen_candidate["width_pt"])
+                actual_pt = post_width / 12700.0
+                if abs(actual_pt - expected_pt) > 1.0:
+                    failures.append(
+                        f"widen fixture: shape width expected ~{expected_pt}pt; "
+                        f"got {actual_pt:.2f}pt (before {pre_width / 12700:.2f}pt)"
+                    )
+                if post_shape.text_frame.text != "Automation improves review speed":
+                    failures.append(
+                        "widen fixture: expected joined word; got "
+                        f"{post_shape.text_frame.text!r}"
+                    )
 
         # --- text color allowlist follows design-system candidate even if marked manual_required ---
         text_color = tmp_dir / "text-color.pptx"
