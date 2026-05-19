@@ -33,8 +33,8 @@ from pptx.util import Emu, Pt
 
 HERE = Path(__file__).parent
 ROOT = HERE.parents[2]
-VSCODE_RENDER_SCRIPT = ROOT / "tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js"
-VSCODE_CAPTURE_SCRIPT = ROOT / "tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js"
+VSCODE_RENDER_SCRIPT = HERE / "render_with_vscode_pptx_viewer.js"
+VSCODE_CAPTURE_SCRIPT = HERE / "capture_vscode_pptx_viewer.js"
 sys.path.insert(0, str(HERE))
 
 import make_examples  # noqa: E402

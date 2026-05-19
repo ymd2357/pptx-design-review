@@ -31,15 +31,16 @@ Chromium pipeline. Do NOT route through PDF, and do NOT use LibreOffice.**
 
 The supported path: open the PPTX in vscode-pptx-viewer's HTML viewer,
 then drive headless Chromium (Playwright) to screenshot each slide at 2×
-device pixel ratio. Two scripts compose the pipeline:
+device pixel ratio. Two scripts compose the pipeline (tracked, live under
+`skills/pptx-design-reviewer/scripts/`):
 
 ```bash
 # 1. PPTX → viewer-dir (slides.json + index.html + webview assets)
-node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \
+node skills/pptx-design-reviewer/scripts/render_with_vscode_pptx_viewer.js \
   path/to/DECK.pptx path/to/viewer-dir
 
 # 2. viewer-dir → slide-NN.png in render-dir (Playwright headless Chromium)
-node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \
+node skills/pptx-design-reviewer/scripts/capture_vscode_pptx_viewer.js \
   path/to/viewer-dir path/to/render-dir
 ```
 
@@ -48,22 +49,22 @@ prefer that when generating before/after evidence for a review.
 
 Requirements:
 
-- `vscode-pptx-viewer` repo must be present locally so `playwright` resolves
-  via `createRequire`. The capture script currently hardcodes
-  `/Users/yamadakenichi/workspace/GitHub/vscode-pptx-viewer/package.json`;
-  update this if the repo lives elsewhere.
-- `node` 18+ and a Playwright Chromium install (`npx playwright install
-  chromium` inside the vscode-pptx-viewer repo).
-
-Known caveat (scripts location): `render_with_vscode_pptx_viewer.js` and
-`capture_vscode_pptx_viewer.js` live under
-`tmp/review/260329-seminar-curriculum-proposal/scripts/`, which is
-gitignored. They were grown as deck-specific helpers but are now part of
-the project-wide pipeline (`pptx_review_orchestrator.py:_render_pptx`
-hardcodes the paths). Promoting them to a tracked location (e.g.
-`skills/pptx-design-reviewer/scripts/` or repo-root `scripts/`) is
-recommended but not yet done; until then keep the working copies in
-sync manually if you edit them.
+- `astx-jp.vscode-pptx-viewer` extension installed in VSCode or Cursor
+  (the render script reuses its bundled `dist/extension.js` parser and
+  `dist/webview.js` / `dist/webview.css` assets). The render script
+  auto-discovers `~/.vscode/extensions/astx-jp.vscode-pptx-viewer-*` and
+  `~/.cursor/extensions/astx-jp.vscode-pptx-viewer-*`, picking the
+  highest version. Override with `PPTX_VIEWER_EXT_DIR=/abs/path` if it
+  lives elsewhere.
+- `playwright` available to the capture script. It tries (in order)
+  `require('playwright')`, the repo's own `node_modules`, then the
+  `vscode-pptx-viewer` source checkouts under
+  `~/workspace/GitHub/vscode-pptx-viewer/` and
+  `~/Documents/GitHub/vscode-pptx-viewer/`. Override with
+  `PPTX_VIEWER_PLAYWRIGHT_ROOT=/abs/path/to/package.json` to force a
+  specific resolution. Run `npx playwright install chromium` once in
+  whatever package owns the playwright install.
+- `node` 18+.
 
 What NOT to use:
 
@@ -343,15 +344,15 @@ node scripts directly:
 
 \`\`\`bash
 # Before
-node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \\
+node skills/pptx-design-reviewer/scripts/render_with_vscode_pptx_viewer.js \\
   BEFORE.pptx review/before-viewer
-node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \\
+node skills/pptx-design-reviewer/scripts/capture_vscode_pptx_viewer.js \\
   review/before-viewer review/before
 
 # After
-node tmp/review/260329-seminar-curriculum-proposal/scripts/render_with_vscode_pptx_viewer.js \\
+node skills/pptx-design-reviewer/scripts/render_with_vscode_pptx_viewer.js \\
   AFTER.pptx review/after-viewer
-node tmp/review/260329-seminar-curriculum-proposal/scripts/capture_vscode_pptx_viewer.js \\
+node skills/pptx-design-reviewer/scripts/capture_vscode_pptx_viewer.js \\
   review/after-viewer review/after
 \`\`\`
 
