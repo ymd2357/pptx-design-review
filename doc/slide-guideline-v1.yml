@@ -1807,7 +1807,7 @@ rules:
       review_threshold_ratio: 0.08
 
     lint_palette:
-      description: "Explicit hex lists used by pptx_lint.py. Single source of truth for color constants when PPTX_PALETTE_SOURCE=yaml. Keep in sync with the Python defaults until DS-COLOR-001 retires the hardcoded path."
+      description: "Single source of truth for the lint color constants consumed by pptx_lint.py. The Python-side hardcoded duplicates were removed on 2026-05-20 when DS-COLOR-001 was completed; design_system_loader.load_lint_palette() now reads this section at pptx_lint import time."
       allowed_text_colors_hex:
         - "#000000"
         - "#0072B2"

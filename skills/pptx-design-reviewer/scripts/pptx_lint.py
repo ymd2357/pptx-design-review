@@ -190,210 +190,27 @@ DECORATIVE_RASTER_KEYWORDS = (
 )
 PX_PER_PT = 96 / 72
 
-ALLOWED_TEXT_COLORS_HEX = {
-    "#000000",  # brand.utility.black
-    "#333333",  # text.primary
-    "#474747",  # brand.black.b800
-    "#5C5C5C",  # brand.black.b700
-    "#666666",  # text.muted
-    "#707070",  # brand.black.b600
-    "#858585",  # brand.black.b500
-    "#999999",  # brand.black.b400
-    "#1E112D",  # text.alt_dark
-    "#FEFEFE",  # brand.utility.off_white
-    "#FFFFFF",  # text.inverse
-    "#E6033D",  # brand.gradient.red_deep, allowed for hue-preserving contrast repair
-    "#A51E6D",  # accent.magenta, allowed for emphasis text
-    "#0072B2",  # state.info, allowed for link-like text
-}
+# ---- Color palette (DS-COLOR-001: YAML 一本化, 2026-05-20) ----------------
+#
+# doc/slide-guideline-v1.yml -> rules.color.lint_palette が lint の 6 色定数
+# (allowed_text/fill_colors_hex, *_color_token_by_hex,
+#  contrast_repair / fill_repair _color_families) の唯一の正本。
+# 旧来ここに hardcoded していた Python 辞書/タプルは DS-COLOR-001 の完了に
+# 伴い撤去 (2026-05-20)。design_system_loader.load_lint_palette() が
+# import 時に YAML を読んで同じ名前空間に展開する。
+from design_system_loader import load_lint_palette as _load_lint_palette
 
-CONTRAST_REPAIR_COLOR_FAMILIES = (
-    (
-        "neutral_black",
-        (
-            "#FFFFFF",
-            "#FEFEFE",
-            "#999999",
-            "#858585",
-            "#707070",
-            "#666666",
-            "#5C5C5C",
-            "#474747",
-            "#333333",
-            "#1E112D",
-            "#000000",
-        ),
-    ),
-    (
-        "red",
-        (
-            "#FF5757",
-            "#E6033D",
-            "#D55E00",
-        ),
-    ),
-    (
-        "magenta",
-        (
-            "#C978A7",
-            "#C06299",
-            "#B74B8A",
-            "#AE357C",
-            "#A51E6D",
-        ),
-    ),
-    (
-        "blue",
-        (
-            "#56B4E9",
-            "#32BED2",
-            "#0072B2",
-        ),
-    ),
-    (
-        "green",
-        (
-            "#68BFAE",
-            "#4FB5A1",
-            "#35AA93",
-            "#1CA086",
-            "#039578",
-            "#009E73",
-        ),
-    ),
-)
+_LINT_PALETTE = _load_lint_palette()
+ALLOWED_TEXT_COLORS_HEX = set(_LINT_PALETTE.allowed_text_colors_hex)
+ALLOWED_FILL_COLORS_HEX = set(_LINT_PALETTE.allowed_fill_colors_hex)
+TEXT_COLOR_TOKEN_BY_HEX = dict(_LINT_PALETTE.text_color_token_by_hex)
+FILL_COLOR_TOKEN_BY_HEX = dict(_LINT_PALETTE.fill_color_token_by_hex)
+CONTRAST_REPAIR_COLOR_FAMILIES = _LINT_PALETTE.contrast_repair_color_families
+FILL_REPAIR_COLOR_FAMILIES = _LINT_PALETTE.fill_repair_color_families
+
 
 # Background-side hue families (sorted light→dark within each family) for fill repair.
-FILL_REPAIR_COLOR_FAMILIES = (
-    (
-        "neutral_black",
-        (
-            "#FFFFFF",
-            "#F7F7F7",
-            "#EEEEEE",
-            "#EBEBEB",
-            "#DDDDDD",
-            "#D6D6D6",
-            "#C2C2C2",
-            "#ADADAD",
-            "#999999",
-            "#858585",
-            "#707070",
-            "#5C5C5C",
-            "#474747",
-            "#333333",
-            "#1E112D",
-        ),
-    ),
-    (
-        "red",
-        (
-            "#FF5757",
-            "#E6033D",
-            "#D55E00",
-        ),
-    ),
-    (
-        "magenta",
-        (
-            "#F6E9F0",
-            "#EDD2E2",
-            "#E4BCD3",
-            "#DBA5C5",
-            "#D28FB6",
-            "#C978A7",
-            "#C06299",
-            "#B74B8A",
-            "#AE357C",
-            "#A51E6D",
-        ),
-    ),
-    (
-        "blue",
-        (
-            "#56B4E9",
-            "#32BED2",
-            "#0072B2",
-        ),
-    ),
-    (
-        "green",
-        (
-            "#E6F4F2",
-            "#CDEAE4",
-            "#B3DFD7",
-            "#9AD5C9",
-            "#81CABC",
-            "#68BFAE",
-            "#4FB5A1",
-            "#35AA93",
-            "#1CA086",
-            "#039578",
-            "#009E73",
-        ),
-    ),
-    (
-        "gold",
-        (
-            "#FFF9CF",
-            "#FFE177",
-            "#FFBC2A",
-            "#E69F00",
-        ),
-    ),
-)
 
-ALLOWED_FILL_COLORS_HEX = {
-    "#FFFFFF",  # background.base / neutral.n0
-    "#F7F7F7",  # background.muted / neutral.n100
-    "#EEEEEE",  # neutral.n200
-    "#EBEBEB",  # brand.black.b50
-    "#DDDDDD",  # neutral.n300 / border.default
-    "#D6D6D6",  # brand.black.b100
-    "#C2C2C2",  # brand.black.b200
-    "#ADADAD",  # brand.black.b300
-    "#999999",  # brand.black.b400
-    "#858585",  # brand.black.b500
-    "#707070",  # brand.black.b600
-    "#5C5C5C",  # brand.black.b700
-    "#474747",  # brand.black.b800
-    "#333333",  # brand.black.b900
-    "#F6E9F0",  # brand.primary.p50
-    "#EDD2E2",  # brand.primary.p100
-    "#E4BCD3",  # brand.primary.p200
-    "#DBA5C5",  # brand.primary.p300
-    "#D28FB6",  # brand.primary.p400
-    "#C978A7",  # brand.primary.p500
-    "#C06299",  # brand.primary.p600
-    "#B74B8A",  # brand.primary.p700
-    "#AE357C",  # brand.primary.p800
-    "#A51E6D",  # accent.magenta
-    "#E6F4F2",  # brand.secondary.s50
-    "#CDEAE4",  # brand.secondary.s100
-    "#B3DFD7",  # brand.secondary.s200
-    "#9AD5C9",  # brand.secondary.s300
-    "#81CABC",  # brand.secondary.s400
-    "#68BFAE",  # brand.secondary.s500
-    "#4FB5A1",  # brand.secondary.s600
-    "#35AA93",  # brand.secondary.s700
-    "#1CA086",  # brand.secondary.s800
-    "#039578",  # brand.secondary.s900
-    "#FF5757",  # brand.gradient.red
-    "#E6033D",  # brand.gradient.red_deep
-    "#32BED2",  # brand.gradient.cyan
-    "#8C52FF",  # brand.gradient.purple
-    "#673BA0",  # brand.gradient.purple_deep
-    "#FFBC2A",  # brand.gold.base
-    "#FFE177",  # brand.gold.light
-    "#FFF9CF",  # brand.gold.pale
-    "#1E112D",  # data series / dark emphasis
-    "#0072B2",  # state.info / data series
-    "#009E73",  # state.success / data series
-    "#E69F00",  # state.warning / data series
-    "#D55E00",  # state.danger / data series
-    "#56B4E9",  # data series
-    "#CC79A7",  # data series
-}
 
 CONTRAST_RATIO_NORMAL_TEXT_MIN = 4.5
 CONTRAST_RATIO_LARGE_TEXT_MIN = 3.0
@@ -409,60 +226,7 @@ RENDERED_CONTRAST_EXPECTED_COLOR_DISTANCE_MAX = 18
 RENDERED_CONTRAST_BACKGROUND_UNIFORM_DISTANCE_MAX = 12
 RENDERED_CONTRAST_BACKGROUND_UNIFORMITY_MIN = 0.70
 
-TEXT_COLOR_TOKEN_BY_HEX = {
-    "#000000": "brand.utility.black",
-    "#333333": "text.primary",
-    "#474747": "brand.black.b800",
-    "#5C5C5C": "brand.black.b700",
-    "#666666": "text.muted",
-    "#707070": "brand.black.b600",
-    "#858585": "brand.black.b500",
-    "#999999": "brand.black.b400",
-    "#1E112D": "text.alt_dark",
-    "#FEFEFE": "brand.utility.off_white",
-    "#FFFFFF": "text.inverse",
-    "#E6033D": "brand.gradient.red_deep",
-    "#A51E6D": "accent.magenta",
-    "#0072B2": "state.info",
-}
 
-FILL_COLOR_TOKEN_BY_HEX = {
-    "#FFFFFF": "background.base",
-    "#F7F7F7": "background.muted",
-    "#EEEEEE": "neutral.n200",
-    "#EBEBEB": "brand.black.b50",
-    "#DDDDDD": "border.default",
-    "#333333": "brand.black.b900",
-    "#F6E9F0": "brand.primary.p50",
-    "#A51E6D": "accent.magenta",
-    "#E6F4F2": "brand.secondary.s50",
-    "#039578": "brand.secondary.s900",
-    "#FFBC2A": "brand.gold.base",
-    "#1E112D": "data.dark",
-    "#0072B2": "state.info",
-    "#009E73": "state.success",
-    "#E69F00": "state.warning",
-    "#D55E00": "state.danger",
-}
-
-# ---- Optional YAML palette override (DS-COLOR-001) ------------------------
-#
-# When env var `PPTX_PALETTE_SOURCE=yaml` is set, replace the 5 hardcoded
-# color constants above with values loaded from `doc/slide-guideline-v1.yml`
-# → `rules.color.lint_palette`. Default keeps the hardcoded path. The two
-# sources are intended to be identical; the YAML version is the migration
-# target and the hardcoded version is the safety net until full cutover.
-
-if os.environ.get("PPTX_PALETTE_SOURCE", "hardcoded").lower() == "yaml":
-    from design_system_loader import load_lint_palette as _load_lint_palette
-
-    _yaml_palette = _load_lint_palette()
-    ALLOWED_TEXT_COLORS_HEX = set(_yaml_palette.allowed_text_colors_hex)
-    ALLOWED_FILL_COLORS_HEX = set(_yaml_palette.allowed_fill_colors_hex)
-    TEXT_COLOR_TOKEN_BY_HEX = dict(_yaml_palette.text_color_token_by_hex)
-    FILL_COLOR_TOKEN_BY_HEX = dict(_yaml_palette.fill_color_token_by_hex)
-    CONTRAST_REPAIR_COLOR_FAMILIES = _yaml_palette.contrast_repair_color_families
-    FILL_REPAIR_COLOR_FAMILIES = _yaml_palette.fill_repair_color_families
 
 # Tolerance for fp comparisons in pt. Geometry rounding policy is 0.5pt.
 TOL_PT = 0.5

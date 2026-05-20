@@ -6,9 +6,10 @@ constants (ALLOWED_TEXT_COLORS_HEX, ALLOWED_FILL_COLORS_HEX,
 TEXT_COLOR_TOKEN_BY_HEX, FILL_COLOR_TOKEN_BY_HEX,
 CONTRAST_REPAIR_COLOR_FAMILIES, FILL_REPAIR_COLOR_FAMILIES).
 
-Used when env var `PPTX_PALETTE_SOURCE=yaml`. Default behavior keeps the
-Python-side hardcoded constants — this loader is opt-in until
-DS-COLOR-001 retires the duplicate definition.
+Called unconditionally at pptx_lint.py import time (DS-COLOR-001 was
+completed on 2026-05-20: the Python-side hardcoded duplicates have been
+removed, so this YAML file is the single source of truth for the lint
+color palette).
 """
 
 from __future__ import annotations
