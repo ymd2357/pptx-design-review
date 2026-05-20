@@ -97,36 +97,80 @@ ALL_RULES = (
     "text_vertical_balance",
     "badge_alignment",
 )
-CHECK_TO_RULE = {
-    "text_autofit_disabled": "autofit",
-    "geometry_rounding": "geometry",
-    "font_size_scale": "font_size",
-    "line_height": "line_height",
-    "alignment_left_top": "alignment",
-    "low_contrast": "contrast",
-    "contrast_ratio": "contrast",
-    "font_family": "font_family",
-    "text_color_allowlist": "text_color",
-    "background_color_palette": "fill_color",
-    "overflow_text": "bbox_fit",
-    "overflow_shapes": "bbox_fit",
-    "overflow_images": "bbox_fit",
-    "safe_margins": "bbox_fit",
-    "safe_text_area_text": "bbox_fit",
-    "text_overlap": "overlap",
-    "object_overlap": "overlap",
-    "object_gap_too_small": "spacing",
-    "image_aspect_distortion": "image_aspect",
-    "key_area_cropped": "image_crop",
-    "reading_order": "reading_order",
-    "animation_present": "animation",
-    "wrap_break_changes_meaning": "text_wrap",
-    "heading_hierarchy_broken": "heading_hierarchy",
-    "inner_padding_imbalance": "inner_padding",
-    "card_grid_consistency": "card_grid",
-    "text_vertical_balance": "text_vertical_balance",
-    "badge_alignment": "badge_alignment",
-}
+def _load_check_to_rule() -> dict[str, str]:
+    """Derive CHECK_TO_RULE from doc/slide-guideline-v1.yml:rules.lint.fix_policy.
+
+    The YAML is the single source of truth (POLICY-001). Only checks with
+    apply_mode in {auto, judgement} expose a fix_rule; apply_mode=manual
+    checks intentionally do not appear in CHECK_TO_RULE.
+
+    Tolerates a missing PyYAML by falling back to a minimal text parser
+    so that pptx_fix.py can still import in environments where PyYAML
+    is unavailable.
+    """
+    guideline = Path(__file__).resolve().parents[3] / "doc" / "slide-guideline-v1.yml"
+    try:
+        import yaml  # type: ignore
+
+        data = yaml.safe_load(guideline.read_text(encoding="utf-8"))
+        fix_policy = (data.get("rules") or {}).get("lint", {}).get("fix_policy") or {}
+        mapping: dict[str, str] = {}
+        for check, entry in fix_policy.items():
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("apply_mode") in {"auto", "judgement"}:
+                fix_rule = entry.get("fix_rule")
+                if isinstance(fix_rule, str):
+                    mapping[check] = fix_rule
+        return mapping
+    except Exception:
+        return _parse_check_to_rule_textually(guideline)
+
+
+def _parse_check_to_rule_textually(guideline: Path) -> dict[str, str]:
+    """Minimal text-mode reader for rules.lint.fix_policy used when PyYAML
+    is not installed. Only extracts {check: fix_rule} pairs.
+    """
+    mapping: dict[str, str] = {}
+    in_section = False
+    current_check: str | None = None
+    current_mode: str | None = None
+    current_rule: str | None = None
+
+    def flush() -> None:
+        if current_check and current_mode in {"auto", "judgement"} and current_rule:
+            mapping[current_check] = current_rule
+
+    for raw in guideline.read_text(encoding="utf-8").splitlines():
+        if raw.lstrip().startswith("#"):
+            continue
+        if raw == "    fix_policy:":
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        if raw.startswith("    ") and not raw.startswith("      "):
+            # Left the fix_policy block.
+            flush()
+            current_check = current_mode = current_rule = None
+            break
+        if raw.startswith("      ") and not raw.startswith("        ") and raw.rstrip().endswith(":"):
+            flush()
+            current_check = raw.strip().rstrip(":")
+            current_mode = current_rule = None
+            continue
+        if current_check and raw.startswith("        "):
+            stripped = raw.strip()
+            if stripped.startswith("apply_mode:"):
+                current_mode = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+            elif stripped.startswith("fix_rule:"):
+                value = stripped.split(":", 1)[1].strip().strip('"').strip("'")
+                current_rule = None if value in {"null", "~", ""} else value
+    flush()
+    return mapping
+
+
+CHECK_TO_RULE = _load_check_to_rule()
 
 
 @dataclass

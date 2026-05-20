@@ -4106,6 +4106,27 @@ def filter_by_severity(findings: List[Finding], min_sev: str) -> List[Finding]:
     return findings
 
 
+def _load_fix_policy() -> dict[str, dict]:
+    """Read rules.lint.fix_policy from doc/slide-guideline-v1.yml (POLICY-001).
+
+    Single source of truth: pptx_fix.py also reads the same table. PyYAML is
+    expected to be present in the project venv; fall back to an empty dict
+    if it's missing so that imports do not break in unconfigured envs
+    (callers will then take the manual_required default path).
+    """
+    guideline = Path(__file__).resolve().parents[3] / "doc" / "slide-guideline-v1.yml"
+    try:
+        import yaml  # type: ignore
+
+        data = yaml.safe_load(guideline.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return (data.get("rules") or {}).get("lint", {}).get("fix_policy") or {}
+
+
+FIX_POLICY = _load_fix_policy()
+
+
 MANUAL_REQUIRED_REASONS = {
     "slide_size": "slide canvas change can reflow all content",
     "animation_present": "static delivery impact requires author decision",
@@ -4177,94 +4198,110 @@ def _contrast_auto_fixable(check: str, evidence: dict) -> bool:
     return _contrast_candidate(foreground, background, required) is not None
 
 
-def _fixability_for_json(check: str, evidence: dict) -> dict:
-    if check == "text_autofit_disabled":
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "autofit",
-            "fixability_reason": "mechanical text_frame.auto_size NONE change",
-        }
-    if check == "geometry_rounding" and _geometry_auto_fixable(evidence):
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "geometry",
-            "fixability_reason": "all drifted geometry values are within 0.1pt of integer coordinates",
-        }
+_AUTO_FIX_REASONS = {
+    "text_autofit_disabled": "mechanical text_frame.auto_size NONE change",
+    "font_size_scale": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+    "line_height": "nearest allowed fixed line height can be applied when pptx_fix fit checks pass",
+    "alignment_left_top": "mechanical paragraph LEFT and text-frame TOP alignment change",
+    "badge_alignment": "mechanical paragraph CENTER and text-frame MIDDLE alignment change for badge container",
+}
+
+_JUDGEMENT_AUTO_FIX_REASONS = {
+    "geometry_rounding": "all drifted geometry values are within 0.1pt of integer coordinates",
+    "wrap_break_changes_meaning": "widen_to_fit_within_safe_area",
+    "low_contrast": "nearest allowed foreground color passes the required contrast ratio",
+    "contrast_ratio": "nearest allowed foreground color passes the required contrast ratio",
+    "card_grid_consistency": (
+        "row containers can be aligned to the group median geometry (top/width/height + padding)"
+    ),
+}
+
+
+def _judgement_auto_fixable(check: str, evidence: dict) -> bool:
+    """Per-check predicate that decides whether a `judgement`-policy finding
+    qualifies for immediate auto_fix_candidate promotion (instead of waiting
+    for SPA judgement). Mirrors the historical branching: presence of a
+    concrete fix candidate / drift within tolerance / etc.
+    """
     if check == "geometry_rounding":
-        reason = "geometry delta is not within the safe auto-rounding tolerance"
-        return {
-            "fixability": "manual_required",
-            "fixability_rule": "geometry",
-            "fixability_reason": reason,
-            "manual_required_reason": reason,
-        }
-    if check == "font_size_scale":
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "font_size",
-            "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
-        }
-    if check == "line_height":
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "line_height",
-            "fixability_reason": "nearest allowed fixed line height can be applied when pptx_fix fit checks pass",
-        }
-    if check == "alignment_left_top":
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "alignment",
-            "fixability_reason": "mechanical paragraph LEFT and text-frame TOP alignment change",
-        }
+        return _geometry_auto_fixable(evidence)
     if check == "wrap_break_changes_meaning":
-        widen_candidate = _widen_to_fit_candidate(evidence)
-        if widen_candidate is not None:
-            return {
-                "fixability": "auto_fix_candidate",
-                "fixability_rule": "text_wrap",
-                "fixability_reason": "widen_to_fit_within_safe_area",
-            }
-        reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
-        return {
-            "fixability": "manual_required",
-            "fixability_rule": "text_wrap",
-            "fixability_reason": reason,
-            "manual_required_reason": reason,
-        }
-    if check == "badge_alignment":
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "badge_alignment",
-            "fixability_reason": "mechanical paragraph CENTER and text-frame MIDDLE alignment change for badge container",
-        }
-    if _contrast_auto_fixable(check, evidence):
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "contrast",
-            "fixability_reason": "nearest allowed foreground color passes the required contrast ratio",
-        }
-    if _card_grid_auto_fixable(check, evidence):
-        return {
-            "fixability": "auto_fix_candidate",
-            "fixability_rule": "card_grid",
-            "fixability_reason": "row containers can be aligned to the group median geometry (top/width/height + padding)",
-        }
+        return _widen_to_fit_candidate(evidence) is not None
+    if check in {"low_contrast", "contrast_ratio"}:
+        return _contrast_auto_fixable(check, evidence)
+    if check == "card_grid_consistency":
+        return _card_grid_auto_fixable(check, evidence)
+    return False
+
+
+def _judgement_manual_reason(check: str, evidence: dict) -> str:
+    """Reason string when a judgement-policy check stays at manual_required.
+    Captures the small set of context-aware overrides the previous
+    if/elif had for contrast 系.
+    """
     if check in {"contrast_ratio", "low_contrast"}:
-        reason = MANUAL_REQUIRED_REASONS.get(check, "contrast repair requires visual review")
         if evidence.get("affected_slides"):
-            reason = "recurring contrast finding must be expanded with --no-consolidate before auto-fix"
-        elif evidence.get("background_complexity") == "complex":
-            reason = "complex background requires local-contrast review before auto-fix"
+            return "recurring contrast finding must be expanded with --no-consolidate before auto-fix"
+        if evidence.get("background_complexity") == "complex":
+            return "complex background requires local-contrast review before auto-fix"
+        return MANUAL_REQUIRED_REASONS.get(check, "contrast repair requires visual review")
+    return MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
+
+
+def _fixability_for_json(check: str, evidence: dict) -> dict:
+    """Resolve the fixability/rule/reason triple for `check` using the
+    single source of truth `rules.lint.fix_policy` in
+    doc/slide-guideline-v1.yml (POLICY-001 段階 2).
+
+    apply_mode dispatch:
+      - manual    : never auto-fixable. decorative_isolated_lines surfaces
+                    as `decorative_review`; everything else stays
+                    `manual_required`.
+      - auto      : always emit `auto_fix_candidate` with the policy
+                    fix_rule and a per-check reason from _AUTO_FIX_REASONS.
+      - judgement : emit `auto_fix_candidate` only when the per-check
+                    predicate `_judgement_auto_fixable` is satisfied;
+                    otherwise stay at `manual_required` (the SPA-driven
+                    promotion path takes over).
+    """
+    entry = FIX_POLICY.get(check, {})
+    apply_mode = entry.get("apply_mode")
+    fix_rule = entry.get("fix_rule")
+
+    if apply_mode == "manual" or apply_mode is None:
+        reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
+        if check == "decorative_isolated_lines":
+            return {
+                "fixability": "decorative_review",
+                "fixability_rule": None,
+                "fixability_reason": reason,
+                "manual_required_reason": reason,
+            }
         return {
             "fixability": "manual_required",
-            "fixability_rule": "contrast",
+            "fixability_rule": None,
             "fixability_reason": reason,
             "manual_required_reason": reason,
         }
-    reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
+
+    if apply_mode == "auto":
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": fix_rule,
+            "fixability_reason": _AUTO_FIX_REASONS.get(check, f"mechanical {fix_rule} change"),
+        }
+
+    # apply_mode == "judgement"
+    if _judgement_auto_fixable(check, evidence):
+        return {
+            "fixability": "auto_fix_candidate",
+            "fixability_rule": fix_rule,
+            "fixability_reason": _JUDGEMENT_AUTO_FIX_REASONS.get(check, f"auto-fix candidate for {fix_rule}"),
+        }
+    reason = _judgement_manual_reason(check, evidence)
     return {
         "fixability": "manual_required",
-        "fixability_rule": None,
+        "fixability_rule": fix_rule,
         "fixability_reason": reason,
         "manual_required_reason": reason,
     }
