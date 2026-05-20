@@ -2901,12 +2901,25 @@ def check_decorative_isolated_lines(slide_idx, slide_id, records: list[ShapeReco
             "line_classification": label,
             "nearest_neighbor_gap_pt": gap_value,
             "proximity_threshold_pt": DECORATIVE_LINE_PROXIMITY_PT_MAX,
-            "fixability": "decorative_review",
+            # FIX-013 / POLICY-001 段階3: apply_mode=judgement_fix で扱う。
+            # lint は manual_required + candidate (= 削除候補) を出し、SPA で
+            # judgement_reason=auto_fixable に promote されたものだけ
+            # pptx_fix が shape を削除する (strict gate)。
+            "fixability": "manual_required",
             "fixability_reason": "decorative_isolated_line",
             "manual_required_reason": (
                 "孤立した装飾 line/connector/arrow は意図的か削除候補かの判断が必要。"
+                "SPA で auto_fixable と判定された場合のみ pptx_fix が削除する。"
             ),
-            "candidate_values": [],
+            "candidate_values": [
+                {
+                    "strategy": "remove_shape",
+                    "shape_id": getattr(line.shape, "shape_id", None),
+                    "shape_name": getattr(line.shape, "name", None),
+                    "line_classification": label,
+                    "bbox_pt": bbox_rounded,
+                }
+            ],
             "measurement_confidence": "medium",
             "evidence_source": "pptx_xml",
             "evidence_confidence": "medium",
@@ -4273,13 +4286,6 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
 
     if apply_mode == "no_fix" or apply_mode is None:
         reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
-        if check == "decorative_isolated_lines":
-            return {
-                "fixability": "decorative_review",
-                "fixability_rule": None,
-                "fixability_reason": reason,
-                "manual_required_reason": reason,
-            }
         return {
             "fixability": "manual_required",
             "fixability_rule": None,
@@ -4385,6 +4391,10 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
             return widen
     if check == "badge_alignment":
         return {"alignment": "CENTER", "vertical_anchor": "MIDDLE"}
+    if check == "decorative_isolated_lines":
+        candidates = evidence.get("candidate_values")
+        if isinstance(candidates, list) and candidates:
+            return candidates
     return None
 
 

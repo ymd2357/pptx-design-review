@@ -106,6 +106,33 @@ def _build_wrap_break_fixture(out: Path) -> None:
     prs.save(str(out))
 
 
+def _build_decorative_isolated_lines_fixture(out: Path) -> None:
+    """Slide with a connector + thin decorative bar far from any text + one
+    far-away textbox (= isolated decorative lines). Used by FIX-013 tests
+    for judgement-driven shape removal.
+    """
+    from pptx.enum.shapes import MSO_CONNECTOR  # local import to avoid top-level dep
+
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    slide.shapes.add_connector(
+        MSO_CONNECTOR.STRAIGHT, Pt(200), Pt(200), Pt(500), Pt(200)
+    )
+    bar = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(200), Pt(620), Pt(220), Pt(3))
+    bar.fill.solid()
+    bar.fill.fore_color.rgb = RGBColor.from_string("707070")
+    bar.line.fill.background()
+    box = slide.shapes.add_textbox(Pt(900), Pt(360), Pt(400), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "本文 (lines are isolated)"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _build_badge_alignment_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -862,6 +889,69 @@ def main() -> int:
             if residual:
                 failures.append(
                     f"badge_alignment finding remained after fix: {len(residual)}"
+                )
+
+        # --- decorative_isolated_lines: judgement-driven shape removal [FIX-013] ---
+        deco = tmp_dir / "decorative-isolated.pptx"
+        _build_decorative_isolated_lines_fixture(deco)
+
+        # 1. Without judgement, strict gate keeps the shape (manual_required).
+        deco_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(deco)
+            if f.check == "decorative_isolated_lines"
+        ]
+        if not deco_findings:
+            failures.append("decorative-isolated fixture did not trigger lint")
+        else:
+            pre_count = len(Presentation(str(deco)).slides[0].shapes)
+            actions_skipped = pptx_fix.fix_pptx(
+                deco,
+                apply=True,
+                rules=("decorative_remove",),
+                findings=deco_findings,
+            )
+            applied = [a for a in actions_skipped if a.rule == "decorative_remove" and a.status == "apply"]
+            if applied:
+                failures.append(
+                    f"decorative_remove without judgement should be skipped by gate; got {len(applied)} apply"
+                )
+            post_count = len(Presentation(str(deco)).slides[0].shapes)
+            if post_count != pre_count:
+                failures.append(
+                    f"shape count changed without judgement: {pre_count} -> {post_count}"
+                )
+
+            # 2. Promote one finding via judgement_reason=auto_fixable → it is removed.
+            target = deco_findings[0]
+            key = pptx_fix._judgement_finding_key(
+                target["check"], target["slide_index"], target["shape_id"]
+            )
+            judgements_data = {
+                "deck": "fixture",
+                "rev": "001",
+                "judgements": {key: {"judgement_reason": "auto_fixable"}},
+            }
+            promoted = pptx_fix.apply_finding_judgements_overrides(deco_findings, judgements_data)
+            if promoted != 1:
+                failures.append(
+                    f"apply_finding_judgements_overrides expected 1 promote; got {promoted}"
+                )
+            actions_applied = pptx_fix.fix_pptx(
+                deco,
+                apply=True,
+                rules=("decorative_remove",),
+                findings=deco_findings,
+            )
+            applied = [a for a in actions_applied if a.rule == "decorative_remove" and a.status == "apply"]
+            if len(applied) != 1:
+                failures.append(
+                    f"decorative_remove expected 1 apply after promote; got {len(applied)}"
+                )
+            remaining_count = len(Presentation(str(deco)).slides[0].shapes)
+            if remaining_count != pre_count - 1:
+                failures.append(
+                    f"shape count after promote+apply expected {pre_count - 1}; got {remaining_count}"
                 )
 
         # --- wrap-break widen-to-fit candidate widens the shape [FIX-001] ---

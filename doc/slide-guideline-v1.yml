@@ -3991,9 +3991,9 @@ rules:
         fix_rule: null
         manual_reason: "content/template 判断が必要。"
       decorative_isolated_lines:
-        apply_mode: no_fix
-        fix_rule: null
-        manual_reason: "意図的な装飾と区別できないため自動削除しない。FIX-013 で judgement 経路に拡張予定。"
+        apply_mode: judgement_fix
+        fix_rule: decorative_remove
+        note: "FIX-013 で judgement_fix 経路に移行 (2026-05-20)。lint は manual_required + candidate_values=[{strategy:remove_shape}] を出力。SPA で judgement_reason=auto_fixable に promote されたものだけ pptx_fix が shape を element tree から remove する (strict gate なので promote 必須、自動削除はしない原則を維持)。"
       slide_size:
         apply_mode: no_fix
         fix_rule: null

@@ -1387,16 +1387,27 @@ def main() -> int:
                     "decorative-isolated-line-bad.pptx is missing expected classifications; "
                     f"got {sorted(l for l in labels if l)}"
                 )
+            # FIX-013 (2026-05-20): decorative_isolated_lines は no_fix から
+            # judgement_fix policy に移行。lint は manual_required + 削除
+            # candidate (remove_shape) を出し、SPA judgement で auto_fixable
+            # に promote されたものだけ pptx_fix が削除する。
             for f in decorative_bad_findings:
-                if f.detail.get("fixability") != "decorative_review":
+                if f.detail.get("fixability") != "manual_required":
                     failures.append(
-                        "decorative_isolated_lines finding must use fixability=decorative_review; "
-                        f"got {f.detail.get('fixability')}"
+                        "decorative_isolated_lines finding must use fixability=manual_required "
+                        f"(judgement_fix policy); got {f.detail.get('fixability')}"
                     )
-                if not f.detail.get("candidate_values") == []:
+                candidates = f.detail.get("candidate_values") or []
+                if not (
+                    isinstance(candidates, list)
+                    and any(
+                        isinstance(c, dict) and c.get("strategy") == "remove_shape"
+                        for c in candidates
+                    )
+                ):
                     failures.append(
-                        "decorative_isolated_lines must never propose auto-removal candidates; "
-                        f"got {f.detail.get('candidate_values')!r}"
+                        "decorative_isolated_lines must propose a remove_shape candidate; "
+                        f"got {candidates!r}"
                     )
 
         decorative_good_findings = [

@@ -96,6 +96,7 @@ ALL_RULES = (
     "card_grid",
     "text_vertical_balance",
     "badge_alignment",
+    "decorative_remove",
 )
 def _load_fix_policy() -> dict[str, dict]:
     """Load rules.lint.fix_policy from doc/slide-guideline-v1.yml.
@@ -807,6 +808,7 @@ FINDING_DRIVEN_RULES = {
     "card_grid",
     "badge_alignment",
     "text_vertical_balance",
+    "decorative_remove",
 }
 
 
@@ -1870,6 +1872,26 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             after={"alignment": "CENTER", "vertical_anchor": "MIDDLE"},
         )
 
+    if rule == "decorative_remove":
+        # FIX-013: lint が出した remove_shape candidate を SPA judgement で
+        # auto_fixable に promote した finding が来ると、対象 shape を
+        # slide の spTree から物理削除する。promote されないと strict gate
+        # が manual_required で skip するので、ここまで来た時点で削除可。
+        if shape is None:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={
+                "shape_id": getattr(shape, "shape_id", None),
+                "shape_name": getattr(shape, "name", None),
+            },
+            after={"action": "remove_shape"},
+        )
+
     if rule == "heading_hierarchy":
         title = _shape_from_finding(prs, finding, "title_candidate")
         body = _shape_from_finding(prs, finding, "largest_body_candidate")
@@ -2237,6 +2259,14 @@ def _apply_finding_action(prs, action: FixAction) -> None:
         for para in shape.text_frame.paragraphs:
             if para.text.strip():
                 para.alignment = PP_ALIGN.CENTER
+    elif action.rule == "decorative_remove":
+        # FIX-013: physically remove the shape element from its slide spTree.
+        # python-pptx does not expose a high-level delete API, so we drop the
+        # underlying lxml element.
+        sp_element = shape._element  # noqa: SLF001 — intentional XML access
+        parent = sp_element.getparent()
+        if parent is not None:
+            parent.remove(sp_element)
 
 
 # ---- Driver ----------------------------------------------------------------
