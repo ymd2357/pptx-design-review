@@ -3853,6 +3853,147 @@ rules:
           principle: "フォントサイズ変更とテキストボックスサイズ変更は対等な選択肢として扱い、片方を他方に内包させない。anchor、line height、internal margin と合わせて 5 軸で再設計する。"
           excluded_from_auto_fix: true
 
+    # ========================================================================
+    # rules.lint.fix_policy
+    # ------------------------------------------------------------------------
+    # lint で検出される各 check に対する fix の取り扱い方針を宣言する単一の
+    # 正本テーブル。pptx_lint.py の _fixability_for_json、pptx_fix.py の
+    # CHECK_TO_RULE / FINDING_DRIVEN_RULES、pptx_review_priorities.py が
+    # 共通でここを参照する想定 (refactor 段階 2 以降で実装側を切替)。
+    #
+    # apply_mode:
+    #   - auto       : lint が常に auto_fix_candidate を発行し、pptx_fix が
+    #                  即適用できる ("無条件で機械修正可" な mechanical 系)。
+    #   - judgement  : lint は manual_required (場合により auto_fix_candidate)
+    #                  を発行し、candidate_values も併走で出す。SPA で
+    #                  finding 単位の judgement_reason=auto_fixable が付与
+    #                  された finding のみ pptx_fix が apply する。
+    #                  REV-017 などの deck-level adopt/reject はこの apply の
+    #                  「後段」のレビューに位置づけられる (= apply ↔ adopt は
+    #                  異なるレイヤー)。
+    #   - manual     : 機械修正は一切提案しない。lint 検出のみで終わる。
+    #                  原則として content / semantic / 素材入手が必要なもの。
+    #
+    # fix_rule: pptx_fix.py 側に登録された rule 名。apply_mode=manual のとき
+    #          は null。
+    #
+    # 段階 1 (このコミット時点): YAML 正本テーブルとして列挙のみ。
+    # 段階 2: pptx_lint.py / pptx_fix.py がここを参照するよう refactor。
+    # 段階 3: 「apply_mode=judgement は judgement 不在で apply しない」厳格化
+    #         (仕様変更が伴うため別議論)。
+    # ========================================================================
+    fix_policy:
+      text_autofit_disabled:
+        apply_mode: auto
+        fix_rule: autofit
+      font_size_scale:
+        apply_mode: auto
+        fix_rule: font_size
+      line_height:
+        apply_mode: auto
+        fix_rule: line_height
+      alignment_left_top:
+        apply_mode: auto
+        fix_rule: alignment
+      badge_alignment:
+        apply_mode: auto
+        fix_rule: badge_alignment
+      geometry_rounding:
+        apply_mode: judgement
+        fix_rule: geometry
+        note: "drift が 0.1pt 未満なら lint 側で auto_fix_candidate に昇格 (実装条件)。"
+      low_contrast:
+        apply_mode: judgement
+        fix_rule: contrast
+      contrast_ratio:
+        apply_mode: judgement
+        fix_rule: contrast
+      font_family:
+        apply_mode: judgement
+        fix_rule: font_family
+      text_color_allowlist:
+        apply_mode: judgement
+        fix_rule: text_color
+      background_color_palette:
+        apply_mode: judgement
+        fix_rule: fill_color
+      overflow_text:
+        apply_mode: judgement
+        fix_rule: bbox_fit
+      overflow_shapes:
+        apply_mode: judgement
+        fix_rule: bbox_fit
+      overflow_images:
+        apply_mode: judgement
+        fix_rule: bbox_fit
+      safe_margins:
+        apply_mode: judgement
+        fix_rule: bbox_fit
+      safe_text_area_text:
+        apply_mode: judgement
+        fix_rule: bbox_fit
+      text_overlap:
+        apply_mode: judgement
+        fix_rule: overlap
+      object_overlap:
+        apply_mode: judgement
+        fix_rule: overlap
+      object_gap_too_small:
+        apply_mode: judgement
+        fix_rule: spacing
+      image_aspect_distortion:
+        apply_mode: judgement
+        fix_rule: image_aspect
+      key_area_cropped:
+        apply_mode: judgement
+        fix_rule: image_crop
+      reading_order:
+        apply_mode: judgement
+        fix_rule: reading_order
+      animation_present:
+        apply_mode: judgement
+        fix_rule: animation
+      wrap_break_changes_meaning:
+        apply_mode: judgement
+        fix_rule: text_wrap
+        note: "widen_to_fit candidate あれば lint 側で auto_fix_candidate に昇格。"
+      heading_hierarchy_broken:
+        apply_mode: judgement
+        fix_rule: heading_hierarchy
+      inner_padding_imbalance:
+        apply_mode: judgement
+        fix_rule: inner_padding
+      card_grid_consistency:
+        apply_mode: judgement
+        fix_rule: card_grid
+      text_vertical_balance:
+        apply_mode: judgement
+        fix_rule: text_vertical_balance
+      image_upscale_ratio:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "画像差し替えが必要 (素材入手と再配置はオペレーター作業)。"
+      alt_text_required:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "著者の意味記述が必要。"
+      color_only_meaning:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "色以外の手がかり (ラベル / 記号 / 形状) の追加はデザイン判断。"
+      missing_required_element:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "content/template 判断が必要。"
+      decorative_isolated_lines:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "意図的な装飾と区別できないため自動削除しない。FIX-013 で judgement 経路に拡張予定。"
+      slide_size:
+        apply_mode: manual
+        fix_rule: null
+        manual_reason: "比率変更は配布形態の再判断が必要。"
+
     rounding_policy:
       allow_grid_pt: 0.5
       normalize_geometry_to_integer_pt: true
