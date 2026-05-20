@@ -7,8 +7,8 @@ TEXT_COLOR_TOKEN_BY_HEX, FILL_COLOR_TOKEN_BY_HEX,
 CONTRAST_REPAIR_COLOR_FAMILIES, FILL_REPAIR_COLOR_FAMILIES).
 
 Used when env var `PPTX_PALETTE_SOURCE=yaml`. Default behavior keeps the
-Python-side hardcoded constants — this loader is opt-in until DS-002
-retires the duplicate definition.
+Python-side hardcoded constants — this loader is opt-in until
+DS-COLOR-001 retires the duplicate definition.
 """
 
 from __future__ import annotations

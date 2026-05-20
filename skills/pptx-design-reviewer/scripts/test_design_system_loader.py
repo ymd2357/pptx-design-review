@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assert that the YAML-loaded lint_palette matches the hardcoded Python
 constants in pptx_lint.py. Both sources are intentionally maintained side
-by side (DS-002) until the YAML version becomes the single source of
+by side (DS-COLOR-001) until the YAML version becomes the single source of
 truth. The test is the gate that prevents silent drift between them.
 """
 

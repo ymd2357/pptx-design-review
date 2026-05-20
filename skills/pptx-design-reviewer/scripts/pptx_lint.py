@@ -445,7 +445,7 @@ FILL_COLOR_TOKEN_BY_HEX = {
     "#D55E00": "state.danger",
 }
 
-# ---- Optional YAML palette override (DS-002) ------------------------------
+# ---- Optional YAML palette override (DS-COLOR-001) ------------------------
 #
 # When env var `PPTX_PALETTE_SOURCE=yaml` is set, replace the 5 hardcoded
 # color constants above with values loaded from `doc/slide-guideline-v1.yml`
