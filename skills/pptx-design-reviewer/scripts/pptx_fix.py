@@ -97,23 +97,33 @@ ALL_RULES = (
     "text_vertical_balance",
     "badge_alignment",
 )
-def _load_check_to_rule() -> dict[str, str]:
-    """Derive CHECK_TO_RULE from doc/slide-guideline-v1.yml:rules.lint.fix_policy.
+def _load_fix_policy() -> dict[str, dict]:
+    """Load rules.lint.fix_policy from doc/slide-guideline-v1.yml.
 
-    The YAML is the single source of truth (POLICY-001). Only checks with
-    apply_mode in {auto_fix, judgement_fix} expose a fix_rule;
-    apply_mode=no_fix checks intentionally do not appear in CHECK_TO_RULE.
-
-    Tolerates a missing PyYAML by falling back to a minimal text parser
-    so that pptx_fix.py can still import in environments where PyYAML
-    is unavailable.
+    Single source of truth (POLICY-001). Returns the full {check: {apply_mode,
+    fix_rule, ...}} mapping, or an empty dict when PyYAML is unavailable.
+    Callers must tolerate the empty case and fall back to defaults.
     """
     guideline = Path(__file__).resolve().parents[3] / "doc" / "slide-guideline-v1.yml"
     try:
         import yaml  # type: ignore
 
         data = yaml.safe_load(guideline.read_text(encoding="utf-8"))
-        fix_policy = (data.get("rules") or {}).get("lint", {}).get("fix_policy") or {}
+        return (data.get("rules") or {}).get("lint", {}).get("fix_policy") or {}
+    except Exception:
+        return {}
+
+
+def _load_check_to_rule() -> dict[str, str]:
+    """Derive CHECK_TO_RULE from rules.lint.fix_policy.
+
+    Only checks with apply_mode in {auto_fix, judgement_fix} expose a fix_rule;
+    apply_mode=no_fix checks intentionally do not appear in CHECK_TO_RULE.
+    Falls back to a minimal text parser so pptx_fix.py can still import in
+    environments without PyYAML.
+    """
+    fix_policy = _load_fix_policy()
+    if fix_policy:
         mapping: dict[str, str] = {}
         for check, entry in fix_policy.items():
             if not isinstance(entry, dict):
@@ -123,8 +133,8 @@ def _load_check_to_rule() -> dict[str, str]:
                 if isinstance(fix_rule, str):
                     mapping[check] = fix_rule
         return mapping
-    except Exception:
-        return _parse_check_to_rule_textually(guideline)
+    guideline = Path(__file__).resolve().parents[3] / "doc" / "slide-guideline-v1.yml"
+    return _parse_check_to_rule_textually(guideline)
 
 
 def _parse_check_to_rule_textually(guideline: Path) -> dict[str, str]:
@@ -170,7 +180,20 @@ def _parse_check_to_rule_textually(guideline: Path) -> dict[str, str]:
     return mapping
 
 
+FIX_POLICY = _load_fix_policy()
 CHECK_TO_RULE = _load_check_to_rule()
+
+
+def _apply_mode_for_check(check: str | None) -> str | None:
+    """Lookup apply_mode (auto_fix / judgement_fix / no_fix) for a check, or
+    None when the check is not declared in rules.lint.fix_policy.
+    """
+    if not check:
+        return None
+    entry = FIX_POLICY.get(check)
+    if not isinstance(entry, dict):
+        return None
+    return entry.get("apply_mode")
 
 
 @dataclass
@@ -1521,11 +1544,24 @@ def _finding_reasons(finding: Any) -> list[str]:
     return reasons
 
 
-def _fixability_decision_from_finding(finding: Any) -> Optional[tuple[str, list[str]]]:
+def _fixability_decision_from_finding(
+    finding: Any,
+    *,
+    judgement_gate: bool = True,
+) -> Optional[tuple[str, list[str]]]:
     """Return an action status override from evidence-schema findings.
 
     Legacy findings that do not declare fixability fall back to the existing
     detector-only behavior.
+
+    When ``judgement_gate=True`` (default, POLICY-001 段階 3), apply_mode=
+    judgement_fix findings whose lint output is still `manual_required` are
+    kept at manual_required regardless of candidate_values: the SPA
+    judgement (auto_fixable) is required before pptx_fix will touch the
+    deck. Set ``judgement_gate=False`` to recover the pre-段階 3 behavior
+    that applied any manual_required finding with concrete candidate_values.
+    apply_mode=auto_fix and apply_mode=no_fix paths are unaffected by the
+    gate.
     """
     fixability = _finding_detail_value(finding, "fixability")
     if fixability is None:
@@ -1542,6 +1578,11 @@ def _fixability_decision_from_finding(finding: Any) -> Optional[tuple[str, list[
         check = _finding_field(finding, "check")
         if check in {"image_upscale_ratio", "slide_size"}:
             return "manual_required", reasons or ["finding_marked_manual_required"]
+        apply_mode = _apply_mode_for_check(check)
+        if judgement_gate and apply_mode == "judgement_fix":
+            gate_reasons = list(reasons) if reasons else []
+            gate_reasons.append("judgement_fix_gate_requires_spa_judgement")
+            return "manual_required", gate_reasons
         candidate_values = _finding_detail_value(finding, "candidate_values")
         if _candidate_values_present(candidate_values):
             return "apply", reasons or ["manual_required_overridden_by_design_system_candidate"]
@@ -1550,8 +1591,13 @@ def _fixability_decision_from_finding(finding: Any) -> Optional[tuple[str, list[
     return "manual_required", reasons or [f"fixability_{fixability}"]
 
 
-def _apply_finding_fixability(action: FixAction, finding: Any) -> FixAction:
-    decision = _fixability_decision_from_finding(finding)
+def _apply_finding_fixability(
+    action: FixAction,
+    finding: Any,
+    *,
+    judgement_gate: bool = True,
+) -> FixAction:
+    decision = _fixability_decision_from_finding(finding, judgement_gate=judgement_gate)
     if decision is None:
         return action
 
@@ -1568,13 +1614,17 @@ def _apply_finding_fixability(action: FixAction, finding: Any) -> FixAction:
 def _apply_matching_finding_fixability(
     action: FixAction,
     findings: Optional[Sequence[Any]],
+    *,
+    judgement_gate: bool = True,
 ) -> FixAction:
     if not findings:
         return action
 
     for finding in findings:
         if _finding_matches_action(finding, action):
-            return _apply_finding_fixability(action, finding)
+            return _apply_finding_fixability(
+                action, finding, judgement_gate=judgement_gate
+            )
     return action
 
 
@@ -2199,7 +2249,19 @@ def fix_pptx(
     backup: bool = False,
     rules: Sequence[str] = DEFAULT_RULES,
     findings: Optional[Sequence[Any]] = None,
+    judgement_gate: bool = True,
 ) -> List[FixAction]:
+    """Apply registered fix rules to ``path``.
+
+    ``judgement_gate`` (POLICY-001 段階 3, default ``True``): when ``True``
+    the judgement_fix policy is enforced — findings whose lint output is
+    still ``manual_required`` are skipped unless the SPA judgement layer
+    has already promoted them to ``auto_fix_candidate`` (typically via
+    ``apply_finding_judgements_overrides``). Pass ``False`` to recover the
+    pre-段階 3 behavior that auto-applied any ``manual_required`` finding
+    with concrete ``candidate_values`` (kept for legacy callers such as
+    the REV-017/REV-019 pipelines).
+    """
     prs = Presentation(str(path))
     actions: List[FixAction] = []
     active_rules = _enabled_rules(rules)
@@ -2217,7 +2279,9 @@ def fix_pptx(
             if action is None:
                 continue
             if rule != "contrast":
-                action = _apply_matching_finding_fixability(action, findings)
+                action = _apply_matching_finding_fixability(
+                    action, findings, judgement_gate=judgement_gate
+                )
             actions.append(action)
             if action.status == "apply":
                 _apply_action(shape, action, slide=slide)
@@ -2232,7 +2296,9 @@ def fix_pptx(
                 continue
             detected_actions = detected if isinstance(detected, list) else [detected]
             for action in detected_actions:
-                action = _apply_finding_fixability(action, finding)
+                action = _apply_finding_fixability(
+                    action, finding, judgement_gate=judgement_gate
+                )
                 actions.append(action)
                 if action.status == "apply":
                     _apply_finding_action(prs, action)
@@ -2547,6 +2613,17 @@ def main(argv: List[str]) -> int:
             "judgement_reason is auto_fixable"
         ),
     )
+    ap.add_argument(
+        "--no-judgement-gate",
+        action="store_true",
+        help=(
+            "disable POLICY-001 段階3 strict gate: when set, judgement_fix-policy "
+            "findings with manual_required + candidate_values are auto-applied "
+            "without requiring an SPA judgement. Default is strict (manual_required "
+            "findings under judgement_fix mode are skipped unless promoted by "
+            "--finding-judgements-json)."
+        ),
+    )
     args = ap.parse_args(argv)
 
     if not args.pptx.exists():
@@ -2624,6 +2701,7 @@ def main(argv: List[str]) -> int:
         backup=args.backup,
         rules=rules,
         findings=findings,
+        judgement_gate=not args.no_judgement_gate,
     )
 
     residual: List[FixAction] = []

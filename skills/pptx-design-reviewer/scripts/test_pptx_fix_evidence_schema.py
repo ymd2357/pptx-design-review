@@ -55,7 +55,9 @@ def main() -> int:
             f"auto_fix_candidate with candidates should apply; got {auto_fixable.status}"
         )
 
-    manual = pptx_fix._apply_matching_finding_fixability(
+    # geometry_rounding is a judgement_fix-policy check (POLICY-001 段階 3).
+    # With the strict gate (default), manual_required findings are skipped:
+    manual_gated = pptx_fix._apply_matching_finding_fixability(
         _action(),
         [
             _finding(
@@ -66,12 +68,39 @@ def main() -> int:
             )
         ],
     )
-    if manual.status != "apply":
+    if manual_gated.status != "manual_required":
         failures.append(
-            f"manual_required finding should keep mechanical apply enabled; got {manual.status}"
+            "manual_required under judgement_fix policy should be skipped by "
+            f"the strict gate; got {manual_gated.status}"
         )
-    if "intentional_half_pt_grid" not in manual.reasons:
-        failures.append(f"manual_required reason was not preserved: {manual.reasons}")
+    if "judgement_fix_gate_requires_spa_judgement" not in manual_gated.reasons:
+        failures.append(
+            "gated skip should record judgement_fix_gate_requires_spa_judgement; "
+            f"got {manual_gated.reasons}"
+        )
+
+    # With judgement_gate=False (legacy callers), mechanical apply remains:
+    manual_legacy = pptx_fix._apply_matching_finding_fixability(
+        _action(),
+        [
+            _finding(
+                {
+                    "fixability": "manual_required",
+                    "manual_required_reason": "intentional_half_pt_grid",
+                }
+            )
+        ],
+        judgement_gate=False,
+    )
+    if manual_legacy.status != "apply":
+        failures.append(
+            "manual_required with judgement_gate=False should still apply; "
+            f"got {manual_legacy.status}"
+        )
+    if "intentional_half_pt_grid" not in manual_legacy.reasons:
+        failures.append(
+            f"manual_required reason was not preserved: {manual_legacy.reasons}"
+        )
 
     missing_candidates = pptx_fix._apply_matching_finding_fixability(
         _action(),

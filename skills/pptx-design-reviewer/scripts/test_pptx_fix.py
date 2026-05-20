@@ -673,6 +673,7 @@ def main() -> int:
             apply=True,
             rules=overlap_rules,
             findings=overlap_findings,
+            judgement_gate=False,  # text_overlap is judgement_fix policy
         )
         overlap_actions = [a for a in actions if a.rule == "overlap" and a.status == "apply"]
         if len(overlap_actions) != 1:
@@ -804,7 +805,17 @@ def main() -> int:
         ]
         if not findings:
             failures.append("wrap-break fixture did not trigger wrap_break_changes_meaning")
-        actions = pptx_fix.fix_pptx(wrap, apply=True, rules=("text_wrap",), findings=findings)
+        # wrap_break_changes_meaning is a judgement_fix-policy check; the
+        # 900pt-wide fixture has no widen_to_fit candidate so its fixability
+        # stays at manual_required. Disable the gate to keep the legacy
+        # behavior (mechanical replace_text_breaks) under test.
+        actions = pptx_fix.fix_pptx(
+            wrap,
+            apply=True,
+            rules=("text_wrap",),
+            findings=findings,
+            judgement_gate=False,
+        )
         if not any(a.rule == "text_wrap" and a.status == "apply" for a in actions):
             failures.append("text_wrap fixer did not report an apply action")
         prs = Presentation(str(wrap))
@@ -915,11 +926,16 @@ def main() -> int:
         ]
         if not text_color_findings:
             failures.append("text-color fixture did not trigger text_color_allowlist")
+        # text_color_allowlist is a judgement_fix-policy check (POLICY-001
+        # 段階 3): without an SPA judgement, the strict gate skips it. We
+        # disable the gate here to keep covering the design-system candidate
+        # apply path. The gated behavior is exercised by test_judgement_gate.py.
         actions = pptx_fix.fix_pptx(
             text_color,
             apply=True,
             rules=("text_color",),
             findings=text_color_findings,
+            judgement_gate=False,
         )
         if not any(a.rule == "text_color" and a.status == "apply" for a in actions):
             failures.append("text_color_allowlist did not apply design-system candidate")
