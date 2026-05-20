@@ -95,6 +95,12 @@ ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
 LINE_HEIGHT_TOL_PT = 2.0
 OBJECT_OVERLAP_AREA_PT2_MIN = 1.0
 STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN = 0.9
+# Background shape ratio (canvas % covered) above which a shape is treated as
+# a structural background container regardless of the child's overflow. Fixes
+# the case where a canvas-sized background freeform appeared in
+# object_overlap findings because the child text box overflowed the canvas
+# and dropped the child's containment ratio below 0.9.
+BACKGROUND_CONTAINER_CANVAS_RATIO_MIN = 0.9
 OBJECT_GAP_DEFAULT_MIN_PT = 0.0  # Mirrors rules.slide.object_spacing.default_adjacent_gap_pt_min.
 OBJECT_GAP_ELEMENT_MIN_PT = {
     "default": OBJECT_GAP_DEFAULT_MIN_PT,
@@ -752,11 +758,41 @@ def _containment_relation(
             overlap_bbox_pt=overlap_bbox,
         )
     overlap_area = overlap_bbox[2] * overlap_bbox[3]
+    canvas_area = float(SLIDE_W_PT * SLIDE_H_PT)
+    canvas_bbox = (0.0, 0.0, float(SLIDE_W_PT), float(SLIDE_H_PT))
     for container, child in ((first, second), (second, first)):
-        child_area = _bbox_area(child.bbox_pt)
-        if child_area <= 0:
+        # (1) Background-shaped container: if it covers >= 90% of the canvas
+        # and the child's visible portion sits inside it, treat the relation
+        # as structural containment regardless of how much the child overflows
+        # the canvas. This is the fix for the slide-background freeform
+        # appearing in object_overlap findings.
+        container_canvas_ratio = _bbox_area(container.bbox_pt) / canvas_area if canvas_area else 0
+        if (
+            container_canvas_ratio >= BACKGROUND_CONTAINER_CANVAS_RATIO_MIN
+            and _point_in_bbox(_bbox_center(child.bbox_pt), container.bbox_pt)
+        ):
+            return StructureRelation(
+                relation="contains_background",
+                container=container,
+                child=child,
+                overlap_area_pt2=overlap_area,
+                overlap_bbox_pt=overlap_bbox,
+                metadata={
+                    "container_canvas_ratio": round(container_canvas_ratio, 4),
+                    "threshold_canvas_ratio": BACKGROUND_CONTAINER_CANVAS_RATIO_MIN,
+                },
+            )
+
+        # (2) Standard containment by ratio, but measure against the child's
+        # **canvas-visible** area (= child clipped to the slide canvas). A
+        # child that overflows the canvas should not lose its containment
+        # status — what matters is whether the part of the child that is
+        # actually rendered sits inside the container.
+        clipped = _intersection_bbox(child.bbox_pt, canvas_bbox) or child.bbox_pt
+        visible_area = _bbox_area(clipped)
+        if visible_area <= 0:
             continue
-        overlap_ratio = overlap_area / child_area
+        overlap_ratio = overlap_area / visible_area
         if (
             overlap_ratio >= STRUCTURAL_CONTAINMENT_OVERLAP_RATIO_MIN
             and _point_in_bbox(_bbox_center(child.bbox_pt), container.bbox_pt)
