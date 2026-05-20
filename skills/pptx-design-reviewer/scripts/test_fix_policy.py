@@ -3,7 +3,7 @@
 single source of truth for which lint check maps to which pptx_fix rule.
 
 This is the policy-side counterpart of test_design_system_review.py: the
-guideline YAML declares apply_mode (auto / judgement / manual) and
+guideline YAML declares apply_mode (auto_fix / judgement_fix / no_fix) and
 fix_rule, and we assert that the implementation (pptx_lint.py and
 pptx_fix.py) does not silently drift from it.
 
@@ -57,7 +57,7 @@ def main() -> int:
         )
 
     # 2. apply_mode must be one of the documented enum values.
-    allowed_modes = {"auto", "judgement", "manual"}
+    allowed_modes = {"auto_fix", "judgement_fix", "no_fix"}
     for check, entry in fix_policy.items():
         if not isinstance(entry, dict):
             failures.append(f"fix_policy.{check} is not a mapping")
@@ -68,24 +68,24 @@ def main() -> int:
                 f"fix_policy.{check}.apply_mode={mode!r} is not in {sorted(allowed_modes)}"
             )
 
-    # 3. apply_mode=manual → fix_rule must be null, AND check must NOT appear
+    # 3. apply_mode=no_fix → fix_rule must be null, AND check must NOT appear
     #    in pptx_fix.CHECK_TO_RULE.
-    # 4. apply_mode in {auto, judgement} → fix_rule must be a string, AND
-    #    pptx_fix.CHECK_TO_RULE[check] must equal that fix_rule.
+    # 4. apply_mode in {auto_fix, judgement_fix} → fix_rule must be a string,
+    #    AND pptx_fix.CHECK_TO_RULE[check] must equal that fix_rule.
     check_to_rule = pptx_fix.CHECK_TO_RULE
     for check, entry in fix_policy.items():
         if not isinstance(entry, dict):
             continue
         mode = entry.get("apply_mode")
         fix_rule = entry.get("fix_rule")
-        if mode == "manual":
+        if mode == "no_fix":
             if fix_rule is not None:
                 failures.append(
-                    f"fix_policy.{check}.apply_mode=manual but fix_rule={fix_rule!r} (expected null)"
+                    f"fix_policy.{check}.apply_mode=no_fix but fix_rule={fix_rule!r} (expected null)"
                 )
             if check in check_to_rule:
                 failures.append(
-                    f"fix_policy.{check}.apply_mode=manual but pptx_fix.CHECK_TO_RULE[{check!r}]"
+                    f"fix_policy.{check}.apply_mode=no_fix but pptx_fix.CHECK_TO_RULE[{check!r}]"
                     f"={check_to_rule[check]!r} (expected the check to be absent)"
                 )
             continue
@@ -100,9 +100,9 @@ def main() -> int:
                 f"fix_policy.{check}.fix_rule={fix_rule!r} but pptx_fix.CHECK_TO_RULE[{check!r}]={actual_rule!r}"
             )
 
-    # 5. Every pptx_fix.CHECK_TO_RULE key must be covered by fix_policy with a
-    #    non-manual apply_mode. Catches the reverse drift (rule registered in
-    #    pptx_fix.py but no policy declared in YAML).
+    # 5. Every pptx_fix.CHECK_TO_RULE key must be covered by fix_policy with
+    #    a non-`no_fix` apply_mode. Catches the reverse drift (rule registered
+    #    in pptx_fix.py but no policy declared in YAML).
     for check in sorted(check_to_rule):
         entry = fix_policy.get(check)
         if entry is None:
@@ -110,9 +110,9 @@ def main() -> int:
                 f"pptx_fix.CHECK_TO_RULE has {check!r} but fix_policy has no entry"
             )
             continue
-        if entry.get("apply_mode") == "manual":
+        if entry.get("apply_mode") == "no_fix":
             failures.append(
-                f"pptx_fix.CHECK_TO_RULE has {check!r} but fix_policy.{check}.apply_mode=manual"
+                f"pptx_fix.CHECK_TO_RULE has {check!r} but fix_policy.{check}.apply_mode=no_fix"
             )
 
     if failures:
@@ -121,12 +121,12 @@ def main() -> int:
             print(f"- {f}")
         return 1
 
-    auto = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "auto")
-    judgement = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "judgement")
-    manual = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "manual")
+    auto_fix = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "auto_fix")
+    judgement_fix = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "judgement_fix")
+    no_fix = sum(1 for e in fix_policy.values() if e.get("apply_mode") == "no_fix")
     print(
         f"OK: fix_policy sync ({len(fix_policy)} checks: "
-        f"auto={auto} judgement={judgement} manual={manual})"
+        f"auto_fix={auto_fix} judgement_fix={judgement_fix} no_fix={no_fix})"
     )
     return 0
 

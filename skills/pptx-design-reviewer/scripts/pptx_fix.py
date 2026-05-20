@@ -101,8 +101,8 @@ def _load_check_to_rule() -> dict[str, str]:
     """Derive CHECK_TO_RULE from doc/slide-guideline-v1.yml:rules.lint.fix_policy.
 
     The YAML is the single source of truth (POLICY-001). Only checks with
-    apply_mode in {auto, judgement} expose a fix_rule; apply_mode=manual
-    checks intentionally do not appear in CHECK_TO_RULE.
+    apply_mode in {auto_fix, judgement_fix} expose a fix_rule;
+    apply_mode=no_fix checks intentionally do not appear in CHECK_TO_RULE.
 
     Tolerates a missing PyYAML by falling back to a minimal text parser
     so that pptx_fix.py can still import in environments where PyYAML
@@ -118,7 +118,7 @@ def _load_check_to_rule() -> dict[str, str]:
         for check, entry in fix_policy.items():
             if not isinstance(entry, dict):
                 continue
-            if entry.get("apply_mode") in {"auto", "judgement"}:
+            if entry.get("apply_mode") in {"auto_fix", "judgement_fix"}:
                 fix_rule = entry.get("fix_rule")
                 if isinstance(fix_rule, str):
                     mapping[check] = fix_rule
@@ -138,7 +138,7 @@ def _parse_check_to_rule_textually(guideline: Path) -> dict[str, str]:
     current_rule: str | None = None
 
     def flush() -> None:
-        if current_check and current_mode in {"auto", "judgement"} and current_rule:
+        if current_check and current_mode in {"auto_fix", "judgement_fix"} and current_rule:
             mapping[current_check] = current_rule
 
     for raw in guideline.read_text(encoding="utf-8").splitlines():

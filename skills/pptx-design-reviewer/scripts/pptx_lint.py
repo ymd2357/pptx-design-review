@@ -4254,21 +4254,24 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
     doc/slide-guideline-v1.yml (POLICY-001 段階 2).
 
     apply_mode dispatch:
-      - manual    : never auto-fixable. decorative_isolated_lines surfaces
-                    as `decorative_review`; everything else stays
-                    `manual_required`.
-      - auto      : always emit `auto_fix_candidate` with the policy
-                    fix_rule and a per-check reason from _AUTO_FIX_REASONS.
-      - judgement : emit `auto_fix_candidate` only when the per-check
-                    predicate `_judgement_auto_fixable` is satisfied;
-                    otherwise stay at `manual_required` (the SPA-driven
-                    promotion path takes over).
+      - no_fix         : never auto-fixable (the lint check exists but no
+                         machine-repair path is provided).
+                         decorative_isolated_lines surfaces as
+                         `decorative_review`; everything else stays
+                         `manual_required`.
+      - auto_fix       : always emit `auto_fix_candidate` with the policy
+                         fix_rule and a per-check reason from
+                         _AUTO_FIX_REASONS.
+      - judgement_fix  : emit `auto_fix_candidate` only when the per-check
+                         predicate `_judgement_auto_fixable` is satisfied;
+                         otherwise stay at `manual_required` (the SPA-driven
+                         promotion path takes over).
     """
     entry = FIX_POLICY.get(check, {})
     apply_mode = entry.get("apply_mode")
     fix_rule = entry.get("fix_rule")
 
-    if apply_mode == "manual" or apply_mode is None:
+    if apply_mode == "no_fix" or apply_mode is None:
         reason = MANUAL_REQUIRED_REASONS.get(check, "requires manual review")
         if check == "decorative_isolated_lines":
             return {
@@ -4284,14 +4287,14 @@ def _fixability_for_json(check: str, evidence: dict) -> dict:
             "manual_required_reason": reason,
         }
 
-    if apply_mode == "auto":
+    if apply_mode == "auto_fix":
         return {
             "fixability": "auto_fix_candidate",
             "fixability_rule": fix_rule,
             "fixability_reason": _AUTO_FIX_REASONS.get(check, f"mechanical {fix_rule} change"),
         }
 
-    # apply_mode == "judgement"
+    # apply_mode == "judgement_fix"
     if _judgement_auto_fixable(check, evidence):
         return {
             "fixability": "auto_fix_candidate",
