@@ -345,7 +345,7 @@ def _summarize_findings(
 ) -> list[PriorityIssue]:
     findings = pptx_lint.consolidate_recurring(raw_findings)
     issues = list(issues or [])
-    p0_checks = {"overflow_text", "text_autofit_disabled", "text_overlap", "low_contrast"}
+    p0_checks = {"box_canvas_overflow", "text_autofit_disabled", "text_overlap", "low_contrast"}
     slides = _slides_for(findings, p0_checks)
     if slides:
         issues.append(

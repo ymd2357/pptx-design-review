@@ -97,7 +97,10 @@ ALL_RULES = (
     "text_vertical_balance",
     "badge_alignment",
     "decorative_remove",
+    "box_canvas_clip",
 )
+
+
 def _load_fix_policy() -> dict[str, dict]:
     """Load rules.lint.fix_policy from doc/slide-guideline-v1.yml.
 
@@ -809,6 +812,7 @@ FINDING_DRIVEN_RULES = {
     "badge_alignment",
     "text_vertical_balance",
     "decorative_remove",
+    "box_canvas_clip",
 }
 
 
@@ -1870,6 +1874,64 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 ),
             },
             after={"alignment": "CENTER", "vertical_anchor": "MIDDLE"},
+        )
+
+    if rule == "box_canvas_clip":
+        # DS-OVERFLOW-001 段階1 (2026-05-21): box_canvas_overflow finding を
+        # 受けて、右下方向の box bbox はみ出しだけを width/height 切り詰めで
+        # 修正する。box.left / box.top を動かすと text の絶対座標が変わって
+        # しまうので、左/上方向のはみ出しは manual_required で skip する。
+        if shape is None:
+            return None
+        overflow = detail.get("overflow_sides_pt") or {}
+        if not isinstance(overflow, dict):
+            return None
+        before_geometry = _shape_geometry_pt(shape)
+        sx, sy = _slide_scale_xy(prs)
+        left_norm = before_geometry["left"] / sx
+        top_norm = before_geometry["top"] / sy
+        width_norm = before_geometry["width"] / sx
+        height_norm = before_geometry["height"] / sy
+        new_w = width_norm
+        new_h = height_norm
+        right_over = float(overflow.get("right", 0) or 0)
+        bottom_over = float(overflow.get("bottom", 0) or 0)
+        left_over = float(overflow.get("left", 0) or 0)
+        top_over = float(overflow.get("top", 0) or 0)
+        if left_over > 0 or top_over > 0:
+            # 左/上方向 overflow は text 絶対座標の移動を伴うので auto 対象外。
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                status="manual_required",
+                reasons=["box_canvas_clip_left_top_overflow_requires_manual"],
+                before={"geometry": before_geometry, "overflow_sides_pt": overflow},
+                after={},
+            )
+        if right_over > 0:
+            new_w = max(20.0, width_norm - right_over)
+        if bottom_over > 0:
+            new_h = max(20.0, height_norm - bottom_over)
+        if abs(new_w - width_norm) < 0.05 and abs(new_h - height_norm) < 0.05:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={"geometry": before_geometry, "overflow_sides_pt": overflow},
+            after={
+                "geometry": {
+                    "left": before_geometry["left"],
+                    "top": before_geometry["top"],
+                    "width": round(new_w * sx, 4),
+                    "height": round(new_h * sy, 4),
+                },
+            },
         )
 
     if rule == "decorative_remove":

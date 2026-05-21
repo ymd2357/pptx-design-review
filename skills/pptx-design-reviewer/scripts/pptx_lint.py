@@ -2,7 +2,7 @@
 """PPTX lint MVP for slide-guideline-v1 compliance.
 
 Checks
-- overflow_text        (error)   text-bearing element extends beyond slide canvas
+- box_canvas_overflow  (warning) text shape の box bbox が slide canvas からはみ出す
 - overflow_shapes      (error)   shape element extends beyond slide canvas
 - overflow_images      (error)   image element extends beyond slide canvas
 - safe_text_area_text  (warning) text-bearing element outside safe text area
@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -1416,134 +1417,101 @@ def make_finding(severity, check, slide_idx, slide_id, shape, message, detail=No
 # ---- Checks ----------------------------------------------------------------
 
 
-def _multi_step_overflow_candidates(ctx: LintContext, shape, normalized_bbox, out_sides) -> list[dict]:
-    """Build a ranked list of repair strategies for overflow_text findings.
-
-    Each entry is self-contained and can be consumed by pptx_fix.py. Order
-    reflects preference: minimal-disruption strategies come first.
+def _estimate_text_render_lines(
+    ctx: LintContext,
+    shape,
+    wrap_width_pt: float,
+    font_size_pt: float,
+) -> int:
+    """Estimate the number of rendered lines when `shape.text_frame` is wrapped
+    at `wrap_width_pt`. Each paragraph is wrapped independently (PPTX semantics);
+    an empty paragraph counts as 1 visual line. CJK / Latin width mixing is
+    delegated to `_estimate_text_width_pt`.
     """
-    x, y, w, h = normalized_bbox
-    candidates: list[dict] = []
+    if wrap_width_pt <= 0:
+        return 1
+    total = 0
+    for para in shape.text_frame.paragraphs:
+        text = (para.text or "").strip()
+        if not text:
+            total += 1
+            continue
+        para_w = _estimate_text_width_pt(text, font_size_pt)
+        total += max(1, int(math.ceil(para_w / wrap_width_pt)))
+    return max(total, 1)
 
-    # 1) Shrink height so the bbox bottom fits within the slide canvas.
-    bottom_overflow = next((amt for side, amt in out_sides if side == "bottom"), 0.0)
-    top_overflow = next((amt for side, amt in out_sides if side == "top"), 0.0)
-    if bottom_overflow > 0:
-        target_h = max(20.0, round(h - bottom_overflow, 2))
-        if target_h < h:
-            candidates.append(
-                {
-                    "strategy": "shrink_height",
-                    "geometry": {
-                        "left": round(x, 2),
-                        "top": round(y, 2),
-                        "width": round(w, 2),
-                        "height": target_h,
-                    },
-                    "reason": "trim height to fit slide bottom",
-                }
-            )
 
-    # 2) Move shape so its bbox sits inside the canvas (only addresses out-of-canvas, not text fit).
-    new_top = y
-    if top_overflow > 0:
-        new_top = max(0.0, y + top_overflow)
-    if bottom_overflow > 0 and h <= SLIDE_H_PT:
-        new_top = min(new_top, SLIDE_H_PT - h)
-    new_left = x
-    left_overflow = next((amt for side, amt in out_sides if side == "left"), 0.0)
-    right_overflow = next((amt for side, amt in out_sides if side == "right"), 0.0)
-    if left_overflow > 0:
-        new_left = max(0.0, x + left_overflow)
-    if right_overflow > 0 and w <= SLIDE_W_PT:
-        new_left = min(new_left, SLIDE_W_PT - w)
-    if (abs(new_top - y) > 0.1 or abs(new_left - x) > 0.1):
-        candidates.append(
-            {
-                "strategy": "move",
-                "geometry": {
-                    "left": round(new_left, 2),
-                    "top": round(new_top, 2),
-                    "width": round(w, 2),
-                    "height": round(h, 2),
-                },
-                "reason": "move shape inside the slide canvas",
-            }
-        )
-
-    # 3) Shrink font size to the next smaller allowed step.
-    if getattr(shape, "has_text_frame", False):
-        current_size = _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
-        if current_size is not None:
-            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < current_size]
-            if smaller:
-                target_size = smaller[-1]
-                candidates.append(
-                    {
-                        "strategy": "shrink_font_size",
-                        "font_size_pt": target_size,
-                        "from_pt": round(current_size, 2),
-                        "reason": "step down to nearest smaller allowed font size",
-                    }
-                )
-
-        # 4) Compress line height to next smaller allowed step.
-        line_heights = [
-            para.line_spacing.pt
-            for para in shape.text_frame.paragraphs
-            if para.line_spacing is not None and not isinstance(para.line_spacing, float)
-        ]
-        if line_heights:
-            current_lh = max(line_heights)
-            smaller_lh = [lh for lh in sorted(ALLOWED_LINE_HEIGHTS_PT) if lh < current_lh]
-            if smaller_lh:
-                candidates.append(
-                    {
-                        "strategy": "compress_line_height",
-                        "line_height_pt": smaller_lh[-1],
-                        "from_pt": round(current_lh, 2),
-                        "reason": "step down to nearest smaller allowed line height",
-                    }
-                )
-
-    return candidates
+def _canvas_overflow_sides(x: float, y: float, w: float, h: float) -> dict[str, float]:
+    out: dict[str, float] = {}
+    right = x + w
+    bottom = y + h
+    if x < -TOL_PT:
+        out["left"] = round(-x, 2)
+    if y < -TOL_PT:
+        out["top"] = round(-y, 2)
+    if right > SLIDE_W_PT + TOL_PT:
+        out["right"] = round(right - SLIDE_W_PT, 2)
+    if bottom > SLIDE_H_PT + TOL_PT:
+        out["bottom"] = round(bottom - SLIDE_H_PT, 2)
+    return out
 
 
 def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
+    """3-way overflow lint family (DS-OVERFLOW-001 段階1+).
+
+    1. box_canvas_overflow  : box bbox が slide canvas 外。text/non-text 共通。
+                              fixer = box_canvas_clip (右下方向のみ width/height
+                              切り、左/上方向は manual で残す)。
+    2. text_box_overflow    : (段階2 で実装) text 描画が自分の box.height を超える。
+    3. text_canvas_overflow : (段階3 で実装) canvas 端で wrap した時、text 自体
+                              の描画範囲が canvas 右端を超える。
+
+    Non-text picture / shape の box overflow は従来通り `overflow_images` /
+    `overflow_shapes` として fire させる (= box_canvas_overflow とは別 lint で、
+    text 系の box geometry overflow とは責務が違う)。
+    """
     decorative_reason = _decorative_template_raster_reason(shape)
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized
-    right, bottom = x + w, y + h
-    out: List[tuple] = []
-    if x < -TOL_PT:
-        out.append(("left", -x))
-    if y < -TOL_PT:
-        out.append(("top", -y))
-    if right > SLIDE_W_PT + TOL_PT:
-        out.append(("right", right - SLIDE_W_PT))
-    if bottom > SLIDE_H_PT + TOL_PT:
-        out.append(("bottom", bottom - SLIDE_H_PT))
-    if not out:
-        return
+    overflow_sides = _canvas_overflow_sides(x, y, w, h)
+
     if shape.has_text_frame and shape.text_frame.text.strip():
-        check_id = "overflow_text"
-    elif shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+        if not overflow_sides:
+            return
+        msg = "text box outside slide canvas: " + ", ".join(
+            f"{side}+{amount:.1f}pt" for side, amount in overflow_sides.items()
+        )
+        detail = {
+            "bbox_pt": [round(v, 2) for v in normalized],
+            "actual_bbox_pt": [round(v, 2) for v in bbox],
+            "overflow_sides_pt": overflow_sides,
+            "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+            "text_excerpt": _text_excerpt(shape),
+        }
+        findings.append(
+            make_finding(
+                "warning", "box_canvas_overflow", slide_idx, slide_id, shape, msg, detail,
+            )
+        )
+        return
+
+    if not overflow_sides:
+        return
+    if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
         if decorative_reason:
             return
         check_id = "overflow_images"
     else:
         check_id = "overflow_shapes"
-    msg = "outside slide canvas: " + ", ".join(f"{s}+{a:.1f}pt" for s, a in out)
+    msg = "outside slide canvas: " + ", ".join(
+        f"{s}+{a:.1f}pt" for s, a in overflow_sides.items()
+    )
     detail = {
         "bbox_pt": [round(v, 2) for v in normalized],
         "actual_bbox_pt": [round(v, 2) for v in bbox],
-        "overflow_sides_pt": {side: round(amount, 2) for side, amount in out},
+        "overflow_sides_pt": overflow_sides,
         "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
     }
-    if check_id == "overflow_text":
-        multi_step = _multi_step_overflow_candidates(ctx, shape, normalized, out)
-        if multi_step:
-            detail["multi_step_candidates"] = multi_step
     findings.append(
         make_finding(
             "error", check_id, slide_idx, slide_id, shape, msg, detail,
@@ -3719,7 +3687,7 @@ def lint_pptx(
             bbox = record.actual_bbox_pt
             before_overflow_count = len(findings)
             check_overflow(ctx, idx, slide_id, shape, bbox, findings)
-            overflowed = any(f.check == "overflow_text" for f in findings[before_overflow_count:])
+            overflowed = any(f.check in ("box_canvas_overflow", "overflow_shapes", "overflow_images") for f in findings[before_overflow_count:])
             check_safe_text_area(ctx, idx, slide_id, record, findings, slide_type)
             check_safe_margins(ctx, idx, slide_id, shape, bbox, findings, slide_type)
             check_geometry_rounding(ctx, idx, slide_id, shape, bbox, findings)
@@ -3943,7 +3911,7 @@ FIX_POLICY = _load_fix_policy()
 MANUAL_REQUIRED_REASONS = {
     "slide_size": "slide canvas change can reflow all content",
     "animation_present": "static delivery impact requires author decision",
-    "overflow_text": "requires layout or copy decision",
+    "box_canvas_overflow": "text box bbox extends past the slide canvas; clip width/height on the right/bottom side only, never relocate the box",
     "overflow_shapes": "requires visual layout decision",
     "overflow_images": "requires crop or placement decision",
     "safe_text_area_text": "requires layout hierarchy decision",
@@ -4191,6 +4159,18 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
             return widen
     if check == "badge_alignment":
         return {"alignment": "CENTER", "vertical_anchor": "MIDDLE"}
+    if check == "box_canvas_overflow":
+        bbox = evidence.get("bbox_pt") or []
+        sides = evidence.get("overflow_sides_pt") or {}
+        if len(bbox) == 4 and isinstance(sides, dict):
+            x, y, w, h = bbox
+            cand: dict = {"overflow_sides_pt": sides}
+            if sides.get("right"):
+                cand["target_width_pt"] = max(20.0, round(w - float(sides["right"]), 2))
+            if sides.get("bottom"):
+                cand["target_height_pt"] = max(20.0, round(h - float(sides["bottom"]), 2))
+            return cand
+        return None
     if check == "decorative_isolated_lines":
         candidates = evidence.get("candidate_values")
         if isinstance(candidates, list) and candidates:

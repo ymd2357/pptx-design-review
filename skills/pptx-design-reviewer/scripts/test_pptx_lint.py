@@ -34,7 +34,7 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 
 EXPECTED_BAD_CHECKS = {
-    "overflow_text",
+    "box_canvas_overflow",
     "safe_text_area_text",
     "text_autofit_disabled",
     "font_family",
@@ -1511,13 +1511,14 @@ def main() -> int:
             failures.append(
                 f"bad.pptx did not trigger {sorted(missing)}; got {sorted(bad_check_set)}"
             )
-        bad_overflow_text = [f for f in bad_findings if f.check == "overflow_text"]
-        if bad_overflow_text:
-            multi = bad_overflow_text[0].detail.get("multi_step_candidates") or []
-            strategies = {entry.get("strategy") for entry in multi if isinstance(entry, dict)}
-            if not strategies:
+        bad_box_overflow = [f for f in bad_findings if f.check == "box_canvas_overflow"]
+        if not bad_box_overflow:
+            failures.append("bad.pptx did not trigger box_canvas_overflow")
+        else:
+            sides = bad_box_overflow[0].detail.get("overflow_sides_pt") or {}
+            if "right" not in sides:
                 failures.append(
-                    "overflow_text finding missing multi_step_candidates strategies"
+                    f"bad.pptx box_canvas_overflow should report a right overflow; got {sides}"
                 )
         bad_autofit = [f for f in bad_findings if f.check == "text_autofit_disabled"]
         if not bad_autofit:

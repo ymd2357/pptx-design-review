@@ -2741,21 +2741,19 @@ rules:
             - "threshold"
             - "unit"
           manual_required_reason: "Canvas conversion can change layout and must be reviewed."
-        overflow_text:
+        box_canvas_overflow:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
-          fixability: "manual_required"
+          fixability: "auto_fix_candidate"
           required_target_fields:
             - "bbox_pt"
             - "actual_bbox_pt"
+            - "overflow_sides_pt"
             - "text_excerpt"
           required_measurement_fields:
-            - "overflow_by_pt"
-            - "slide_canvas_pt"
-            - "measured_value"
-            - "threshold"
-            - "unit"
-          manual_required_reason: "Repair may require content, line break, font, or box-size decisions."
+            - "overflow_sides_pt"
+            - "canvas_pt"
+          candidate_values: "{shrink_right: target_width_pt, shrink_bottom: target_height_pt}; left/top の超過は manual_required で残す。"
         overflow_shapes:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -3349,14 +3347,14 @@ rules:
         impact_axis: "readability"
         issue_title: "読めないコントラストで内容を判別できない"
         action: "最終レンダリングで文字と背景を測定し、十分なコントラストへ直す。"
-      overflow_text:
+      box_canvas_overflow:
         status: "implemented_lint"
         priority: "P0"
         detection: "automated"
-        fix_policy: "manual_review"
+        fix_policy: "auto_fix"
         impact_axis: "readability"
-        issue_title: "テキストが切れて内容を読めない"
-        action: "テキスト枠、文字量、改行を調整して全内容を表示する。"
+        issue_title: "テキスト枠がスライド外にはみ出している"
+        action: "右下方向の超過は枠サイズを切る (文字位置は維持)。左上方向は手動で枠位置を調整する。"
       animation_present:
         status: "implemented_lint"
         priority: "P1"
@@ -3630,17 +3628,11 @@ rules:
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.slide_size"
         detection: "Warn only when the PPTX canvas is not proportional to rules.slide.size_pt; proportional 16:9 decks are normalized before other checks."
-      overflow_text:
-        severity: "error"
+      box_canvas_overflow:
+        severity: "warning"
         automation: "automated"
-        priority_catalog: "rules.lint.priority_catalog.overflow_text"
-        multi_step_candidates:
-          ordered_strategies:
-            - "shrink_height"
-            - "move"
-            - "shrink_font_size"
-            - "compress_line_height"
-          rationale: "Reviewer chooses minimal-disruption step first; pptx_fix.py supports each via bbox_fit / font_size / line_height rules."
+        priority_catalog: "rules.lint.priority_catalog.box_canvas_overflow"
+        detection: "text shape (has_text_frame & text.strip()) の box bbox が slide canvas (0,0,SLIDE_W,SLIDE_H) の任意の辺を超える場合に発火。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。non-text shape の box overflow は overflow_shapes / overflow_images が引き続き担当する。"
       overflow_shapes:
         severity: "error"
         automation: "automated"
@@ -3922,9 +3914,10 @@ rules:
       background_color_palette:
         apply_mode: judgement_fix
         fix_rule: fill_color
-      overflow_text:
-        apply_mode: judgement_fix
-        fix_rule: bbox_fit
+      box_canvas_overflow:
+        apply_mode: auto_fix
+        fix_rule: box_canvas_clip
+        note: "text shape の box bbox が canvas 外。右下方向の超過は width/height を切る (text 絶対座標は不変)。左/上方向は box_canvas_clip rule 内で manual_required として skip (= box.left/top を動かすと text 位置が変わるので auto 対象外)。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。"
       overflow_shapes:
         apply_mode: judgement_fix
         fix_rule: bbox_fit

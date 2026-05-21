@@ -38,6 +38,23 @@ DRIFT_LEFT_EMU = round(81.05 * 12700)  # 1029335 -> should round to 81pt
 HALF_LEFT_EMU = round(81.5 * 12700)    # 1034605 -> drift 0.5pt, must stay
 
 
+def _build_box_canvas_overflow_fixture(out: Path) -> None:
+    """text box bbox が canvas 右に 60pt はみ出している fixture。
+    box_canvas_clip rule が width を切る (left/top は不変) ことの回帰検証用。
+    """
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(1300), Pt(40), Pt(200), Pt(120))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Bad shape A"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _build_geometry_fixture(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -1063,6 +1080,53 @@ def main() -> int:
             failures.append(
                 f"verify_pptx reported residual on a clean fix: {len(residual)}"
             )
+
+        # --- DS-OVERFLOW-001 段階1: box_canvas_clip --------------------------
+        box_over = tmp_dir / "box-canvas-overflow.pptx"
+        _build_box_canvas_overflow_fixture(box_over)
+        box_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(box_over)
+            if f.check == "box_canvas_overflow"
+        ]
+        if not box_findings:
+            failures.append("box_canvas_overflow fixture did not trigger lint")
+        else:
+            sides = box_findings[0]["detail"].get("overflow_sides_pt") or {}
+            if "right" not in sides:
+                failures.append(
+                    f"box_canvas_overflow detail missing right side: {sides}"
+                )
+            actions = pptx_fix.fix_pptx(
+                box_over,
+                apply=True,
+                rules=("box_canvas_clip",),
+                findings=box_findings,
+            )
+            applied = [
+                a for a in actions if a.rule == "box_canvas_clip" and a.status == "apply"
+            ]
+            if len(applied) != 1:
+                failures.append(
+                    f"box_canvas_clip expected 1 apply action; got {len(applied)}"
+                )
+            prs = Presentation(str(box_over))
+            sh = prs.slides[0].shapes[0]
+            left_pt = sh.left / 12700
+            top_pt = sh.top / 12700
+            width_pt = sh.width / 12700
+            if abs(left_pt - 1300) > 0.5:
+                failures.append(
+                    f"box_canvas_clip moved left (1300pt expected, got {left_pt:.2f}pt)"
+                )
+            if abs(top_pt - 40) > 0.5:
+                failures.append(
+                    f"box_canvas_clip moved top (40pt expected, got {top_pt:.2f}pt)"
+                )
+            if width_pt > 140.5:
+                failures.append(
+                    f"box_canvas_clip did not shrink width into canvas (expected ~140pt, got {width_pt:.2f}pt)"
+                )
 
     if failures:
         print("FAIL:")

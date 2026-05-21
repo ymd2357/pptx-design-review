@@ -41,7 +41,7 @@ REQUIRED_CATALOG_CHECKS = {
     "object_overlap",
     "overflow_images",
     "overflow_shapes",
-    "overflow_text",
+    "box_canvas_overflow",
     "reading_order",
     "safe_margins",
     "safe_text_area_text",

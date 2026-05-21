@@ -138,6 +138,9 @@ def make_bad(out: Path) -> None:
     prs = _new_169_deck()
     slide = _add_blank_slide(prs)
 
+    # Shape A: text box bbox extends past the slide canvas right edge.
+    # DS-OVERFLOW-001 段階1 (2026-05-21): box_canvas_overflow を検出させる
+    # ための fixture。box.right = 1300 + 200 = 1500 > canvas right 1440。
     a = slide.shapes.add_textbox(Pt(1300), Pt(40), Pt(200), Pt(120))
     a.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     _set_norm_autofit_font_scale(a, 65000)
