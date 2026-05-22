@@ -38,6 +38,28 @@ DRIFT_LEFT_EMU = round(81.05 * 12700)  # 1029335 -> should round to 81pt
 HALF_LEFT_EMU = round(81.5 * 12700)    # 1034605 -> drift 0.5pt, must stay
 
 
+def _build_text_box_overflow_fixture(out: Path) -> None:
+    """text 量が box.height (= 40pt) に入りきらない fixture。
+    box.width 400pt で wrap させても複数行になって required_h > 40pt。
+    text_box_resize rule の strategy 切替を回帰検証する用。
+    """
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(120), Pt(120), Pt(400), Pt(40))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.word_wrap = True
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = (
+        "This sentence is intentionally long enough that wrapping inside the "
+        "box generates several rendered lines and overflows the 40pt height."
+    )
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _build_box_canvas_overflow_fixture(out: Path) -> None:
     """text box bbox が canvas 右に 60pt はみ出している fixture。
     box_canvas_clip rule が width を切る (left/top は不変) ことの回帰検証用。
@@ -1080,6 +1102,54 @@ def main() -> int:
             failures.append(
                 f"verify_pptx reported residual on a clean fix: {len(residual)}"
             )
+
+        # --- DS-OVERFLOW-001 段階2: text_box_resize --------------------------
+        tbox_over = tmp_dir / "text-box-overflow.pptx"
+        _build_text_box_overflow_fixture(tbox_over)
+        tbox_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(tbox_over)
+            if f.check == "text_box_overflow"
+        ]
+        if not tbox_findings:
+            failures.append("text_box_overflow fixture did not trigger lint")
+        else:
+            cv = tbox_findings[0]["detail"].get("candidate_values") or []
+            strategies = [
+                c.get("strategy")
+                for c in cv
+                if isinstance(c, dict) and c.get("strategy")
+            ]
+            if "shrink_font_size" not in strategies:
+                failures.append(
+                    f"text_box_overflow candidate missing shrink_font_size: {strategies}"
+                )
+
+            # Default strategy (first candidate = shrink_font_size). Without
+            # SPA judgement the strict gate would skip this finding, so we
+            # disable the gate just like other judgement_fix-policy tests.
+            actions = pptx_fix.fix_pptx(
+                tbox_over,
+                apply=True,
+                rules=("text_box_resize",),
+                findings=tbox_findings,
+                judgement_gate=False,
+            )
+            applied = [
+                a for a in actions if a.rule == "text_box_resize" and a.status == "apply"
+            ]
+            if len(applied) != 1:
+                failures.append(
+                    f"text_box_resize expected 1 apply; got {len(applied)}"
+                )
+            prs = Presentation(str(tbox_over))
+            sh = prs.slides[0].shapes[0]
+            runs = sh.text_frame.paragraphs[0].runs
+            new_font = runs[0].font.size.pt if runs and runs[0].font.size else None
+            if new_font is None or new_font >= 24:
+                failures.append(
+                    f"text_box_resize default strategy expected font<24; got {new_font!r}"
+                )
 
         # --- DS-OVERFLOW-001 段階1: box_canvas_clip --------------------------
         box_over = tmp_dir / "box-canvas-overflow.pptx"

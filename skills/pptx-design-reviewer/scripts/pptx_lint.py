@@ -3,6 +3,7 @@
 
 Checks
 - box_canvas_overflow  (warning) text shape の box bbox が slide canvas からはみ出す
+- text_box_overflow    (warning) box.width で折り返した text の必要 height が box.height を超える
 - overflow_shapes      (error)   shape element extends beyond slide canvas
 - overflow_images      (error)   image element extends beyond slide canvas
 - safe_text_area_text  (warning) text-bearing element outside safe text area
@@ -1476,23 +1477,73 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     overflow_sides = _canvas_overflow_sides(x, y, w, h)
 
     if shape.has_text_frame and shape.text_frame.text.strip():
-        if not overflow_sides:
-            return
-        msg = "text box outside slide canvas: " + ", ".join(
-            f"{side}+{amount:.1f}pt" for side, amount in overflow_sides.items()
-        )
-        detail = {
-            "bbox_pt": [round(v, 2) for v in normalized],
-            "actual_bbox_pt": [round(v, 2) for v in bbox],
-            "overflow_sides_pt": overflow_sides,
-            "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
-            "text_excerpt": _text_excerpt(shape),
-        }
-        findings.append(
-            make_finding(
-                "warning", "box_canvas_overflow", slide_idx, slide_id, shape, msg, detail,
+        # 1) box_canvas_overflow: box bbox が canvas 外。
+        if overflow_sides:
+            findings.append(
+                make_finding(
+                    "warning",
+                    "box_canvas_overflow",
+                    slide_idx,
+                    slide_id,
+                    shape,
+                    "text box outside slide canvas: "
+                    + ", ".join(f"{side}+{amount:.1f}pt" for side, amount in overflow_sides.items()),
+                    {
+                        "bbox_pt": [round(v, 2) for v in normalized],
+                        "actual_bbox_pt": [round(v, 2) for v in bbox],
+                        "overflow_sides_pt": overflow_sides,
+                        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                        "text_excerpt": _text_excerpt(shape),
+                    },
+                )
             )
+
+        # 2) text_box_overflow: box.width で folded した text の required_h が
+        # box.height を超える (= 描画 text が自分の box から下にあふれる)。
+        font_size_pt = _text_frame_dominant_font_size_pt(ctx, shape.text_frame) or 18.0
+        line_heights = [
+            _paragraph_line_height_pt(ctx, para, font_size_pt)
+            for para in shape.text_frame.paragraphs
+            if (para.text or "").strip()
+        ]
+        line_height_pt = (
+            max(line_heights) if line_heights else font_size_pt * DEFAULT_LINE_HEIGHT_MULTIPLIER
         )
+        wrap_w_box = max(0.0, w)
+        lines_in_box = _estimate_text_render_lines(ctx, shape, wrap_w_box, font_size_pt)
+        required_h_in_box = lines_in_box * line_height_pt
+        if required_h_in_box > h + TOL_PT and wrap_w_box > 0:
+            overflow_by_pt = round(required_h_in_box - h, 2)
+            findings.append(
+                make_finding(
+                    "warning",
+                    "text_box_overflow",
+                    slide_idx,
+                    slide_id,
+                    shape,
+                    (
+                        f"text rendered height {required_h_in_box:.1f}pt exceeds "
+                        f"box.height {h:.1f}pt (overflow +{overflow_by_pt:.1f}pt; "
+                        f"{lines_in_box} line(s) at wrap_w={wrap_w_box:.0f}pt, "
+                        f"font {font_size_pt:g}pt)"
+                    ),
+                    {
+                        "bbox_pt": [round(v, 2) for v in normalized],
+                        "actual_bbox_pt": [round(v, 2) for v in bbox],
+                        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                        "text_render": {
+                            "font_size_pt": round(font_size_pt, 2),
+                            "line_height_pt": round(line_height_pt, 2),
+                            "wrap_width_pt": round(wrap_w_box, 2),
+                            "lines": lines_in_box,
+                            "required_height_pt": round(required_h_in_box, 2),
+                            "box_height_pt": round(h, 2),
+                        },
+                        "overflow_by_pt": overflow_by_pt,
+                        "text_excerpt": _text_excerpt(shape),
+                    },
+                )
+            )
         return
 
     if not overflow_sides:
@@ -3912,6 +3963,7 @@ MANUAL_REQUIRED_REASONS = {
     "slide_size": "slide canvas change can reflow all content",
     "animation_present": "static delivery impact requires author decision",
     "box_canvas_overflow": "text box bbox extends past the slide canvas; clip width/height on the right/bottom side only, never relocate the box",
+    "text_box_overflow": "rendered text overflows its own box.height; resolve by font_size shrink / line_height compress / box.height expand (multi_step)",
     "overflow_shapes": "requires visual layout decision",
     "overflow_images": "requires crop or placement decision",
     "safe_text_area_text": "requires layout hierarchy decision",
@@ -4171,6 +4223,56 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                 cand["target_height_pt"] = max(20.0, round(h - float(sides["bottom"]), 2))
             return cand
         return None
+    if check == "text_box_overflow":
+        tr = evidence.get("text_render") or {}
+        bbox = evidence.get("bbox_pt") or []
+        if not isinstance(tr, dict) or len(bbox) != 4:
+            return None
+        cur_font = tr.get("font_size_pt")
+        cur_lh = tr.get("line_height_pt")
+        lines = tr.get("lines") or 1
+        required_h = float(tr.get("required_height_pt") or 0)
+        candidates: list[dict] = []
+        # Strategy A: font_size shrink → 1 段階下の allowed font size に。
+        if isinstance(cur_font, (int, float)):
+            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
+            if smaller:
+                target_font = smaller[-1]
+                candidates.append(
+                    {
+                        "strategy": "shrink_font_size",
+                        "font_size_pt": target_font,
+                        "from_pt": round(float(cur_font), 2),
+                        "reason": "step down to nearest smaller allowed font size",
+                    }
+                )
+        # Strategy B: line_height 圧縮 → 1 段階下の allowed line height。
+        if isinstance(cur_lh, (int, float)):
+            smaller_lh = [lh for lh in sorted(ALLOWED_LINE_HEIGHTS_PT) if lh < float(cur_lh)]
+            if smaller_lh:
+                candidates.append(
+                    {
+                        "strategy": "compress_line_height",
+                        "line_height_pt": smaller_lh[-1],
+                        "from_pt": round(float(cur_lh), 2),
+                        "reason": "step down to nearest smaller allowed line height",
+                    }
+                )
+        # Strategy C: box.height 拡張 → required_h まで box を伸ばす。
+        x, y, w, h = bbox
+        max_h = max(0.0, SLIDE_H_PT - float(y))
+        target_h = min(round(required_h, 2), round(max_h, 2)) if max_h > 0 else round(required_h, 2)
+        if target_h > h + 0.5:
+            candidates.append(
+                {
+                    "strategy": "expand_box_height",
+                    "target_height_pt": target_h,
+                    "from_pt": round(h, 2),
+                    "fits_within_canvas": target_h <= max_h,
+                    "reason": "expand box.height to fit required text height (capped at canvas bottom)",
+                }
+            )
+        return candidates or None
     if check == "decorative_isolated_lines":
         candidates = evidence.get("candidate_values")
         if isinstance(candidates, list) and candidates:

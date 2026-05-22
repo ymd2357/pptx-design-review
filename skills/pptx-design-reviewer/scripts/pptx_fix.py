@@ -98,6 +98,7 @@ ALL_RULES = (
     "badge_alignment",
     "decorative_remove",
     "box_canvas_clip",
+    "text_box_resize",
 )
 
 
@@ -813,6 +814,7 @@ FINDING_DRIVEN_RULES = {
     "text_vertical_balance",
     "decorative_remove",
     "box_canvas_clip",
+    "text_box_resize",
 }
 
 
@@ -1876,6 +1878,85 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             after={"alignment": "CENTER", "vertical_anchor": "MIDDLE"},
         )
 
+    if rule == "text_box_resize":
+        # DS-OVERFLOW-001 段階2 (2026-05-22): text_box_overflow finding を受け、
+        # SPA で promoted (= judgement_reason=auto_fixable + chosen_strategy)
+        # された 1 つの strategy を apply する。SPA が strategy を明示しなければ、
+        # multi_step candidates の **先頭** (= shrink_font_size 優先) を採用する。
+        if shape is None or not getattr(shape, "has_text_frame", False):
+            return None
+        candidates = detail.get("candidate_values")
+        chosen = None
+        if isinstance(candidates, list):
+            chosen_name = detail.get("chosen_strategy")
+            if isinstance(chosen_name, str):
+                for entry in candidates:
+                    if isinstance(entry, dict) and entry.get("strategy") == chosen_name:
+                        chosen = entry
+                        break
+            if chosen is None:
+                for entry in candidates:
+                    if isinstance(entry, dict) and "strategy" in entry:
+                        chosen = entry
+                        break
+        if chosen is None:
+            return None
+        strategy = chosen.get("strategy")
+        before_state = {
+            "shape_id": getattr(shape, "shape_id", None),
+            "shape_name": getattr(shape, "name", None),
+        }
+        if strategy == "shrink_font_size":
+            new_font = chosen.get("font_size_pt")
+            if not isinstance(new_font, (int, float)):
+                return None
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before=before_state,
+                after={"strategy": "shrink_font_size", "font_size_pt": float(new_font)},
+            )
+        if strategy == "compress_line_height":
+            new_lh = chosen.get("line_height_pt")
+            if not isinstance(new_lh, (int, float)):
+                return None
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before=before_state,
+                after={"strategy": "compress_line_height", "line_height_pt": float(new_lh)},
+            )
+        if strategy == "expand_box_height":
+            new_h_norm = chosen.get("target_height_pt")
+            if not isinstance(new_h_norm, (int, float)):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "geometry": before_geometry},
+                after={
+                    "strategy": "expand_box_height",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": before_geometry["width"],
+                        "height": round(float(new_h_norm) * sy, 4),
+                    },
+                },
+            )
+        return None
+
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 段階1 (2026-05-21): box_canvas_overflow finding を
         # 受けて、右下方向の box bbox はみ出しだけを width/height 切り詰めで
@@ -2329,6 +2410,22 @@ def _apply_finding_action(prs, action: FixAction) -> None:
         parent = sp_element.getparent()
         if parent is not None:
             parent.remove(sp_element)
+    elif action.rule == "text_box_resize":
+        # DS-OVERFLOW-001 段階2: SPA で選ばれた 1 つの strategy を apply。
+        # box_canvas_clip と違い "geometry" を action.after に置いた場合は
+        # 上の `if "geometry" in action.after` 分岐で処理済 (= expand_box_height)。
+        # ここでは font_size / line_height の strategy のみを扱う。
+        strategy = action.after.get("strategy") if isinstance(action.after, dict) else None
+        if strategy == "shrink_font_size":
+            target_pt = float(action.after.get("font_size_pt") or 0)
+            if target_pt > 0:
+                _set_shape_text_size(shape, target_pt)
+        elif strategy == "compress_line_height":
+            target_pt = float(action.after.get("line_height_pt") or 0)
+            if target_pt > 0:
+                for para in shape.text_frame.paragraphs:
+                    if para.text.strip():
+                        para.line_spacing = Pt(target_pt)
 
 
 # ---- Driver ----------------------------------------------------------------

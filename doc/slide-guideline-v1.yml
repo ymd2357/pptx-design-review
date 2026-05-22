@@ -2754,6 +2754,17 @@ rules:
             - "overflow_sides_pt"
             - "canvas_pt"
           candidate_values: "{shrink_right: target_width_pt, shrink_bottom: target_height_pt}; left/top の超過は manual_required で残す。"
+        text_box_overflow:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "text_render"
+            - "overflow_by_pt"
+          candidate_values: "multi_step: shrink_font_size / compress_line_height / expand_box_height のうち SPA で 1 つ選ぶ"
         overflow_shapes:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -3355,6 +3366,14 @@ rules:
         impact_axis: "readability"
         issue_title: "テキスト枠がスライド外にはみ出している"
         action: "右下方向の超過は枠サイズを切る (文字位置は維持)。左上方向は手動で枠位置を調整する。"
+      text_box_overflow:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "judgement_fix"
+        impact_axis: "readability"
+        issue_title: "テキストが枠の高さに収まっていない"
+        action: "フォントサイズ縮小 / 行間圧縮 / 枠の高さ拡張 のいずれかを SPA で選んで適用する。"
       animation_present:
         status: "implemented_lint"
         priority: "P1"
@@ -3633,6 +3652,11 @@ rules:
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.box_canvas_overflow"
         detection: "text shape (has_text_frame & text.strip()) の box bbox が slide canvas (0,0,SLIDE_W,SLIDE_H) の任意の辺を超える場合に発火。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。non-text shape の box overflow は overflow_shapes / overflow_images が引き続き担当する。"
+      text_box_overflow:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_box_overflow"
+        detection: "text shape の text を box.width で折り返した時の必要 height (lines × line_height) が box.height を超える場合に発火。DS-OVERFLOW-001 段階2 (2026-05-22)。"
       overflow_shapes:
         severity: "error"
         automation: "automated"
@@ -3918,6 +3942,10 @@ rules:
         apply_mode: auto_fix
         fix_rule: box_canvas_clip
         note: "text shape の box bbox が canvas 外。右下方向の超過は width/height を切る (text 絶対座標は不変)。左/上方向は box_canvas_clip rule 内で manual_required として skip (= box.left/top を動かすと text 位置が変わるので auto 対象外)。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。"
+      text_box_overflow:
+        apply_mode: judgement_fix
+        fix_rule: text_box_resize
+        note: "box.width で folded した text の required_h が box.height を超える。SPA で multi_step (shrink_font_size / compress_line_height / expand_box_height) から 1 つ選んで apply。DS-OVERFLOW-001 段階2 (2026-05-22)。"
       overflow_shapes:
         apply_mode: judgement_fix
         fix_rule: bbox_fit
