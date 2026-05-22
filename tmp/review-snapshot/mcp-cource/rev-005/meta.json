@@ -1,8 +1,11 @@
 {
   "deck": "mcp-cource",
-  "rev": "003",
+  "rev": "005",
   "threshold_ae_pixels": 200,
-  "changed_slides": [],
+  "changed_slides": [
+    36,
+    45
+  ],
   "slide_diffs": [
     {
       "slide_no": 1,
@@ -181,8 +184,8 @@
     },
     {
       "slide_no": 36,
-      "ae_pixels": 0,
-      "changed": false
+      "ae_pixels": 2183,
+      "changed": true
     },
     {
       "slide_no": 37,
@@ -226,8 +229,8 @@
     },
     {
       "slide_no": 45,
-      "ae_pixels": 0,
-      "changed": false
+      "ae_pixels": 1400,
+      "changed": true
     },
     {
       "slide_no": 46,
