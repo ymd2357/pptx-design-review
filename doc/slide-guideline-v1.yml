@@ -2765,6 +2765,17 @@ rules:
             - "text_render"
             - "overflow_by_pt"
           candidate_values: "multi_step: shrink_font_size / compress_line_height / expand_box_height のうち SPA で 1 つ選ぶ"
+        text_canvas_overflow:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "text_render"
+            - "overflow_by_pt"
+          candidate_values: "multi_step: enable_word_wrap / shrink_box_width_to_canvas / shrink_font_size のうち SPA で 1 つ選ぶ"
         overflow_shapes:
           evidence_source: "pptx_xml"
           evidence_confidence: "high"
@@ -3374,6 +3385,14 @@ rules:
         impact_axis: "readability"
         issue_title: "テキストが枠の高さに収まっていない"
         action: "フォントサイズ縮小 / 行間圧縮 / 枠の高さ拡張 のいずれかを SPA で選んで適用する。"
+      text_canvas_overflow:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "judgement_fix"
+        impact_axis: "readability"
+        issue_title: "テキスト自体がスライド右端を超えている"
+        action: "word_wrap 有効化 / 枠の幅をスライドに合わせる / フォントサイズ縮小 のいずれかを SPA で選んで適用する。"
       animation_present:
         status: "implemented_lint"
         priority: "P1"
@@ -3657,6 +3676,11 @@ rules:
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.text_box_overflow"
         detection: "text shape の text を box.width で折り返した時の必要 height (lines × line_height) が box.height を超える場合に発火。DS-OVERFLOW-001 段階2 (2026-05-22)。"
+      text_canvas_overflow:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_canvas_overflow"
+        detection: "text を canvas 端 (wrap_w = min(box.width, canvas.right - box.left)) で強制改行した場合でも、wrap できない unit (word_wrap=False のとき text 全幅、または 1 単語/1 文字が wrap_w 超え) が canvas 右端を超える場合に発火。DS-OVERFLOW-001 段階3 (2026-05-23)。"
       overflow_shapes:
         severity: "error"
         automation: "automated"
@@ -3946,6 +3970,10 @@ rules:
         apply_mode: judgement_fix
         fix_rule: text_box_resize
         note: "box.width で folded した text の required_h が box.height を超える。SPA で multi_step (shrink_font_size / compress_line_height / expand_box_height) から 1 つ選んで apply。DS-OVERFLOW-001 段階2 (2026-05-22)。"
+      text_canvas_overflow:
+        apply_mode: judgement_fix
+        fix_rule: text_canvas_reflow
+        note: "canvas 端強制改行でも wrap できない text 単位 (word_wrap=False の text 全幅、or 1 単語が wrap_w 超え) が canvas 右端を出る。SPA で multi_step (enable_word_wrap / shrink_box_width_to_canvas / shrink_font_size) を選んで apply。DS-OVERFLOW-001 段階3 (2026-05-23)。"
       overflow_shapes:
         apply_mode: judgement_fix
         fix_rule: bbox_fit

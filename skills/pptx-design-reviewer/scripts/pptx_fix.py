@@ -99,6 +99,7 @@ ALL_RULES = (
     "decorative_remove",
     "box_canvas_clip",
     "text_box_resize",
+    "text_canvas_reflow",
 )
 
 
@@ -815,6 +816,7 @@ FINDING_DRIVEN_RULES = {
     "decorative_remove",
     "box_canvas_clip",
     "text_box_resize",
+    "text_canvas_reflow",
 }
 
 
@@ -1878,6 +1880,82 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             after={"alignment": "CENTER", "vertical_anchor": "MIDDLE"},
         )
 
+    if rule == "text_canvas_reflow":
+        # DS-OVERFLOW-001 段階3 (2026-05-23): text_canvas_overflow finding を
+        # 受けて、SPA で promoted された 1 つの strategy を apply する。
+        # candidate strategies: enable_word_wrap / shrink_box_width_to_canvas /
+        # shrink_font_size。SPA が chosen_strategy を指定しなければ 先頭採用。
+        if shape is None or not getattr(shape, "has_text_frame", False):
+            return None
+        candidates = detail.get("candidate_values")
+        chosen = None
+        if isinstance(candidates, list):
+            chosen_name = detail.get("chosen_strategy")
+            if isinstance(chosen_name, str):
+                for entry in candidates:
+                    if isinstance(entry, dict) and entry.get("strategy") == chosen_name:
+                        chosen = entry
+                        break
+            if chosen is None:
+                for entry in candidates:
+                    if isinstance(entry, dict) and "strategy" in entry:
+                        chosen = entry
+                        break
+        if chosen is None:
+            return None
+        strategy = chosen.get("strategy")
+        before_state = {
+            "shape_id": getattr(shape, "shape_id", None),
+            "shape_name": getattr(shape, "name", None),
+        }
+        if strategy == "enable_word_wrap":
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "word_wrap": shape.text_frame.word_wrap},
+                after={"strategy": "enable_word_wrap"},
+            )
+        if strategy == "shrink_box_width_to_canvas":
+            target_w_norm = chosen.get("target_width_pt")
+            if not isinstance(target_w_norm, (int, float)):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "geometry": before_geometry},
+                after={
+                    "strategy": "shrink_box_width_to_canvas",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": round(float(target_w_norm) * sx, 4),
+                        "height": before_geometry["height"],
+                    },
+                },
+            )
+        if strategy == "shrink_font_size":
+            new_font = chosen.get("font_size_pt")
+            if not isinstance(new_font, (int, float)):
+                return None
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before=before_state,
+                after={"strategy": "shrink_font_size", "font_size_pt": float(new_font)},
+            )
+        return None
+
     if rule == "text_box_resize":
         # DS-OVERFLOW-001 段階2 (2026-05-22): text_box_overflow finding を受け、
         # SPA で promoted (= judgement_reason=auto_fixable + chosen_strategy)
@@ -2426,6 +2504,17 @@ def _apply_finding_action(prs, action: FixAction) -> None:
                 for para in shape.text_frame.paragraphs:
                     if para.text.strip():
                         para.line_spacing = Pt(target_pt)
+    elif action.rule == "text_canvas_reflow":
+        # DS-OVERFLOW-001 段階3: enable_word_wrap / shrink_font_size を扱う。
+        # shrink_box_width_to_canvas は action.after.geometry 経由で上の
+        # `if "geometry" in action.after` 分岐で apply 済。
+        strategy = action.after.get("strategy") if isinstance(action.after, dict) else None
+        if strategy == "enable_word_wrap":
+            shape.text_frame.word_wrap = True
+        elif strategy == "shrink_font_size":
+            target_pt = float(action.after.get("font_size_pt") or 0)
+            if target_pt > 0:
+                _set_shape_text_size(shape, target_pt)
 
 
 # ---- Driver ----------------------------------------------------------------

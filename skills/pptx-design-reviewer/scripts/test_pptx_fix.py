@@ -38,6 +38,28 @@ DRIFT_LEFT_EMU = round(81.05 * 12700)  # 1029335 -> should round to 81pt
 HALF_LEFT_EMU = round(81.5 * 12700)    # 1034605 -> drift 0.5pt, must stay
 
 
+def _build_text_canvas_overflow_fixture(out: Path) -> None:
+    """word_wrap=False で text の全幅が canvas - box.left を大幅に超える
+    fixture (= text の右端が canvas 外)。text_canvas_reflow rule で
+    enable_word_wrap strategy を apply できる。
+    """
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(1200), Pt(120), Pt(220), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    box.text_frame.word_wrap = False
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = (
+        "This is intentionally long single-line text that runs far beyond "
+        "the canvas right edge because word_wrap is disabled."
+    )
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(28)
+    prs.save(str(out))
+
+
 def _build_text_box_overflow_fixture(out: Path) -> None:
     """text 量が box.height (= 40pt) に入りきらない fixture。
     box.width 400pt で wrap させても複数行になって required_h > 40pt。
@@ -1102,6 +1124,46 @@ def main() -> int:
             failures.append(
                 f"verify_pptx reported residual on a clean fix: {len(residual)}"
             )
+
+        # --- DS-OVERFLOW-001 段階3: text_canvas_reflow ----------------------
+        tcanvas = tmp_dir / "text-canvas-overflow.pptx"
+        _build_text_canvas_overflow_fixture(tcanvas)
+        tcanvas_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(tcanvas)
+            if f.check == "text_canvas_overflow"
+        ]
+        if not tcanvas_findings:
+            failures.append("text_canvas_overflow fixture did not trigger lint")
+        else:
+            cv = tcanvas_findings[0]["detail"].get("candidate_values") or []
+            strategies = [
+                c.get("strategy") for c in cv if isinstance(c, dict) and c.get("strategy")
+            ]
+            if "enable_word_wrap" not in strategies:
+                failures.append(
+                    f"text_canvas_overflow candidate missing enable_word_wrap: {strategies}"
+                )
+            actions = pptx_fix.fix_pptx(
+                tcanvas,
+                apply=True,
+                rules=("text_canvas_reflow",),
+                findings=tcanvas_findings,
+                judgement_gate=False,
+            )
+            applied = [
+                a for a in actions if a.rule == "text_canvas_reflow" and a.status == "apply"
+            ]
+            if len(applied) != 1:
+                failures.append(
+                    f"text_canvas_reflow expected 1 apply; got {len(applied)}"
+                )
+            prs = Presentation(str(tcanvas))
+            sh = prs.slides[0].shapes[0]
+            if sh.text_frame.word_wrap is not True:
+                failures.append(
+                    f"text_canvas_reflow default strategy expected word_wrap=True; got {sh.text_frame.word_wrap}"
+                )
 
         # --- DS-OVERFLOW-001 段階2: text_box_resize --------------------------
         tbox_over = tmp_dir / "text-box-overflow.pptx"

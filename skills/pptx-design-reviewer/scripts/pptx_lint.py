@@ -4,6 +4,7 @@
 Checks
 - box_canvas_overflow  (warning) text shape の box bbox が slide canvas からはみ出す
 - text_box_overflow    (warning) box.width で折り返した text の必要 height が box.height を超える
+- text_canvas_overflow (warning) canvas 端強制改行でも text が canvas 右端を超える
 - overflow_shapes      (error)   shape element extends beyond slide canvas
 - overflow_images      (error)   image element extends beyond slide canvas
 - safe_text_area_text  (warning) text-bearing element outside safe text area
@@ -1540,6 +1541,89 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
                             "box_height_pt": round(h, 2),
                         },
                         "overflow_by_pt": overflow_by_pt,
+                        "text_excerpt": _text_excerpt(shape),
+                    },
+                )
+            )
+
+        # 3) text_canvas_overflow: canvas 端で強制改行した見た目でも、text 自体
+        # の描画範囲が canvas 右端を超えるケース。
+        # - word_wrap=False: text 全幅で判定
+        # - word_wrap=True : 単語境界 (Latin) / 各文字 (CJK) を unit として、
+        #                    最大 unit 幅が wrap_w_canvas を超えるか判定。
+        wrap_w_canvas = max(0.0, min(w, SLIDE_W_PT - x))
+        text_raw = (shape.text_frame.text or "").strip()
+        text_canvas_fires = False
+        overflow_pt = 0.0
+        longest_unit_pt = 0.0
+        word_wrap = getattr(shape.text_frame, "word_wrap", True)
+        word_wrap_enabled = word_wrap is None or word_wrap
+        if wrap_w_canvas > 0 and text_raw:
+            if not word_wrap_enabled:
+                total_w = _estimate_text_width_pt(text_raw, font_size_pt)
+                if total_w > wrap_w_canvas + TOL_PT:
+                    text_canvas_fires = True
+                    overflow_pt = total_w - wrap_w_canvas
+                    longest_unit_pt = total_w
+            else:
+                max_unit_w = 0.0
+                for word in re.split(r"\s+", text_raw):
+                    if not word:
+                        continue
+                    current_run = ""
+                    for ch in word:
+                        if (
+                            "぀" <= ch <= "ヿ"
+                            or "㐀" <= ch <= "鿿"
+                            or "＀" <= ch <= "￯"
+                            or "　" <= ch <= "〿"
+                        ):
+                            if current_run:
+                                max_unit_w = max(
+                                    max_unit_w,
+                                    _estimate_text_width_pt(current_run, font_size_pt),
+                                )
+                                current_run = ""
+                            max_unit_w = max(
+                                max_unit_w,
+                                _estimate_text_width_pt(ch, font_size_pt),
+                            )
+                        else:
+                            current_run += ch
+                    if current_run:
+                        max_unit_w = max(
+                            max_unit_w,
+                            _estimate_text_width_pt(current_run, font_size_pt),
+                        )
+                if max_unit_w > wrap_w_canvas + TOL_PT:
+                    text_canvas_fires = True
+                    overflow_pt = max_unit_w - wrap_w_canvas
+                    longest_unit_pt = max_unit_w
+        if text_canvas_fires:
+            findings.append(
+                make_finding(
+                    "warning",
+                    "text_canvas_overflow",
+                    slide_idx,
+                    slide_id,
+                    shape,
+                    (
+                        f"longest unwrappable text segment {longest_unit_pt:.1f}pt "
+                        f"exceeds canvas-right wrap width {wrap_w_canvas:.1f}pt "
+                        f"(word_wrap={'False' if word_wrap is False else 'True'}; "
+                        f"overflow +{overflow_pt:.1f}pt)"
+                    ),
+                    {
+                        "bbox_pt": [round(v, 2) for v in normalized],
+                        "actual_bbox_pt": [round(v, 2) for v in bbox],
+                        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                        "text_render": {
+                            "font_size_pt": round(font_size_pt, 2),
+                            "wrap_width_pt": round(wrap_w_canvas, 2),
+                            "longest_unit_pt": round(longest_unit_pt, 2),
+                            "word_wrap": bool(word_wrap_enabled),
+                        },
+                        "overflow_by_pt": round(overflow_pt, 2),
                         "text_excerpt": _text_excerpt(shape),
                     },
                 )
@@ -3964,6 +4048,7 @@ MANUAL_REQUIRED_REASONS = {
     "animation_present": "static delivery impact requires author decision",
     "box_canvas_overflow": "text box bbox extends past the slide canvas; clip width/height on the right/bottom side only, never relocate the box",
     "text_box_overflow": "rendered text overflows its own box.height; resolve by font_size shrink / line_height compress / box.height expand (multi_step)",
+    "text_canvas_overflow": "text content cannot be wrapped to fit within canvas right edge; resolve by enabling word_wrap / shrinking box.width to canvas / shrinking font_size (multi_step)",
     "overflow_shapes": "requires visual layout decision",
     "overflow_images": "requires crop or placement decision",
     "safe_text_area_text": "requires layout hierarchy decision",
@@ -4223,6 +4308,48 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                 cand["target_height_pt"] = max(20.0, round(h - float(sides["bottom"]), 2))
             return cand
         return None
+    if check == "text_canvas_overflow":
+        tr = evidence.get("text_render") or {}
+        bbox = evidence.get("bbox_pt") or []
+        if not isinstance(tr, dict) or len(bbox) != 4:
+            return None
+        x, y, w, h = bbox
+        candidates: list[dict] = []
+        # Strategy A: enable word_wrap (= word_wrap が False の場合のみ)。
+        if tr.get("word_wrap") is False:
+            candidates.append(
+                {
+                    "strategy": "enable_word_wrap",
+                    "from_word_wrap": False,
+                    "to_word_wrap": True,
+                    "reason": "turn on word_wrap so the text reflows inside the box",
+                }
+            )
+        # Strategy B: box.width を canvas 内に切り詰める (右端 = canvas.right)。
+        max_w_in_canvas = max(0.0, SLIDE_W_PT - float(x))
+        if w > max_w_in_canvas + 0.5 and max_w_in_canvas > 20.0:
+            candidates.append(
+                {
+                    "strategy": "shrink_box_width_to_canvas",
+                    "target_width_pt": round(max_w_in_canvas, 2),
+                    "from_pt": round(w, 2),
+                    "reason": "clip box.width so its right edge sits at canvas right edge",
+                }
+            )
+        # Strategy C: font_size 縮小 → 1 段階下の allowed font size。
+        cur_font = tr.get("font_size_pt")
+        if isinstance(cur_font, (int, float)):
+            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
+            if smaller:
+                candidates.append(
+                    {
+                        "strategy": "shrink_font_size",
+                        "font_size_pt": smaller[-1],
+                        "from_pt": round(float(cur_font), 2),
+                        "reason": "step down to nearest smaller allowed font size so wrap units shrink",
+                    }
+                )
+        return candidates or None
     if check == "text_box_overflow":
         tr = evidence.get("text_render") or {}
         bbox = evidence.get("bbox_pt") or []
