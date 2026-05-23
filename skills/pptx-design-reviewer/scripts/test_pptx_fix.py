@@ -1214,21 +1214,22 @@ def main() -> int:
                 failures.append(
                     f"text_box_resize expected 1 apply; got {len(applied)}"
                 )
-            # default strategy = expand_box_width_to_canvas (box.right < canvas
-            # の fixture では先頭に出るため)。box.width が canvas 右端まで拡張
-            # されているか、それが不可なら font<24 のいずれかで overflow が解消
-            # されていることを確認。
+            # default strategy = expand_box_height (下に伸ばす、見た目変えない
+            # 方向を最優先)。height が伸びている / box.width が拡張 / font shrink
+            # のいずれかで overflow が解消されることを確認。
             prs = Presentation(str(tbox_over))
             sh = prs.slides[0].shapes[0]
             runs = sh.text_frame.paragraphs[0].runs
             new_font = runs[0].font.size.pt if runs and runs[0].font.size else None
             new_width_pt = sh.width / 12700
+            new_height_pt = sh.height / 12700
             font_shrunk = new_font is not None and new_font < 24
             width_expanded = new_width_pt > 400.5
-            if not (font_shrunk or width_expanded):
+            height_expanded = new_height_pt > 40.5
+            if not (font_shrunk or width_expanded or height_expanded):
                 failures.append(
-                    "text_box_resize default strategy expected width>400 or font<24;"
-                    f" got width={new_width_pt!r}, font={new_font!r}"
+                    "text_box_resize default strategy expected height>40 or width>400 or font<24;"
+                    f" got width={new_width_pt!r}, height={new_height_pt!r}, font={new_font!r}"
                 )
 
         # --- DS-OVERFLOW-001 段階1: box_canvas_clip --------------------------
@@ -1265,17 +1266,19 @@ def main() -> int:
             left_pt = sh.left / 12700
             top_pt = sh.top / 12700
             width_pt = sh.width / 12700
-            if abs(left_pt - 1300) > 0.5:
+            # 改修後: 右はみ出しは box.left を canvas 内に shift する (= 1240pt
+            # 期待: left=1300→1240, width=200 保持。box.right=1440=canvas 右端)。
+            if abs(left_pt - 1240) > 0.5:
                 failures.append(
-                    f"box_canvas_clip moved left (1300pt expected, got {left_pt:.2f}pt)"
+                    f"box_canvas_clip expected left shifted to 1240pt; got {left_pt:.2f}pt"
                 )
             if abs(top_pt - 40) > 0.5:
                 failures.append(
                     f"box_canvas_clip moved top (40pt expected, got {top_pt:.2f}pt)"
                 )
-            if width_pt > 140.5:
+            if abs(width_pt - 200) > 0.5:
                 failures.append(
-                    f"box_canvas_clip did not shrink width into canvas (expected ~140pt, got {width_pt:.2f}pt)"
+                    f"box_canvas_clip should preserve width when shifting (expected 200pt, got {width_pt:.2f}pt)"
                 )
 
     if failures:

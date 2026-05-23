@@ -2140,12 +2140,11 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         return None
 
     if rule == "box_canvas_clip":
-        # DS-OVERFLOW-001 段階1 (2026-05-21): box_canvas_overflow finding を
-        # 受けて、box bbox の canvas はみ出しを修正する。
-        # - 右/下方向は width/height を切り詰める (text 絶対座標は不変、auto)
-        # - 左/上方向は box.left/top を canvas 内に shift する (text 位置も
-        #   一緒に動くため visual impact あり。機能としては提供し、採用判定
-        #   は SPA judgement に委ねる)
+        # DS-OVERFLOW-001 (2026-05-21、2026-05-23 改修):
+        # box bbox はみ出しを **box 全体の shift** で修正する (= 視覚的にも
+        # box が canvas 内に動く)。box が canvas 自体より大きい場合のみ
+        # width/height 縮小の fallback を併用。text 絶対座標は box と一緒に
+        # 動くため visual impact あり、採用判定は SPA judgement に委ねる。
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2161,14 +2160,22 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         bottom_over = float(overflow.get("bottom", 0) or 0)
         left_over = float(overflow.get("left", 0) or 0)
         top_over = float(overflow.get("top", 0) or 0)
-        new_left = left_norm + max(0.0, left_over)
-        new_top = top_norm + max(0.0, top_over)
+        # 左右/上下 shift: 左/上はみ出しは +、右/下はみ出しは -
+        new_left = left_norm + max(0.0, left_over) - max(0.0, right_over)
+        new_top = top_norm + max(0.0, top_over) - max(0.0, bottom_over)
         new_w = width_norm
         new_h = height_norm
-        if right_over > 0:
-            new_w = max(20.0, width_norm - right_over)
-        if bottom_over > 0:
-            new_h = max(20.0, height_norm - bottom_over)
+        # box が canvas 自体より大きいときは shift では収まらないので幅/高さ縮小 fallback
+        if width_norm > SLIDE_W_PT:
+            new_left = 0.0
+            new_w = float(SLIDE_W_PT)
+        elif new_left < 0:
+            new_left = 0.0
+        if height_norm > SLIDE_H_PT:
+            new_top = 0.0
+            new_h = float(SLIDE_H_PT)
+        elif new_top < 0:
+            new_top = 0.0
         if (
             abs(new_left - left_norm) < 0.05
             and abs(new_top - top_norm) < 0.05

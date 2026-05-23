@@ -4440,10 +4440,30 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         lines = tr.get("lines") or 1
         required_h = float(tr.get("required_height_pt") or 0)
         candidates: list[dict] = []
-        # Strategy 先頭: box.width を canvas 右端まで拡張する。box.right < canvas
-        # のときのみ提示。「右に余白がある」状態を解消できる場合は font shrink
-        # より visual impact が小さいので優先採用される。
+        # 優先順位 ([[feedback-overflow-fix-priority]]): 見た目を変えない方向から:
+        # 1) box.height 拡張 (下に伸ばす) ← default
+        # 2) box.width 拡張 (右に伸ばす)
+        # 3) line_height 圧縮 / font shrink (最終手段、見た目変わる)
         x, y, w, h = bbox
+        # Strategy 1: box.height 拡張 → required_h + margin(top+bottom) まで
+        # box を下に伸ばす (required_h は inner_h ベースなので margin 足し戻し)。
+        margins_pt = tr.get("margins_pt") or {}
+        margin_top = float(margins_pt.get("top", 7.2) or 7.2)
+        margin_bot = float(margins_pt.get("bottom", 7.2) or 7.2)
+        max_h = max(0.0, SLIDE_H_PT - float(y))
+        target_h_with_margin = round(required_h + margin_top + margin_bot, 2)
+        target_h = min(target_h_with_margin, round(max_h, 2)) if max_h > 0 else target_h_with_margin
+        if target_h > h + 0.5:
+            candidates.append(
+                {
+                    "strategy": "expand_box_height",
+                    "target_height_pt": target_h,
+                    "from_pt": round(h, 2),
+                    "fits_within_canvas": target_h <= max_h,
+                    "reason": "expand box.height (下に伸ばす) — visual impact 最小",
+                }
+            )
+        # Strategy 2: box.width を canvas 右端まで拡張する。
         max_w = max(0.0, SLIDE_W_PT - float(x))
         if max_w > w + 0.5:
             candidates.append(
@@ -4454,20 +4474,7 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                     "reason": "expand box.width to canvas right edge so wrapped text needs fewer lines",
                 }
             )
-        # Strategy A: font_size shrink → 1 段階下の allowed font size に。
-        if isinstance(cur_font, (int, float)):
-            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
-            if smaller:
-                target_font = smaller[-1]
-                candidates.append(
-                    {
-                        "strategy": "shrink_font_size",
-                        "font_size_pt": target_font,
-                        "from_pt": round(float(cur_font), 2),
-                        "reason": "step down to nearest smaller allowed font size",
-                    }
-                )
-        # Strategy B: line_height 圧縮 → 1 段階下の allowed line height。
+        # Strategy 3: line_height 圧縮 → 1 段階下の allowed line height。
         if isinstance(cur_lh, (int, float)):
             smaller_lh = [lh for lh in sorted(ALLOWED_LINE_HEIGHTS_PT) if lh < float(cur_lh)]
             if smaller_lh:
@@ -4479,20 +4486,19 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                         "reason": "step down to nearest smaller allowed line height",
                     }
                 )
-        # Strategy C: box.height 拡張 → required_h まで box を伸ばす。
-        x, y, w, h = bbox
-        max_h = max(0.0, SLIDE_H_PT - float(y))
-        target_h = min(round(required_h, 2), round(max_h, 2)) if max_h > 0 else round(required_h, 2)
-        if target_h > h + 0.5:
-            candidates.append(
-                {
-                    "strategy": "expand_box_height",
-                    "target_height_pt": target_h,
-                    "from_pt": round(h, 2),
-                    "fits_within_canvas": target_h <= max_h,
-                    "reason": "expand box.height to fit required text height (capped at canvas bottom)",
-                }
-            )
+        # Strategy 4: font_size shrink → 1 段階下の allowed font size に (最終手段)。
+        if isinstance(cur_font, (int, float)):
+            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
+            if smaller:
+                target_font = smaller[-1]
+                candidates.append(
+                    {
+                        "strategy": "shrink_font_size",
+                        "font_size_pt": target_font,
+                        "from_pt": round(float(cur_font), 2),
+                        "reason": "step down to nearest smaller allowed font size (見た目変わる最終手段)",
+                    }
+                )
         return candidates or None
     if check == "decorative_isolated_lines":
         candidates = evidence.get("candidate_values")
