@@ -1601,10 +1601,13 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
             auto_size = shape.text_frame.auto_size
         except (AttributeError, ValueError):
             auto_size = None
-        autofit_suppress = auto_size in {
-            MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE,
-            MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT,
-        }
+        # SHAPE_TO_FIT_TEXT は本来 box が自動拡張される設定だが、XML 上の
+        # box.height/width は拡張前の値のまま (PowerPoint の autofit 計算と
+        # 保存値の不整合)。viewer は XML 値で render するので text 末尾が
+        # 切れる視覚問題が発生する。よって SHAPE_TO_FIT_TEXT は suppress
+        # しない (text_box_overflow を fire させて expand_box_height で fix)。
+        # TEXT_TO_FIT_SHAPE は font が自動縮小される設定なので suppress 継続。
+        autofit_suppress = auto_size == MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
         text_render_can_estimate = font_size_pt is not None and not autofit_suppress
 
         if text_render_can_estimate:
@@ -4610,20 +4613,45 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         required_h = float(tr.get("required_height_pt") or 0)
         candidates: list[dict] = []
         # 優先順位 ([[feedback-overflow-fix-priority]]): 見た目を変えない方向から:
-        # 1) box.height 拡張 (下に伸ばす) ← default
-        # 2) box.width 拡張 (右に伸ばす)
+        # 0) box.width を text 全幅まで拡張 (SHAPE_TO_FIT_TEXT 用、1 行で収める)
+        # 1) box.height 拡張 (下に伸ばす)
+        # 2) box.width を canvas 端まで拡張 (右に伸ばす)
         # 3) line_height 圧縮 / font shrink (最終手段、見た目変わる)
         x, y, w, h = bbox
-        # Strategy 1: box.height 拡張 → required_h + margin(top+bottom) + 1 行
-        # buffer まで box を下に伸ばす (required_h は inner_h ベースなので
-        # margin 足し戻し + PowerPoint 実描画でちょうど 1 行溢れる現象に対し
-        # line_height 分の余裕を加算 [[feedback-overflow-fix-priority]])。
         margins_pt = tr.get("margins_pt") or {}
         margin_top = float(margins_pt.get("top", 7.2) or 7.2)
         margin_bot = float(margins_pt.get("bottom", 7.2) or 7.2)
+        margin_l = float(margins_pt.get("left", 7.2) or 7.2)
+        margin_r = float(margins_pt.get("right", 7.2) or 7.2)
         line_h_buffer = float(cur_lh) if isinstance(cur_lh, (int, float)) else (
             float(cur_font) * DEFAULT_LINE_HEIGHT_MULTIPLIER if isinstance(cur_font, (int, float)) else 28.8
         )
+        autofit_v = tr.get("autofit")
+        is_shape_to_fit_text = bool(autofit_v) and "SHAPE_TO_FIT_TEXT" in str(autofit_v).upper()
+
+        # Strategy 0 (SHAPE_TO_FIT_TEXT のみ default): box.width を text 全幅まで
+        # 拡張して 1 行に収める。required_h ÷ line_height = 現在の行数、
+        # total_text_w ≈ lines × inner_w_now を 1 行ぶんに集約する target.
+        inner_w_now = max(1.0, float(w) - margin_l - margin_r)
+        if isinstance(cur_font, (int, float)) and required_h > 0:
+            line_h_est = line_h_buffer if line_h_buffer > 0 else float(cur_font) * DEFAULT_LINE_HEIGHT_MULTIPLIER
+            lines_now = max(1.0, required_h / line_h_est)
+            total_text_w = lines_now * inner_w_now
+            target_inner_w_fit = total_text_w + 5.0  # 小バッファ
+            target_box_w_fit = target_inner_w_fit + margin_l + margin_r
+            max_w_canvas = max(0.0, SLIDE_W_PT - float(x))
+            target_box_w_fit = min(target_box_w_fit, max_w_canvas)
+            if is_shape_to_fit_text and target_box_w_fit > float(w) + 0.5:
+                candidates.append(
+                    {
+                        "strategy": "expand_box_width_to_fit_text",
+                        "target_width_pt": round(target_box_w_fit, 2),
+                        "from_pt": round(w, 2),
+                        "reason": "expand box.width to fit text in 1 line (SHAPE_TO_FIT_TEXT 用、見た目変えず text を visible に)",
+                    }
+                )
+        # Strategy 1: box.height 拡張 → required_h + margin(top+bottom) + 1 行
+        # buffer まで box を下に伸ばす。
         max_h = max(0.0, SLIDE_H_PT - float(y))
         target_h_with_margin = round(required_h + margin_top + margin_bot + line_h_buffer, 2)
         target_h = min(target_h_with_margin, round(max_h, 2)) if max_h > 0 else target_h_with_margin
@@ -4634,7 +4662,7 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                     "target_height_pt": target_h,
                     "from_pt": round(h, 2),
                     "fits_within_canvas": target_h <= max_h,
-                    "reason": "expand box.height (下に伸ばす) — visual impact 最小",
+                    "reason": "expand box.height (下に伸ばす)",
                 }
             )
         # Strategy 2: box.width を canvas 右端まで拡張する。
@@ -4645,7 +4673,7 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                     "strategy": "expand_box_width_to_canvas",
                     "target_width_pt": round(max_w, 2),
                     "from_pt": round(w, 2),
-                    "reason": "expand box.width to canvas right edge so wrapped text needs fewer lines",
+                    "reason": "expand box.width to canvas right edge",
                 }
             )
         # Strategy 3: line_height 圧縮 → 1 段階下の allowed line height。
