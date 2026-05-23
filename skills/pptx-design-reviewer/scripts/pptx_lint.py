@@ -4386,35 +4386,95 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         is_no_wrap = tr.get("word_wrap") is False
         longest_unit_v = tr.get("longest_unit_pt")
         text_start_x = tr.get("text_start_x_pt")
-        # 「box 拡張だけで text 全幅が canvas に収まるか」を予測 (= 効く strategy だけ
-        # 提示する: 空振りする default は出さない)。
-        expand_width_will_fit = (
-            isinstance(longest_unit_v, (int, float))
-            and isinstance(text_start_x, (int, float))
-            and float(text_start_x) + float(longest_unit_v) <= SLIDE_W_PT + 0.5
-        )
+        cur_font_v = tr.get("font_size_pt")
+        margins_pt_c = tr.get("margins_pt") or {}
+        margin_l_c = float(margins_pt_c.get("left", 7.2) or 7.2)
+        margin_r_c = float(margins_pt_c.get("right", 7.2) or 7.2)
+        margin_t_c = float(margins_pt_c.get("top", 7.2) or 7.2)
+        margin_b_c = float(margins_pt_c.get("bottom", 7.2) or 7.2)
         if is_no_wrap:
-            # Strategy 1: 右に伸ばす (= 拡張で実際に収まる場合のみ default 候補)
-            if max_w_to_canvas > float(w) + 0.5 and expand_width_will_fit:
+            # 3 段判定積み上げ ([[feedback-overflow-fix-priority]] 「右→足り
+            # なきゃ改行→下足りなければ下にも伸ばす」):
+            #   step 1: box.width を canvas 右端まで拡張する
+            #   step 2: (step 1 で text 1 行が収まらないなら) word_wrap=True を追加
+            #   step 3: (step 2 で box.height が足りないなら) box.height を必要分
+            #           まで canvas 下端方向に拡張
+            # 各 step で「足りる」と判定したら次の step は実行しない (= 不要な
+            # 変更を加えない、原則: 見た目を変えない方向)。
+            if (
+                isinstance(longest_unit_v, (int, float))
+                and isinstance(cur_font_v, (int, float))
+                and float(cur_font_v) > 0
+            ):
+                import math as _math
+                cur_font_f = float(cur_font_v)
+                longest = float(longest_unit_v)
+                line_h_pt = cur_font_f * DEFAULT_LINE_HEIGHT_MULTIPLIER
+                inner_h_now = max(0.0, float(h) - margin_t_c - margin_b_c)
+
+                # step 1: 右に伸ばす
+                step1_target_w = max(float(w), max_w_to_canvas)
+                inner_w_step1 = max(1.0, step1_target_w - margin_l_c - margin_r_c)
+                text_right_after_step1 = float(text_start_x or x + margin_l_c) + longest \
+                    if isinstance(text_start_x, (int, float)) else (x + margin_l_c + longest)
+                fits_after_step1 = text_right_after_step1 <= SLIDE_W_PT + 0.5
+                steps = ["expand_box_width_to_canvas"]
+                final_target_w = step1_target_w
+                final_target_h = float(h)
+                final_word_wrap = False
+
+                if fits_after_step1:
+                    # step 1 で text が canvas 内に収まる → ここで終了
+                    pass
+                else:
+                    # step 2: 改行を追加
+                    final_word_wrap = True
+                    steps.append("enable_word_wrap")
+                    # wrap 後の必要行数を見積もる
+                    lines_step2 = max(1, int(_math.ceil(longest / inner_w_step1)))
+                    required_h_step2 = lines_step2 * line_h_pt
+                    required_outer_h_step2 = required_h_step2 + margin_t_c + margin_b_c + line_h_pt
+                    if required_outer_h_step2 <= float(h) + 0.5:
+                        # step 2 までで box.height に収まる
+                        pass
+                    else:
+                        # step 3: 下にも伸ばす
+                        steps.append("expand_box_height")
+                        final_target_h = min(
+                            required_outer_h_step2,
+                            max(float(h), max_h_to_canvas),
+                        )
+
+                candidates.append(
+                    {
+                        "strategy": "expand_box_to_canvas_and_wrap",
+                        "target_width_pt": round(final_target_w, 2),
+                        "target_height_pt": round(final_target_h, 2),
+                        "word_wrap": final_word_wrap,
+                        "applied_steps": steps,
+                        "from_width_pt": round(w, 2),
+                        "from_height_pt": round(h, 2),
+                        "reason": "3段積み上げ: 右に伸ばす → 足りなきゃ改行 → 下足りなければ下にも伸ばす",
+                    }
+                )
+            # 個別 strategy も残す (SPA で人が単体選択したい場合の選択肢)。
+            if max_w_to_canvas > float(w) + 0.5:
                 candidates.append(
                     {
                         "strategy": "expand_box_width_to_canvas",
                         "target_width_pt": round(max_w_to_canvas, 2),
                         "from_pt": round(w, 2),
-                        "reason": "expand box.width to canvas right edge (まず右に伸ばす)",
+                        "reason": "expand box.width only (右拡張のみ)",
                     }
                 )
-            # Strategy 2: enable_word_wrap (text を折り返して text_box に流す)
-            # → text 量が多くて 1 行で canvas に収まらない場合の現実的な default。
             candidates.append(
                 {
                     "strategy": "enable_word_wrap",
                     "from_word_wrap": False,
                     "to_word_wrap": True,
-                    "reason": "turn on word_wrap so the text reflows inside the box (1 行で canvas に収まらない場合)",
+                    "reason": "enable word_wrap only (改行のみ)",
                 }
             )
-            # Strategy 3: 下に伸ばす (word_wrap が後で True になる前提なら box.height 余裕)
             if max_h_to_canvas > float(h) + 0.5:
                 candidates.append(
                     {
@@ -4422,7 +4482,7 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                         "target_height_pt": round(max_h_to_canvas, 2),
                         "from_pt": round(h, 2),
                         "fits_within_canvas": True,
-                        "reason": "expand box.height to canvas bottom",
+                        "reason": "expand box.height only (下拡張のみ)",
                     }
                 )
         # Strategy 4 (legacy): box.right > canvas のときは shrink_box_width_to_canvas

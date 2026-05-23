@@ -1999,6 +1999,42 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 before={**before_state, "word_wrap": shape.text_frame.word_wrap},
                 after={"strategy": "enable_word_wrap"},
             )
+        if strategy == "expand_box_to_canvas_and_wrap":
+            # 3 段積み上げ combined apply ([[feedback-overflow-fix-priority]]):
+            # box.width 拡張 + word_wrap=True + box.height 拡張 を 1 アクションで。
+            target_w_norm = chosen.get("target_width_pt")
+            target_h_norm = chosen.get("target_height_pt")
+            target_word_wrap = chosen.get("word_wrap", True)
+            if not (
+                isinstance(target_w_norm, (int, float))
+                and isinstance(target_h_norm, (int, float))
+            ):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={
+                    **before_state,
+                    "geometry": before_geometry,
+                    "word_wrap": shape.text_frame.word_wrap,
+                },
+                after={
+                    "strategy": "expand_box_to_canvas_and_wrap",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": round(float(target_w_norm) * sx, 4),
+                        "height": round(float(target_h_norm) * sy, 4),
+                    },
+                    "word_wrap": bool(target_word_wrap),
+                    "applied_steps": chosen.get("applied_steps"),
+                },
+            )
         if strategy == "shrink_box_width_to_canvas":
             target_w_norm = chosen.get("target_width_pt")
             if not isinstance(target_w_norm, (int, float)):
@@ -2600,12 +2636,17 @@ def _apply_finding_action(prs, action: FixAction) -> None:
 
     if "geometry" in action.after:
         _apply_geometry(shape, action.after["geometry"])
+        strategy_after = action.after.get("strategy") if isinstance(action.after, dict) else None
         # text_box_resize の expand_box_width_to_canvas は geometry だけだと
         # text 量によっては inner_h を超える残存があり得る。box 拡張後の
         # 状態で再評価し、必要なら font を追加 shrink する (compound apply)。
-        strategy_after = action.after.get("strategy") if isinstance(action.after, dict) else None
         if action.rule == "text_box_resize" and strategy_after == "expand_box_width_to_canvas":
             _compound_resolve_text_box_overflow(shape)
+        # text_canvas_reflow の combined strategy: geometry に加えて
+        # word_wrap も同時に設定する (3 段積み上げの step 2 を実現)。
+        if action.rule == "text_canvas_reflow" and strategy_after == "expand_box_to_canvas_and_wrap":
+            if action.after.get("word_wrap") is True:
+                shape.text_frame.word_wrap = True
     elif action.rule == "image_crop":
         for side, value in action.after.get("crop", {}).items():
             setattr(shape, f"crop_{side}", float(value))
