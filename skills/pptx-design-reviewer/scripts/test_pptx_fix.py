@@ -1276,19 +1276,19 @@ def main() -> int:
             top_pt = sh.top / 12700
             width_pt = sh.width / 12700
             # 改修後 ([[feedback-overflow-fix-priority]]): 右はみ出しは
-            # box.width をカット (text 位置不変、見た目変えない方向が正解)。
-            # 期待: left=1300 保持、width=200→140 (1300+140=canvas 右端 1440)。
-            if abs(left_pt - 1300) > 0.5:
+            # box 全体を shift して box.right を canvas に揃える (width 不変)。
+            # 期待: left=1300→1240 (= canvas 1440 - width 200), width=200 保持。
+            if abs(left_pt - 1240) > 0.5:
                 failures.append(
-                    f"box_canvas_clip expected left preserved at 1300pt; got {left_pt:.2f}pt"
+                    f"box_canvas_clip expected left shifted to 1240pt; got {left_pt:.2f}pt"
                 )
             if abs(top_pt - 40) > 0.5:
                 failures.append(
                     f"box_canvas_clip moved top (40pt expected, got {top_pt:.2f}pt)"
                 )
-            if width_pt > 140.5:
+            if abs(width_pt - 200) > 0.5:
                 failures.append(
-                    f"box_canvas_clip should cut width to fit canvas (expected ~140pt, got {width_pt:.2f}pt)"
+                    f"box_canvas_clip should preserve width when shifting (expected 200pt, got {width_pt:.2f}pt)"
                 )
 
     if failures:
