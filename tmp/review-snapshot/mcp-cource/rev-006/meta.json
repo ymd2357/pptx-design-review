@@ -1,0 +1,277 @@
+{
+  "deck": "mcp-cource",
+  "rev": "006",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 6402,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 2599,
+      "changed": true
+    },
+    {
+      "slide_no": 4,
+      "ae_pixels": 8838,
+      "changed": true
+    },
+    {
+      "slide_no": 5,
+      "ae_pixels": 35207,
+      "changed": true
+    },
+    {
+      "slide_no": 6,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 7,
+      "ae_pixels": 69152,
+      "changed": true
+    },
+    {
+      "slide_no": 8,
+      "ae_pixels": 44809,
+      "changed": true
+    },
+    {
+      "slide_no": 9,
+      "ae_pixels": 46546,
+      "changed": true
+    },
+    {
+      "slide_no": 10,
+      "ae_pixels": 62335,
+      "changed": true
+    },
+    {
+      "slide_no": 11,
+      "ae_pixels": 50408,
+      "changed": true
+    },
+    {
+      "slide_no": 12,
+      "ae_pixels": 60703,
+      "changed": true
+    },
+    {
+      "slide_no": 13,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 14,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 15,
+      "ae_pixels": 16793,
+      "changed": true
+    },
+    {
+      "slide_no": 16,
+      "ae_pixels": 17937,
+      "changed": true
+    },
+    {
+      "slide_no": 17,
+      "ae_pixels": 29095,
+      "changed": true
+    },
+    {
+      "slide_no": 18,
+      "ae_pixels": 46826,
+      "changed": true
+    },
+    {
+      "slide_no": 19,
+      "ae_pixels": 19218,
+      "changed": true
+    },
+    {
+      "slide_no": 20,
+      "ae_pixels": 46472,
+      "changed": true
+    },
+    {
+      "slide_no": 21,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 22,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 23,
+      "ae_pixels": 48086,
+      "changed": true
+    },
+    {
+      "slide_no": 24,
+      "ae_pixels": 15246,
+      "changed": true
+    },
+    {
+      "slide_no": 25,
+      "ae_pixels": 48060,
+      "changed": true
+    },
+    {
+      "slide_no": 26,
+      "ae_pixels": 38536,
+      "changed": true
+    },
+    {
+      "slide_no": 27,
+      "ae_pixels": 107922,
+      "changed": true
+    },
+    {
+      "slide_no": 28,
+      "ae_pixels": 7944,
+      "changed": true
+    },
+    {
+      "slide_no": 29,
+      "ae_pixels": 50697,
+      "changed": true
+    },
+    {
+      "slide_no": 30,
+      "ae_pixels": 102881,
+      "changed": true
+    },
+    {
+      "slide_no": 31,
+      "ae_pixels": 49410,
+      "changed": true
+    },
+    {
+      "slide_no": 32,
+      "ae_pixels": 120437,
+      "changed": true
+    },
+    {
+      "slide_no": 33,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 34,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 35,
+      "ae_pixels": 49250,
+      "changed": true
+    },
+    {
+      "slide_no": 36,
+      "ae_pixels": 54805,
+      "changed": true
+    },
+    {
+      "slide_no": 37,
+      "ae_pixels": 19904,
+      "changed": true
+    },
+    {
+      "slide_no": 38,
+      "ae_pixels": 69898,
+      "changed": true
+    },
+    {
+      "slide_no": 39,
+      "ae_pixels": 75221,
+      "changed": true
+    },
+    {
+      "slide_no": 40,
+      "ae_pixels": 61869,
+      "changed": true
+    },
+    {
+      "slide_no": 41,
+      "ae_pixels": 61592,
+      "changed": true
+    },
+    {
+      "slide_no": 42,
+      "ae_pixels": 63891,
+      "changed": true
+    },
+    {
+      "slide_no": 43,
+      "ae_pixels": 32001,
+      "changed": true
+    },
+    {
+      "slide_no": 44,
+      "ae_pixels": 57321,
+      "changed": true
+    },
+    {
+      "slide_no": 45,
+      "ae_pixels": 53619,
+      "changed": true
+    },
+    {
+      "slide_no": 46,
+      "ae_pixels": 42148,
+      "changed": true
+    }
+  ]
+}
