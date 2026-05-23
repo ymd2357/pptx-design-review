@@ -2223,13 +2223,14 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
 
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 ([[feedback-overflow-fix-priority]]):
-        # - 右/下はみ出し → box.width/height をカット (text 位置不変、見た目
-        #   変えない方向、auto 適用)
-        # - 左/上はみ出し → shift しか方法がなく text 位置が必ず動くので
-        #   **manual_required** で返す (= 機能としては提供、人が SPA で
-        #   adopt 判断したら apply される。本番 deck の意図的なブリード
-        #   デザインを巻き込まない)
-        # - box が canvas 自体より大きい場合は lint 側で fire させない
+        # text の揃え方向と **反対側** の bbox はカットしても text 位置不変
+        # なので auto apply。そうでない辺は manual_required (shift しか
+        # 方法がなく text 位置が動くため)。
+        # - 右はみ出し: text 左揃え or 中央 → width カット auto
+        # - 下はみ出し: vertical_anchor=TOP (default) or MIDDLE → height カット auto
+        # - 上はみ出し: vertical_anchor=BOTTOM → top カット auto (height-=top_over)
+        # - 左はみ出し: 全 paragraph 右揃え → left カット auto (width-=left_over)
+        # box が canvas 自体より大きい場合は lint 側で fire させない。
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2245,13 +2246,37 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         bottom_over = float(overflow.get("bottom", 0) or 0)
         left_over = float(overflow.get("left", 0) or 0)
         top_over = float(overflow.get("top", 0) or 0)
-        has_left_top = left_over > 0 or top_over > 0
-        has_right_bottom = right_over > 0 or bottom_over > 0
 
-        # 左/上はみ出ししかない (= shift しか方法がない) → manual_required
-        if has_left_top and not has_right_bottom:
-            new_left_proposed = left_norm + left_over
-            new_top_proposed = top_norm + top_over
+        # text alignment / vertical_anchor
+        vanchor = None
+        all_right_aligned = False
+        if getattr(shape, "has_text_frame", False):
+            try:
+                vanchor = shape.text_frame.vertical_anchor
+            except (AttributeError, ValueError):
+                vanchor = None
+            paras = [p for p in shape.text_frame.paragraphs if (p.text or "").strip()]
+            if paras:
+                all_right_aligned = all(p.alignment == PP_ALIGN.RIGHT for p in paras)
+
+        # 各辺がカット可能か (text の揃え方向と反対側ならカット可)
+        right_cuttable = right_over > 0 and not all_right_aligned
+        bottom_cuttable = bottom_over > 0 and vanchor in (None, MSO_VERTICAL_ANCHOR.TOP, MSO_VERTICAL_ANCHOR.MIDDLE)
+        top_cuttable = top_over > 0 and vanchor == MSO_VERTICAL_ANCHOR.BOTTOM
+        left_cuttable = left_over > 0 and all_right_aligned
+
+        uncuttable_remaining = (
+            (right_over > 0 and not right_cuttable)
+            or (bottom_over > 0 and not bottom_cuttable)
+            or (top_over > 0 and not top_cuttable)
+            or (left_over > 0 and not left_cuttable)
+        )
+        any_cuttable = right_cuttable or bottom_cuttable or top_cuttable or left_cuttable
+
+        if uncuttable_remaining and not any_cuttable:
+            # 全 overflow がカット不可 → manual_required (shift 候補のみ提示)
+            new_left_proposed = left_norm + left_over - right_over
+            new_top_proposed = top_norm + top_over - bottom_over
             return FixAction(
                 rule=rule,
                 slide_index=int(_finding_field(finding, "slide_index") or 1),
@@ -2259,7 +2284,7 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 shape_id=getattr(shape, "shape_id", None),
                 shape_name=getattr(shape, "name", None),
                 status="manual_required",
-                reasons=["box_canvas_clip_left_top_requires_judgement"],
+                reasons=["box_canvas_clip_requires_judgement"],
                 before={"geometry": before_geometry, "overflow_sides_pt": overflow},
                 after={
                     "candidate_geometry": {
@@ -2271,10 +2296,25 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 },
             )
 
-        # 右/下はみ出しは width/height をカット (text 位置不変、auto apply)
-        new_w = max(20.0, width_norm - right_over) if right_over > 0 else width_norm
-        new_h = max(20.0, height_norm - bottom_over) if bottom_over > 0 else height_norm
-        if abs(new_w - width_norm) < 0.05 and abs(new_h - height_norm) < 0.05:
+        # カット可能な辺のみ apply (それ以外はそのまま)
+        new_left = left_norm + (left_over if left_cuttable else 0.0)
+        new_top = top_norm + (top_over if top_cuttable else 0.0)
+        new_w = width_norm
+        new_h = height_norm
+        if right_cuttable:
+            new_w = max(20.0, new_w - right_over)
+        if left_cuttable:
+            new_w = max(20.0, new_w - left_over)
+        if bottom_cuttable:
+            new_h = max(20.0, new_h - bottom_over)
+        if top_cuttable:
+            new_h = max(20.0, new_h - top_over)
+        if (
+            abs(new_left - left_norm) < 0.05
+            and abs(new_top - top_norm) < 0.05
+            and abs(new_w - width_norm) < 0.05
+            and abs(new_h - height_norm) < 0.05
+        ):
             return None
         return FixAction(
             rule=rule,
@@ -2285,8 +2325,8 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             before={"geometry": before_geometry, "overflow_sides_pt": overflow},
             after={
                 "geometry": {
-                    "left": before_geometry["left"],
-                    "top": before_geometry["top"],
+                    "left": round(new_left * sx, 4),
+                    "top": round(new_top * sy, 4),
                     "width": round(new_w * sx, 4),
                     "height": round(new_h * sy, 4),
                 },
