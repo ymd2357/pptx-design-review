@@ -4398,17 +4398,35 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                     "reason": "clip box.width so its right edge sits at canvas right edge",
                 }
             )
-        # Strategy C: font_size 縮小 → 1 段階下の allowed font size。
+        # Strategy C: font_size 縮小 → 実際に収まる **最大** の allowed font。
+        # 1 段階下では足りないケースがあるため (longest_unit × target/cur
+        # ≤ canvas_remaining を満たす最大値を選ぶ)。
         cur_font = tr.get("font_size_pt")
-        if isinstance(cur_font, (int, float)):
-            smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
-            if smaller:
+        longest_unit = tr.get("longest_unit_pt")
+        canvas_remaining = tr.get("canvas_remaining_pt")
+        if (
+            isinstance(cur_font, (int, float))
+            and isinstance(longest_unit, (int, float))
+            and isinstance(canvas_remaining, (int, float))
+            and float(cur_font) > 0
+        ):
+            cur_f = float(cur_font)
+            target_pt: Optional[float] = None
+            for size in sorted([s for s in ALLOWED_FONT_SIZES_PT if s < cur_f], reverse=True):
+                if float(longest_unit) * (size / cur_f) <= float(canvas_remaining) + 0.5:
+                    target_pt = float(size)
+                    break
+            if target_pt is None:
+                smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < cur_f]
+                if smaller:
+                    target_pt = float(smaller[0])
+            if target_pt is not None:
                 candidates.append(
                     {
                         "strategy": "shrink_font_size",
-                        "font_size_pt": smaller[-1],
-                        "from_pt": round(float(cur_font), 2),
-                        "reason": "step down to nearest smaller allowed font size so wrap units shrink",
+                        "font_size_pt": target_pt,
+                        "from_pt": round(cur_f, 2),
+                        "reason": "shrink to largest allowed font size that fits longest_unit within canvas_remaining",
                     }
                 )
         return candidates or None

@@ -820,6 +820,87 @@ FINDING_DRIVEN_RULES = {
 }
 
 
+_OVERFLOW_ALLOWED_FONT_SIZES_PT = (10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 44, 48, 54, 60, 72)
+
+
+def _compound_resolve_text_box_overflow(shape, slide_height_pt: float = 810.0) -> None:
+    """expand_box_width_to_canvas で box.width を拡張した直後に呼ぶ。優先順位:
+    1) box.height を canvas 下端まで拡張 ([[feedback-overflow-fix-priority]])
+    2) それでも収まらなければ font を 1 段階ずつ shrink (最終手段)
+    font が explicit に取れない / 元から canvas に収まっている場合は no-op。"""
+    import math
+    if not getattr(shape, "has_text_frame", False):
+        return
+    tf = shape.text_frame
+    def _margin(attr: str) -> float:
+        v = getattr(tf, attr, None)
+        if v is None:
+            return 7.2
+        try:
+            return float(v.pt)
+        except (AttributeError, TypeError, ValueError):
+            return 7.2
+    EMU_PER_PT_LOCAL = 12700
+    margin_l = _margin("margin_left")
+    margin_r = _margin("margin_right")
+    margin_t = _margin("margin_top")
+    margin_b = _margin("margin_bottom")
+    inner_w = shape.width / EMU_PER_PT_LOCAL - margin_l - margin_r
+    if inner_w <= 0:
+        return
+    cur_font_pt: Optional[float] = None
+    for para in tf.paragraphs:
+        for run in para.runs:
+            if run.font.size is not None:
+                cur_font_pt = float(run.font.size.pt)
+                break
+        if cur_font_pt is not None:
+            break
+    if cur_font_pt is None:
+        return
+
+    def required_h(font_pt: float) -> float:
+        line_h = font_pt * 1.2
+        total = 0.0
+        for para in tf.paragraphs:
+            ptext = (para.text or "")
+            if not ptext.strip():
+                total += line_h
+                continue
+            w = _estimate_text_width_pt(ptext, font_pt)
+            lines = max(1, math.ceil(w / inner_w))
+            total += lines * line_h
+        return total
+
+    def inner_height_now() -> float:
+        return shape.height / EMU_PER_PT_LOCAL - margin_t - margin_b
+
+    # Step A: current font で必要な inner_h を満たすか。OK なら no-op。
+    needed_h = required_h(cur_font_pt)
+    if needed_h <= inner_height_now() + 0.5:
+        return
+
+    # Step B: box.height 拡張で対応できるなら canvas 下端まで伸ばす (見た目変えない方向)。
+    top_pt = shape.top / EMU_PER_PT_LOCAL
+    max_h_pt = max(0.0, slide_height_pt - top_pt)
+    target_outer_h = needed_h + margin_t + margin_b
+    new_h_pt = min(target_outer_h, max_h_pt)
+    if new_h_pt > shape.height / EMU_PER_PT_LOCAL + 0.5:
+        shape.height = Pt(new_h_pt)
+    if needed_h <= inner_height_now() + 0.5:
+        return
+
+    # Step C: それでも収まらなければ font を 1 段階ずつ shrink (最終手段)。
+    target_font: Optional[float] = None
+    for size in sorted([s for s in _OVERFLOW_ALLOWED_FONT_SIZES_PT if s < cur_font_pt], reverse=True):
+        if required_h(size) <= inner_height_now() + 0.5:
+            target_font = float(size)
+            break
+    if target_font is None:
+        target_font = float(_OVERFLOW_ALLOWED_FONT_SIZES_PT[0])
+    _set_shape_text_size(shape, target_font)
+
+
 def _estimate_text_width_pt(text: str, font_size_pt: float) -> float:
     width = 0.0
     for ch in text:
@@ -2060,9 +2141,11 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
 
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 段階1 (2026-05-21): box_canvas_overflow finding を
-        # 受けて、右下方向の box bbox はみ出しだけを width/height 切り詰めで
-        # 修正する。box.left / box.top を動かすと text の絶対座標が変わって
-        # しまうので、左/上方向のはみ出しは manual_required で skip する。
+        # 受けて、box bbox の canvas はみ出しを修正する。
+        # - 右/下方向は width/height を切り詰める (text 絶対座標は不変、auto)
+        # - 左/上方向は box.left/top を canvas 内に shift する (text 位置も
+        #   一緒に動くため visual impact あり。機能としては提供し、採用判定
+        #   は SPA judgement に委ねる)
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2074,30 +2157,24 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         top_norm = before_geometry["top"] / sy
         width_norm = before_geometry["width"] / sx
         height_norm = before_geometry["height"] / sy
-        new_w = width_norm
-        new_h = height_norm
         right_over = float(overflow.get("right", 0) or 0)
         bottom_over = float(overflow.get("bottom", 0) or 0)
         left_over = float(overflow.get("left", 0) or 0)
         top_over = float(overflow.get("top", 0) or 0)
-        if left_over > 0 or top_over > 0:
-            # 左/上方向 overflow は text 絶対座標の移動を伴うので auto 対象外。
-            return FixAction(
-                rule=rule,
-                slide_index=int(_finding_field(finding, "slide_index") or 1),
-                slide_id=_finding_field(finding, "slide_id"),
-                shape_id=getattr(shape, "shape_id", None),
-                shape_name=getattr(shape, "name", None),
-                status="manual_required",
-                reasons=["box_canvas_clip_left_top_overflow_requires_manual"],
-                before={"geometry": before_geometry, "overflow_sides_pt": overflow},
-                after={},
-            )
+        new_left = left_norm + max(0.0, left_over)
+        new_top = top_norm + max(0.0, top_over)
+        new_w = width_norm
+        new_h = height_norm
         if right_over > 0:
             new_w = max(20.0, width_norm - right_over)
         if bottom_over > 0:
             new_h = max(20.0, height_norm - bottom_over)
-        if abs(new_w - width_norm) < 0.05 and abs(new_h - height_norm) < 0.05:
+        if (
+            abs(new_left - left_norm) < 0.05
+            and abs(new_top - top_norm) < 0.05
+            and abs(new_w - width_norm) < 0.05
+            and abs(new_h - height_norm) < 0.05
+        ):
             return None
         return FixAction(
             rule=rule,
@@ -2108,8 +2185,8 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             before={"geometry": before_geometry, "overflow_sides_pt": overflow},
             after={
                 "geometry": {
-                    "left": before_geometry["left"],
-                    "top": before_geometry["top"],
+                    "left": round(new_left * sx, 4),
+                    "top": round(new_top * sy, 4),
                     "width": round(new_w * sx, 4),
                     "height": round(new_h * sy, 4),
                 },
@@ -2470,6 +2547,12 @@ def _apply_finding_action(prs, action: FixAction) -> None:
 
     if "geometry" in action.after:
         _apply_geometry(shape, action.after["geometry"])
+        # text_box_resize の expand_box_width_to_canvas は geometry だけだと
+        # text 量によっては inner_h を超える残存があり得る。box 拡張後の
+        # 状態で再評価し、必要なら font を追加 shrink する (compound apply)。
+        strategy_after = action.after.get("strategy") if isinstance(action.after, dict) else None
+        if action.rule == "text_box_resize" and strategy_after == "expand_box_width_to_canvas":
+            _compound_resolve_text_box_overflow(shape)
     elif action.rule == "image_crop":
         for side, value in action.after.get("crop", {}).items():
             setattr(shape, f"crop_{side}", float(value))
@@ -2527,6 +2610,11 @@ def _apply_finding_action(prs, action: FixAction) -> None:
                 for para in shape.text_frame.paragraphs:
                     if para.text.strip():
                         para.line_spacing = Pt(target_pt)
+        elif strategy == "expand_box_width_to_canvas":
+            # geometry は上の `if "geometry" in action.after` 分岐で apply 済 +
+            # compound 処理もそちらで実行済。この elif は dead path だが
+            # 防御的に同じ compound を呼んでおく。
+            _compound_resolve_text_box_overflow(shape)
     elif action.rule == "text_canvas_reflow":
         # DS-OVERFLOW-001 段階3: enable_word_wrap / shrink_font_size を扱う。
         # shrink_box_width_to_canvas は action.after.geometry 経由で上の
