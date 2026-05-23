@@ -682,51 +682,11 @@ def _shape_from_finding(prs, finding: Any, nested_key: str | None = None):
 
 
 def _shape_geometry_pt(shape) -> dict:
-    """shape の **絶対座標 (slide canvas 上の pt)** を返す。group 内 shape も
-    親 group の transform を適用した絶対値で返すので、action.after.geometry
-    の入出力単位が一貫する (= _apply_geometry が逆変換で raw に戻す)。"""
-    # _absolute_pt_to_raw の逆 = group transform 適用
-    EMU_PER_PT_LOCAL = 12700
-    left = shape.left / EMU_PER_PT_LOCAL
-    top = shape.top / EMU_PER_PT_LOCAL
-    width = shape.width / EMU_PER_PT_LOCAL
-    height = shape.height / EMU_PER_PT_LOCAL
-    parent = shape._element.getparent()
-    while parent is not None:
-        tag = parent.tag.split("}", 1)[-1] if "}" in parent.tag else parent.tag
-        if tag != "grpSp":
-            break
-        gxfrm = parent.find(f".//{_DML_NS_FIX}xfrm")
-        if gxfrm is not None:
-            goff = gxfrm.find(f"{_DML_NS_FIX}off")
-            gchoff = gxfrm.find(f"{_DML_NS_FIX}chOff")
-            gext = gxfrm.find(f"{_DML_NS_FIX}ext")
-            gchext = gxfrm.find(f"{_DML_NS_FIX}chExt")
-            if goff is not None and gchoff is not None:
-                gox = float(goff.get("x", "0")) / EMU_PER_PT_LOCAL
-                goy = float(goff.get("y", "0")) / EMU_PER_PT_LOCAL
-                gcx = float(gchoff.get("x", "0")) / EMU_PER_PT_LOCAL
-                gcy = float(gchoff.get("y", "0")) / EMU_PER_PT_LOCAL
-                sx = sy = 1.0
-                if gext is not None and gchext is not None:
-                    ex = float(gext.get("cx", "0")) / EMU_PER_PT_LOCAL
-                    ey = float(gext.get("cy", "0")) / EMU_PER_PT_LOCAL
-                    cex = float(gchext.get("cx", "1") or "1") / EMU_PER_PT_LOCAL
-                    cey = float(gchext.get("cy", "1") or "1") / EMU_PER_PT_LOCAL
-                    if cex:
-                        sx = ex / cex
-                    if cey:
-                        sy = ey / cey
-                left = gox + (left - gcx) * sx
-                top = goy + (top - gcy) * sy
-                width = width * sx
-                height = height * sy
-        parent = parent.getparent()
     return {
-        "left": round(left, 4),
-        "top": round(top, 4),
-        "width": round(width, 4),
-        "height": round(height, 4),
+        "left": round(shape.left / EMU_PER_PT, 4),
+        "top": round(shape.top / EMU_PER_PT, 4),
+        "width": round(shape.width / EMU_PER_PT, 4),
+        "height": round(shape.height / EMU_PER_PT, 4),
     }
 
 
@@ -744,72 +704,10 @@ def _geometry_action(rule: str, finding: Any, shape, geometry: dict, reasons: li
     )
 
 
-_DML_NS_FIX = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
-
-
-def _absolute_pt_to_raw(shape, abs_left, abs_top, abs_width, abs_height):
-    """絶対座標 (slide canvas 上の pt) を shape の raw 座標 (group local) に
-    逆変換する。group 内 shape の場合、親 group の xfrm 逆変換を適用する。"""
-    EMU_PER_PT_LOCAL = 12700
-    left = float(abs_left) if abs_left is not None else shape.left / EMU_PER_PT_LOCAL
-    top = float(abs_top) if abs_top is not None else shape.top / EMU_PER_PT_LOCAL
-    width = float(abs_width) if abs_width is not None else shape.width / EMU_PER_PT_LOCAL
-    height = float(abs_height) if abs_height is not None else shape.height / EMU_PER_PT_LOCAL
-    parent = shape._element.getparent()
-    while parent is not None:
-        tag = parent.tag.split("}", 1)[-1] if "}" in parent.tag else parent.tag
-        if tag != "grpSp":
-            break
-        gxfrm = parent.find(f".//{_DML_NS_FIX}xfrm")
-        if gxfrm is not None:
-            goff = gxfrm.find(f"{_DML_NS_FIX}off")
-            gchoff = gxfrm.find(f"{_DML_NS_FIX}chOff")
-            gext = gxfrm.find(f"{_DML_NS_FIX}ext")
-            gchext = gxfrm.find(f"{_DML_NS_FIX}chExt")
-            if goff is not None and gchoff is not None:
-                gox = float(goff.get("x", "0")) / EMU_PER_PT_LOCAL
-                goy = float(goff.get("y", "0")) / EMU_PER_PT_LOCAL
-                gcx = float(gchoff.get("x", "0")) / EMU_PER_PT_LOCAL
-                gcy = float(gchoff.get("y", "0")) / EMU_PER_PT_LOCAL
-                sx = sy = 1.0
-                if gext is not None and gchext is not None:
-                    ex = float(gext.get("cx", "0")) / EMU_PER_PT_LOCAL
-                    ey = float(gext.get("cy", "0")) / EMU_PER_PT_LOCAL
-                    cex = float(gchext.get("cx", "1") or "1") / EMU_PER_PT_LOCAL
-                    cey = float(gchext.get("cy", "1") or "1") / EMU_PER_PT_LOCAL
-                    if cex:
-                        sx = ex / cex
-                    if cey:
-                        sy = ey / cey
-                # 逆変換: child_raw = (abs - group.off) / scale + group.chOff
-                if sx:
-                    left = (left - gox) / sx + gcx
-                    width = width / sx
-                if sy:
-                    top = (top - goy) / sy + gcy
-                    height = height / sy
-        parent = parent.getparent()
-    return left, top, width, height
-
-
 def _apply_geometry(shape, geometry: dict) -> None:
-    # action.after.geometry は **絶対座標 (slide canvas 上の pt)** を想定。
-    # group 内 shape では raw 値に逆変換して set する。
-    raw_left, raw_top, raw_w, raw_h = _absolute_pt_to_raw(
-        shape,
-        geometry.get("left"),
-        geometry.get("top"),
-        geometry.get("width"),
-        geometry.get("height"),
-    )
-    if "left" in geometry:
-        shape.left = Pt(raw_left)
-    if "top" in geometry:
-        shape.top = Pt(raw_top)
-    if "width" in geometry:
-        shape.width = Pt(raw_w)
-    if "height" in geometry:
-        shape.height = Pt(raw_h)
+    for attr in ("left", "top", "width", "height"):
+        if attr in geometry:
+            setattr(shape, attr, Pt(float(geometry[attr])))
 
 
 def _shape_text_frames(shape):
@@ -2313,29 +2211,6 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 before={**before_state, "geometry": before_geometry},
                 after={
                     "strategy": "expand_box_width_to_canvas",
-                    "geometry": {
-                        "left": before_geometry["left"],
-                        "top": before_geometry["top"],
-                        "width": round(float(new_w_norm) * sx, 4),
-                        "height": before_geometry["height"],
-                    },
-                },
-            )
-        if strategy == "expand_box_width_to_fit_text":
-            new_w_norm = chosen.get("target_width_pt")
-            if not isinstance(new_w_norm, (int, float)):
-                return None
-            sx, sy = _slide_scale_xy(prs)
-            before_geometry = _shape_geometry_pt(shape)
-            return FixAction(
-                rule=rule,
-                slide_index=int(_finding_field(finding, "slide_index") or 1),
-                slide_id=_finding_field(finding, "slide_id"),
-                shape_id=getattr(shape, "shape_id", None),
-                shape_name=getattr(shape, "name", None),
-                before={**before_state, "geometry": before_geometry},
-                after={
-                    "strategy": "expand_box_width_to_fit_text",
                     "geometry": {
                         "left": before_geometry["left"],
                         "top": before_geometry["top"],
