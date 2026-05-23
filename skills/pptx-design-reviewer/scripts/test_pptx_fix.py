@@ -1168,11 +1168,20 @@ def main() -> int:
                 failures.append(
                     f"text_canvas_reflow expected 1 apply; got {len(applied)}"
                 )
+            # 改修後 ([[feedback-overflow-fix-priority]]): word_wrap=False の
+            # text_canvas_overflow は「まず右に伸ばす」が default。box.width が
+            # canvas 端まで拡張されているか、enable_word_wrap で word_wrap が
+            # True に変わっているか、いずれかで解消方向に動いていることを確認。
             prs = Presentation(str(tcanvas))
             sh = prs.slides[0].shapes[0]
-            if sh.text_frame.word_wrap is not True:
+            new_width_pt = sh.width / 12700
+            new_left_pt = sh.left / 12700
+            expanded = (new_left_pt + new_width_pt) > 1439.5
+            wrapped = sh.text_frame.word_wrap is True
+            if not (expanded or wrapped):
                 failures.append(
-                    f"text_canvas_reflow default strategy expected word_wrap=True; got {sh.text_frame.word_wrap}"
+                    "text_canvas_reflow default expected box.right≈canvas or word_wrap=True;"
+                    f" got left={new_left_pt:.1f}, width={new_width_pt:.1f}, word_wrap={sh.text_frame.word_wrap}"
                 )
 
         # --- DS-OVERFLOW-001 段階2: text_box_resize --------------------------

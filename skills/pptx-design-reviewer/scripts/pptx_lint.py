@@ -4377,23 +4377,60 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
             return None
         x, y, w, h = bbox
         candidates: list[dict] = []
-        # Strategy A: enable word_wrap (= word_wrap が False の場合のみ)。
-        if tr.get("word_wrap") is False:
+        # 設計原則 ([[feedback-overflow-fix-priority]]):
+        # word_wrap=False (改行なし): 1.右に伸ばす 2.下に伸ばす 3.enable_word_wrap 4.font shrink
+        # word_wrap=True (= 1単語が wrap 不可で canvas 超え): box 拡張しても
+        #   text_start_x 起点の canvas-remaining は変わらないので font shrink 一択。
+        max_w_to_canvas = max(0.0, SLIDE_W_PT - float(x))
+        max_h_to_canvas = max(0.0, SLIDE_H_PT - float(y))
+        is_no_wrap = tr.get("word_wrap") is False
+        longest_unit_v = tr.get("longest_unit_pt")
+        text_start_x = tr.get("text_start_x_pt")
+        # 「box 拡張だけで text 全幅が canvas に収まるか」を予測 (= 効く strategy だけ
+        # 提示する: 空振りする default は出さない)。
+        expand_width_will_fit = (
+            isinstance(longest_unit_v, (int, float))
+            and isinstance(text_start_x, (int, float))
+            and float(text_start_x) + float(longest_unit_v) <= SLIDE_W_PT + 0.5
+        )
+        if is_no_wrap:
+            # Strategy 1: 右に伸ばす (= 拡張で実際に収まる場合のみ default 候補)
+            if max_w_to_canvas > float(w) + 0.5 and expand_width_will_fit:
+                candidates.append(
+                    {
+                        "strategy": "expand_box_width_to_canvas",
+                        "target_width_pt": round(max_w_to_canvas, 2),
+                        "from_pt": round(w, 2),
+                        "reason": "expand box.width to canvas right edge (まず右に伸ばす)",
+                    }
+                )
+            # Strategy 2: enable_word_wrap (text を折り返して text_box に流す)
+            # → text 量が多くて 1 行で canvas に収まらない場合の現実的な default。
             candidates.append(
                 {
                     "strategy": "enable_word_wrap",
                     "from_word_wrap": False,
                     "to_word_wrap": True,
-                    "reason": "turn on word_wrap so the text reflows inside the box",
+                    "reason": "turn on word_wrap so the text reflows inside the box (1 行で canvas に収まらない場合)",
                 }
             )
-        # Strategy B: box.width を canvas 内に切り詰める (右端 = canvas.right)。
-        max_w_in_canvas = max(0.0, SLIDE_W_PT - float(x))
-        if w > max_w_in_canvas + 0.5 and max_w_in_canvas > 20.0:
+            # Strategy 3: 下に伸ばす (word_wrap が後で True になる前提なら box.height 余裕)
+            if max_h_to_canvas > float(h) + 0.5:
+                candidates.append(
+                    {
+                        "strategy": "expand_box_height",
+                        "target_height_pt": round(max_h_to_canvas, 2),
+                        "from_pt": round(h, 2),
+                        "fits_within_canvas": True,
+                        "reason": "expand box.height to canvas bottom",
+                    }
+                )
+        # Strategy 4 (legacy): box.right > canvas のときは shrink_box_width_to_canvas
+        if w > max_w_to_canvas + 0.5 and max_w_to_canvas > 20.0:
             candidates.append(
                 {
                     "strategy": "shrink_box_width_to_canvas",
-                    "target_width_pt": round(max_w_in_canvas, 2),
+                    "target_width_pt": round(max_w_to_canvas, 2),
                     "from_pt": round(w, 2),
                     "reason": "clip box.width so its right edge sits at canvas right edge",
                 }
@@ -4445,13 +4482,18 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         # 2) box.width 拡張 (右に伸ばす)
         # 3) line_height 圧縮 / font shrink (最終手段、見た目変わる)
         x, y, w, h = bbox
-        # Strategy 1: box.height 拡張 → required_h + margin(top+bottom) まで
-        # box を下に伸ばす (required_h は inner_h ベースなので margin 足し戻し)。
+        # Strategy 1: box.height 拡張 → required_h + margin(top+bottom) + 1 行
+        # buffer まで box を下に伸ばす (required_h は inner_h ベースなので
+        # margin 足し戻し + PowerPoint 実描画でちょうど 1 行溢れる現象に対し
+        # line_height 分の余裕を加算 [[feedback-overflow-fix-priority]])。
         margins_pt = tr.get("margins_pt") or {}
         margin_top = float(margins_pt.get("top", 7.2) or 7.2)
         margin_bot = float(margins_pt.get("bottom", 7.2) or 7.2)
+        line_h_buffer = float(cur_lh) if isinstance(cur_lh, (int, float)) else (
+            float(cur_font) * DEFAULT_LINE_HEIGHT_MULTIPLIER if isinstance(cur_font, (int, float)) else 28.8
+        )
         max_h = max(0.0, SLIDE_H_PT - float(y))
-        target_h_with_margin = round(required_h + margin_top + margin_bot, 2)
+        target_h_with_margin = round(required_h + margin_top + margin_bot + line_h_buffer, 2)
         target_h = min(target_h_with_margin, round(max_h, 2)) if max_h > 0 else target_h_with_margin
         if target_h > h + 0.5:
             candidates.append(

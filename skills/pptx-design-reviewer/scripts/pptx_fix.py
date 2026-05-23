@@ -2035,6 +2035,52 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                 before=before_state,
                 after={"strategy": "shrink_font_size", "font_size_pt": float(new_font)},
             )
+        if strategy == "expand_box_width_to_canvas":
+            new_w_norm = chosen.get("target_width_pt")
+            if not isinstance(new_w_norm, (int, float)):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "geometry": before_geometry},
+                after={
+                    "strategy": "expand_box_width_to_canvas",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": round(float(new_w_norm) * sx, 4),
+                        "height": before_geometry["height"],
+                    },
+                },
+            )
+        if strategy == "expand_box_height":
+            new_h_norm = chosen.get("target_height_pt")
+            if not isinstance(new_h_norm, (int, float)):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "geometry": before_geometry},
+                after={
+                    "strategy": "expand_box_height",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": before_geometry["width"],
+                        "height": round(float(new_h_norm) * sy, 4),
+                    },
+                },
+            )
         return None
 
     if rule == "text_box_resize":
