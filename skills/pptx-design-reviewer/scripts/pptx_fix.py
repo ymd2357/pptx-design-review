@@ -2223,13 +2223,13 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
 
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 ([[feedback-overflow-fix-priority]]):
-        # 方向別に挙動を切り替える。
-        # - 右/下はみ出し → **box.width/height をカット** (text 位置不変、
-        #   render 上は見た目同じだが bbox は canvas 内に整う = 正しい挙動)
-        # - 左/上はみ出し → box.left/top を shift (これしか方法がないので
-        #   text 位置も追従する、visual impact あり)
-        # - box が canvas 自体より大きい場合は装飾帯と判断、lint 側で fire
-        #   させないので fix 対象外
+        # - 右/下はみ出し → box.width/height をカット (text 位置不変、見た目
+        #   変えない方向、auto 適用)
+        # - 左/上はみ出し → shift しか方法がなく text 位置が必ず動くので
+        #   **manual_required** で返す (= 機能としては提供、人が SPA で
+        #   adopt 判断したら apply される。本番 deck の意図的なブリード
+        #   デザインを巻き込まない)
+        # - box が canvas 自体より大きい場合は lint 側で fire させない
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2245,18 +2245,36 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         bottom_over = float(overflow.get("bottom", 0) or 0)
         left_over = float(overflow.get("left", 0) or 0)
         top_over = float(overflow.get("top", 0) or 0)
-        # 左/上はみ出し: box.left/top を canvas 内に shift (text も追従)
-        new_left = left_norm + max(0.0, left_over)
-        new_top = top_norm + max(0.0, top_over)
-        # 右/下はみ出し: box.width/height をカット (text 位置不変)
+        has_left_top = left_over > 0 or top_over > 0
+        has_right_bottom = right_over > 0 or bottom_over > 0
+
+        # 左/上はみ出ししかない (= shift しか方法がない) → manual_required
+        if has_left_top and not has_right_bottom:
+            new_left_proposed = left_norm + left_over
+            new_top_proposed = top_norm + top_over
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                status="manual_required",
+                reasons=["box_canvas_clip_left_top_requires_judgement"],
+                before={"geometry": before_geometry, "overflow_sides_pt": overflow},
+                after={
+                    "candidate_geometry": {
+                        "left": round(new_left_proposed * sx, 4),
+                        "top": round(new_top_proposed * sy, 4),
+                        "width": before_geometry["width"],
+                        "height": before_geometry["height"],
+                    },
+                },
+            )
+
+        # 右/下はみ出しは width/height をカット (text 位置不変、auto apply)
         new_w = max(20.0, width_norm - right_over) if right_over > 0 else width_norm
         new_h = max(20.0, height_norm - bottom_over) if bottom_over > 0 else height_norm
-        if (
-            abs(new_left - left_norm) < 0.05
-            and abs(new_top - top_norm) < 0.05
-            and abs(new_w - width_norm) < 0.05
-            and abs(new_h - height_norm) < 0.05
-        ):
+        if abs(new_w - width_norm) < 0.05 and abs(new_h - height_norm) < 0.05:
             return None
         return FixAction(
             rule=rule,
@@ -2267,8 +2285,8 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             before={"geometry": before_geometry, "overflow_sides_pt": overflow},
             after={
                 "geometry": {
-                    "left": round(new_left * sx, 4),
-                    "top": round(new_top * sy, 4),
+                    "left": before_geometry["left"],
+                    "top": before_geometry["top"],
                     "width": round(new_w * sx, 4),
                     "height": round(new_h * sy, 4),
                 },
