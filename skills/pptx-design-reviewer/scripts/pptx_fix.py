@@ -2223,15 +2223,9 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
 
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 ([[feedback-overflow-fix-priority]]):
-        # canvas で clip されて text 末尾が切れている場合に box 全体を shift
-        # して text を canvas 内に visible に戻す。width/height カットは text
-        # を更に切るだけなので使わない。
-        # - 右/下はみ出しあり → box.left/top を shift して box.right/bottom を
-        #   canvas に揃える (box.width/height 不変、text 全体 canvas 内 visible)
-        # - 左/上のみはみ出し → text は box 内に visible (= 上端/左端の塗り
-        #   だけが canvas 外) なので manual_required (= 機能としては提供、
-        #   人の判断で apply)
-        # - box が canvas より大きい場合は lint 側で fire させない (装飾帯)
+        # lint が右/下方向のはみ出しのみ検出するので、fix も box 全体を
+        # shift して box.right/bottom を canvas に揃える (width/height 不変、
+        # text 全体が canvas 内 visible に戻る)。
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2245,35 +2239,6 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         height_norm = before_geometry["height"] / sy
         right_over = float(overflow.get("right", 0) or 0)
         bottom_over = float(overflow.get("bottom", 0) or 0)
-        left_over = float(overflow.get("left", 0) or 0)
-        top_over = float(overflow.get("top", 0) or 0)
-        has_right_bottom = right_over > 0 or bottom_over > 0
-
-        if not has_right_bottom:
-            # 左/上のみ → text は canvas 内に visible なので manual_required
-            new_left_proposed = left_norm + left_over
-            new_top_proposed = top_norm + top_over
-            return FixAction(
-                rule=rule,
-                slide_index=int(_finding_field(finding, "slide_index") or 1),
-                slide_id=_finding_field(finding, "slide_id"),
-                shape_id=getattr(shape, "shape_id", None),
-                shape_name=getattr(shape, "name", None),
-                status="manual_required",
-                reasons=["box_canvas_clip_left_top_only_requires_judgement"],
-                before={"geometry": before_geometry, "overflow_sides_pt": overflow},
-                after={
-                    "candidate_geometry": {
-                        "left": round(new_left_proposed * sx, 4),
-                        "top": round(new_top_proposed * sy, 4),
-                        "width": before_geometry["width"],
-                        "height": before_geometry["height"],
-                    },
-                },
-            )
-
-        # 右/下はみ出しのみ shift で box.right/bottom を canvas に揃える
-        # (左/上はみ出しは触らない = 別 finding として再 lint で manual)
         new_left = left_norm - right_over if right_over > 0 else left_norm
         new_top = top_norm - bottom_over if bottom_over > 0 else top_norm
         new_w = width_norm

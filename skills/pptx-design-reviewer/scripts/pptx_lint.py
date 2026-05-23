@@ -1460,13 +1460,14 @@ def _estimate_text_render_lines(
 
 
 def _canvas_overflow_sides(x: float, y: float, w: float, h: float) -> dict[str, float]:
+    """canvas 端で描画要素が clip される方向のはみ出しのみ検出する。
+    上/左方向の bbox はみ出しは透明 textbox では描画に影響しないので
+    検出対象外 (= top/left の数値だけで判定すると過剰検出になる、
+    [[feedback-overflow-fix-priority]])。
+    """
     out: dict[str, float] = {}
     right = x + w
     bottom = y + h
-    if x < -TOL_PT:
-        out["left"] = round(-x, 2)
-    if y < -TOL_PT:
-        out["top"] = round(-y, 2)
     if right > SLIDE_W_PT + TOL_PT:
         out["right"] = round(right - SLIDE_W_PT, 2)
     if bottom > SLIDE_H_PT + TOL_PT:
