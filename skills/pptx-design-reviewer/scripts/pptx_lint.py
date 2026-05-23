@@ -470,6 +470,22 @@ def _text_frame_inline_joined_text(text_frame) -> str:
     return "".join(parts).strip()
 
 
+def _text_frame_margin_pt_value(text_frame, attr_name: str) -> float:
+    """text_frame.margin_{top,bottom,left,right} を pt で返す。
+    属性が None ・取得不能なら 0pt fallback。
+    """
+    try:
+        value = getattr(text_frame, attr_name)
+    except (AttributeError, ValueError):
+        return 0.0
+    if value is None:
+        return 0.0
+    try:
+        return float(value.pt)
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+
+
 def _text_frame_margin_pt(text_frame) -> tuple[float, float]:
     left = text_frame.margin_left
     right = text_frame.margin_right
@@ -1499,135 +1515,181 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
                 )
             )
 
-        # 2) text_box_overflow: box.width で folded した text の required_h が
-        # box.height を超える (= 描画 text が自分の box から下にあふれる)。
-        font_size_pt = _text_frame_dominant_font_size_pt(ctx, shape.text_frame) or 18.0
-        line_heights = [
-            _paragraph_line_height_pt(ctx, para, font_size_pt)
-            for para in shape.text_frame.paragraphs
-            if (para.text or "").strip()
-        ]
-        line_height_pt = (
-            max(line_heights) if line_heights else font_size_pt * DEFAULT_LINE_HEIGHT_MULTIPLIER
-        )
-        wrap_w_box = max(0.0, w)
-        lines_in_box = _estimate_text_render_lines(ctx, shape, wrap_w_box, font_size_pt)
-        required_h_in_box = lines_in_box * line_height_pt
-        if required_h_in_box > h + TOL_PT and wrap_w_box > 0:
-            overflow_by_pt = round(required_h_in_box - h, 2)
-            findings.append(
-                make_finding(
-                    "warning",
-                    "text_box_overflow",
-                    slide_idx,
-                    slide_id,
-                    shape,
-                    (
-                        f"text rendered height {required_h_in_box:.1f}pt exceeds "
-                        f"box.height {h:.1f}pt (overflow +{overflow_by_pt:.1f}pt; "
-                        f"{lines_in_box} line(s) at wrap_w={wrap_w_box:.0f}pt, "
-                        f"font {font_size_pt:g}pt)"
-                    ),
-                    {
-                        "bbox_pt": [round(v, 2) for v in normalized],
-                        "actual_bbox_pt": [round(v, 2) for v in bbox],
-                        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
-                        "text_render": {
-                            "font_size_pt": round(font_size_pt, 2),
-                            "line_height_pt": round(line_height_pt, 2),
-                            "wrap_width_pt": round(wrap_w_box, 2),
-                            "lines": lines_in_box,
-                            "required_height_pt": round(required_h_in_box, 2),
-                            "box_height_pt": round(h, 2),
-                        },
-                        "overflow_by_pt": overflow_by_pt,
-                        "text_excerpt": _text_excerpt(shape),
-                    },
-                )
-            )
+        # Codex セカンドオピニオン反映 (2026-05-23):
+        # - font_size_pt が None (= run.font.size が explicit でない、
+        #   placeholder 継承未解決) なら text_box / text_canvas は推定不能。
+        # - text_frame.auto_size が TEXT_TO_FIT_SHAPE / SHAPE_TO_FIT_TEXT
+        #   なら PowerPoint が text を自動縮小 / box を自動拡張するので
+        #   両 lint とも suppress。
+        # - 段落ごとに lines × line_height を合算 (旧 max ×全行で過剰膨張
+        #   していたのを是正)。margin_top/bottom/left/right を box から
+        #   inner box にして判定する。
+        font_size_pt = _text_frame_dominant_font_size_pt(ctx, shape.text_frame)
+        try:
+            auto_size = shape.text_frame.auto_size
+        except (AttributeError, ValueError):
+            auto_size = None
+        autofit_suppress = auto_size in {
+            MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE,
+            MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT,
+        }
+        text_render_can_estimate = font_size_pt is not None and not autofit_suppress
 
-        # 3) text_canvas_overflow: canvas 端で強制改行した見た目でも、text 自体
-        # の描画範囲が canvas 右端を超えるケース。
-        # - word_wrap=False: text 全幅で判定
-        # - word_wrap=True : 単語境界 (Latin) / 各文字 (CJK) を unit として、
-        #                    最大 unit 幅が wrap_w_canvas を超えるか判定。
-        wrap_w_canvas = max(0.0, min(w, SLIDE_W_PT - x))
-        text_raw = (shape.text_frame.text or "").strip()
-        text_canvas_fires = False
-        overflow_pt = 0.0
-        longest_unit_pt = 0.0
-        word_wrap = getattr(shape.text_frame, "word_wrap", True)
-        word_wrap_enabled = word_wrap is None or word_wrap
-        if wrap_w_canvas > 0 and text_raw:
-            if not word_wrap_enabled:
-                total_w = _estimate_text_width_pt(text_raw, font_size_pt)
-                if total_w > wrap_w_canvas + TOL_PT:
-                    text_canvas_fires = True
-                    overflow_pt = total_w - wrap_w_canvas
-                    longest_unit_pt = total_w
-            else:
-                max_unit_w = 0.0
-                for word in re.split(r"\s+", text_raw):
-                    if not word:
-                        continue
-                    current_run = ""
-                    for ch in word:
-                        if (
-                            "぀" <= ch <= "ヿ"
-                            or "㐀" <= ch <= "鿿"
-                            or "＀" <= ch <= "￯"
-                            or "　" <= ch <= "〿"
-                        ):
-                            if current_run:
+        if text_render_can_estimate:
+            margin_top = _text_frame_margin_pt_value(shape.text_frame, "margin_top")
+            margin_bottom = _text_frame_margin_pt_value(shape.text_frame, "margin_bottom")
+            margin_left = _text_frame_margin_pt_value(shape.text_frame, "margin_left")
+            margin_right = _text_frame_margin_pt_value(shape.text_frame, "margin_right")
+            inner_h = max(0.0, h - margin_top - margin_bottom)
+            inner_w = max(0.0, w - margin_left - margin_right)
+
+            # 段落ごとに paragraph_lines × paragraph_line_height を合算。
+            total_required_h = 0.0
+            line_count_by_paragraph: list[int] = []
+            for para in shape.text_frame.paragraphs:
+                ptext = (para.text or "")
+                para_line_height = _paragraph_line_height_pt(ctx, para, font_size_pt)
+                if not ptext.strip():
+                    para_lines = 1
+                else:
+                    if inner_w <= 0:
+                        para_lines = 9999
+                    else:
+                        para_w = _estimate_text_width_pt(ptext, font_size_pt)
+                        para_lines = max(1, int(math.ceil(para_w / inner_w)))
+                total_required_h += para_lines * para_line_height
+                line_count_by_paragraph.append(para_lines)
+
+            # 2) text_box_overflow
+            if total_required_h > inner_h + TOL_PT and inner_w > 0:
+                overflow_by_pt = round(total_required_h - inner_h, 2)
+                findings.append(
+                    make_finding(
+                        "warning",
+                        "text_box_overflow",
+                        slide_idx,
+                        slide_id,
+                        shape,
+                        (
+                            f"rendered text height {total_required_h:.1f}pt > inner_h "
+                            f"{inner_h:.1f}pt (overflow +{overflow_by_pt:.1f}pt; "
+                            f"paragraphs={line_count_by_paragraph}, "
+                            f"font {font_size_pt:g}pt)"
+                        ),
+                        {
+                            "bbox_pt": [round(v, 2) for v in normalized],
+                            "actual_bbox_pt": [round(v, 2) for v in bbox],
+                            "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                            "text_render": {
+                                "font_size_pt": round(font_size_pt, 2),
+                                "effective_font_source": "run_explicit",
+                                "autofit": str(auto_size) if auto_size is not None else None,
+                                "wrap_width_pt": round(inner_w, 2),
+                                "inner_height_pt": round(inner_h, 2),
+                                "box_height_pt": round(h, 2),
+                                "margins_pt": {
+                                    "top": round(margin_top, 2),
+                                    "bottom": round(margin_bottom, 2),
+                                    "left": round(margin_left, 2),
+                                    "right": round(margin_right, 2),
+                                },
+                                "line_count_by_paragraph": line_count_by_paragraph,
+                                "required_height_pt": round(total_required_h, 2),
+                            },
+                            "overflow_by_pt": overflow_by_pt,
+                            "text_excerpt": _text_excerpt(shape),
+                        },
+                    )
+                )
+
+            # 3) text_canvas_overflow
+            # 判定軸は box.width ではなく canvas 右端までの実残幅 (text 開始位置基準)。
+            text_start_x = x + margin_left
+            canvas_remaining = max(0.0, SLIDE_W_PT - text_start_x)
+            text_raw = (shape.text_frame.text or "").strip()
+            text_canvas_fires = False
+            overflow_pt_canvas = 0.0
+            longest_unit_pt = 0.0
+            word_wrap = getattr(shape.text_frame, "word_wrap", True)
+            word_wrap_enabled = word_wrap is None or word_wrap
+            if canvas_remaining > 0 and text_raw:
+                if not word_wrap_enabled:
+                    total_w = _estimate_text_width_pt(text_raw, font_size_pt)
+                    if total_w > canvas_remaining + TOL_PT:
+                        text_canvas_fires = True
+                        overflow_pt_canvas = total_w - canvas_remaining
+                        longest_unit_pt = total_w
+                else:
+                    max_unit_w = 0.0
+                    for word in re.split(r"\s+", text_raw):
+                        if not word:
+                            continue
+                        current_run = ""
+                        for ch in word:
+                            if (
+                                "぀" <= ch <= "ヿ"
+                                or "㐀" <= ch <= "鿿"
+                                or "＀" <= ch <= "￯"
+                                or "　" <= ch <= "〿"
+                            ):
+                                if current_run:
+                                    max_unit_w = max(
+                                        max_unit_w,
+                                        _estimate_text_width_pt(current_run, font_size_pt),
+                                    )
+                                    current_run = ""
                                 max_unit_w = max(
                                     max_unit_w,
-                                    _estimate_text_width_pt(current_run, font_size_pt),
+                                    _estimate_text_width_pt(ch, font_size_pt),
                                 )
-                                current_run = ""
+                            else:
+                                current_run += ch
+                        if current_run:
                             max_unit_w = max(
                                 max_unit_w,
-                                _estimate_text_width_pt(ch, font_size_pt),
+                                _estimate_text_width_pt(current_run, font_size_pt),
                             )
-                        else:
-                            current_run += ch
-                    if current_run:
-                        max_unit_w = max(
-                            max_unit_w,
-                            _estimate_text_width_pt(current_run, font_size_pt),
-                        )
-                if max_unit_w > wrap_w_canvas + TOL_PT:
-                    text_canvas_fires = True
-                    overflow_pt = max_unit_w - wrap_w_canvas
-                    longest_unit_pt = max_unit_w
-        if text_canvas_fires:
-            findings.append(
-                make_finding(
-                    "warning",
-                    "text_canvas_overflow",
-                    slide_idx,
-                    slide_id,
-                    shape,
-                    (
-                        f"longest unwrappable text segment {longest_unit_pt:.1f}pt "
-                        f"exceeds canvas-right wrap width {wrap_w_canvas:.1f}pt "
-                        f"(word_wrap={'False' if word_wrap is False else 'True'}; "
-                        f"overflow +{overflow_pt:.1f}pt)"
-                    ),
-                    {
-                        "bbox_pt": [round(v, 2) for v in normalized],
-                        "actual_bbox_pt": [round(v, 2) for v in bbox],
-                        "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
-                        "text_render": {
-                            "font_size_pt": round(font_size_pt, 2),
-                            "wrap_width_pt": round(wrap_w_canvas, 2),
-                            "longest_unit_pt": round(longest_unit_pt, 2),
-                            "word_wrap": bool(word_wrap_enabled),
+                    if max_unit_w > canvas_remaining + TOL_PT:
+                        text_canvas_fires = True
+                        overflow_pt_canvas = max_unit_w - canvas_remaining
+                        longest_unit_pt = max_unit_w
+            if text_canvas_fires:
+                findings.append(
+                    make_finding(
+                        "warning",
+                        "text_canvas_overflow",
+                        slide_idx,
+                        slide_id,
+                        shape,
+                        (
+                            f"longest text unit {longest_unit_pt:.1f}pt exceeds "
+                            f"canvas-remaining {canvas_remaining:.1f}pt "
+                            f"from text_start_x={text_start_x:.1f}pt "
+                            f"(word_wrap={'False' if word_wrap is False else 'True'}; "
+                            f"overflow +{overflow_pt_canvas:.1f}pt)"
+                        ),
+                        {
+                            "bbox_pt": [round(v, 2) for v in normalized],
+                            "actual_bbox_pt": [round(v, 2) for v in bbox],
+                            "canvas_pt": [SLIDE_W_PT, SLIDE_H_PT],
+                            "text_render": {
+                                "font_size_pt": round(font_size_pt, 2),
+                                "effective_font_source": "run_explicit",
+                                "autofit": str(auto_size) if auto_size is not None else None,
+                                "text_start_x_pt": round(text_start_x, 2),
+                                "canvas_remaining_pt": round(canvas_remaining, 2),
+                                "longest_unit_pt": round(longest_unit_pt, 2),
+                                "word_wrap": bool(word_wrap_enabled),
+                                "margins_pt": {
+                                    "left": round(margin_left, 2),
+                                    "right": round(margin_right, 2),
+                                },
+                            },
+                            "overflow_by_pt": round(overflow_pt_canvas, 2),
+                            "text_excerpt": _text_excerpt(shape),
                         },
-                        "overflow_by_pt": round(overflow_pt, 2),
-                        "text_excerpt": _text_excerpt(shape),
-                    },
+                    )
                 )
-            )
         return
 
     if not overflow_sides:

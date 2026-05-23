@@ -462,8 +462,18 @@ def main() -> int:
                 f"autofit findings remain after fix: {len(post_autofit)}"
             )
 
-        pre_other = sorted(f.check for f in pre if f.check != "text_autofit_disabled")
-        post_other = sorted(f.check for f in post if f.check != "text_autofit_disabled")
+        # autofit を NONE にすると、autofit_suppress (lint 側) が解除されるため
+        # 同一 shape で box_canvas_overflow / text_box_overflow / text_canvas_overflow
+        # が新規に表面化することがある。これは strict 化 (Codex 指摘対応) で意図通り
+        # の挙動なので、副作用として現れた overflow 3 種は除外して比較する。
+        _AUTOFIT_SIDE_EFFECTS = {
+            "text_autofit_disabled",
+            "box_canvas_overflow",
+            "text_box_overflow",
+            "text_canvas_overflow",
+        }
+        pre_other = sorted(f.check for f in pre if f.check not in _AUTOFIT_SIDE_EFFECTS)
+        post_other = sorted(f.check for f in post if f.check not in _AUTOFIT_SIDE_EFFECTS)
         if pre_other != post_other:
             failures.append(
                 f"non-targeted checks changed: pre={pre_other} post={post_other}"
