@@ -1214,13 +1214,21 @@ def main() -> int:
                 failures.append(
                     f"text_box_resize expected 1 apply; got {len(applied)}"
                 )
+            # default strategy = expand_box_width_to_canvas (box.right < canvas
+            # の fixture では先頭に出るため)。box.width が canvas 右端まで拡張
+            # されているか、それが不可なら font<24 のいずれかで overflow が解消
+            # されていることを確認。
             prs = Presentation(str(tbox_over))
             sh = prs.slides[0].shapes[0]
             runs = sh.text_frame.paragraphs[0].runs
             new_font = runs[0].font.size.pt if runs and runs[0].font.size else None
-            if new_font is None or new_font >= 24:
+            new_width_pt = sh.width / 12700
+            font_shrunk = new_font is not None and new_font < 24
+            width_expanded = new_width_pt > 400.5
+            if not (font_shrunk or width_expanded):
                 failures.append(
-                    f"text_box_resize default strategy expected font<24; got {new_font!r}"
+                    "text_box_resize default strategy expected width>400 or font<24;"
+                    f" got width={new_width_pt!r}, font={new_font!r}"
                 )
 
         # --- DS-OVERFLOW-001 段階1: box_canvas_clip --------------------------

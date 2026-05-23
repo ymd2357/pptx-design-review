@@ -2033,6 +2033,29 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
                     },
                 },
             )
+        if strategy == "expand_box_width_to_canvas":
+            new_w_norm = chosen.get("target_width_pt")
+            if not isinstance(new_w_norm, (int, float)):
+                return None
+            sx, sy = _slide_scale_xy(prs)
+            before_geometry = _shape_geometry_pt(shape)
+            return FixAction(
+                rule=rule,
+                slide_index=int(_finding_field(finding, "slide_index") or 1),
+                slide_id=_finding_field(finding, "slide_id"),
+                shape_id=getattr(shape, "shape_id", None),
+                shape_name=getattr(shape, "name", None),
+                before={**before_state, "geometry": before_geometry},
+                after={
+                    "strategy": "expand_box_width_to_canvas",
+                    "geometry": {
+                        "left": before_geometry["left"],
+                        "top": before_geometry["top"],
+                        "width": round(float(new_w_norm) * sx, 4),
+                        "height": before_geometry["height"],
+                    },
+                },
+            )
         return None
 
     if rule == "box_canvas_clip":

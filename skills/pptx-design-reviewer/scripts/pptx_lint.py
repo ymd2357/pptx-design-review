@@ -4422,6 +4422,20 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
         lines = tr.get("lines") or 1
         required_h = float(tr.get("required_height_pt") or 0)
         candidates: list[dict] = []
+        # Strategy 先頭: box.width を canvas 右端まで拡張する。box.right < canvas
+        # のときのみ提示。「右に余白がある」状態を解消できる場合は font shrink
+        # より visual impact が小さいので優先採用される。
+        x, y, w, h = bbox
+        max_w = max(0.0, SLIDE_W_PT - float(x))
+        if max_w > w + 0.5:
+            candidates.append(
+                {
+                    "strategy": "expand_box_width_to_canvas",
+                    "target_width_pt": round(max_w, 2),
+                    "from_pt": round(w, 2),
+                    "reason": "expand box.width to canvas right edge so wrapped text needs fewer lines",
+                }
+            )
         # Strategy A: font_size shrink → 1 段階下の allowed font size に。
         if isinstance(cur_font, (int, float)):
             smaller = [s for s in sorted(ALLOWED_FONT_SIZES_PT) if s < float(cur_font)]
