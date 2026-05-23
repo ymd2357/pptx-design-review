@@ -1495,7 +1495,14 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
 
     if shape.has_text_frame and shape.text_frame.text.strip():
         # 1) box_canvas_overflow: box bbox が canvas 外。
-        if overflow_sides:
+        # ただし box.width > canvas or box.height > canvas (= canvas 自体より
+        # 大きい box = 意図的な装飾帯/全幅ヘッダー) は fire させない。位置を
+        # 動かすと装飾意図を壊すため。「box は canvas より小さいが位置のせいで
+        # canvas からはみ出している」ケースのみを対象にする。
+        box_larger_than_canvas = (
+            w > SLIDE_W_PT + TOL_PT or h > SLIDE_H_PT + TOL_PT
+        )
+        if overflow_sides and not box_larger_than_canvas:
             findings.append(
                 make_finding(
                     "warning",
