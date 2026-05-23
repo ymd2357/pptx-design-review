@@ -8,9 +8,6 @@
     8,
     17,
     24,
-    27,
-    30,
-    32,
     38,
     39
   ],
@@ -52,7 +49,7 @@
     },
     {
       "slide_no": 8,
-      "ae_pixels": 34350,
+      "ae_pixels": 22685,
       "changed": true
     },
     {
@@ -147,8 +144,8 @@
     },
     {
       "slide_no": 27,
-      "ae_pixels": 47732,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 28,
@@ -162,8 +159,8 @@
     },
     {
       "slide_no": 30,
-      "ae_pixels": 30450,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 31,
@@ -172,8 +169,8 @@
     },
     {
       "slide_no": 32,
-      "ae_pixels": 42518,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 33,
