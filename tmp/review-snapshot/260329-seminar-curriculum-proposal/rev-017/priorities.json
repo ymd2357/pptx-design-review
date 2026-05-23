@@ -1,0 +1,177 @@
+[
+  {
+    "priority": "P0",
+    "title": "テキストが読めない、または自動縮小で読みにくくなるリスクがある",
+    "slides": [
+      2,
+      3,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "evidence": [
+      "slide 2: low_contrast; measured=2.52; threshold=4.5; source=rendered_image",
+      "slide 2: low_contrast; measured=2.82; threshold=4.5; source=rendered_image",
+      "slide 3: low_contrast; measured=2.82; threshold=4.5; source=rendered_image",
+      "slide 5: low_contrast; measured=2.75; threshold=4.5; source=rendered_image",
+      "slide 5: low_contrast; measured=2.82; threshold=4.5; source=rendered_image"
+    ],
+    "action": "該当スライドを目視確認し、文字色・背景色・テキスト枠・文字量・改行・重なりを調整する。",
+    "checks": [
+      "low_contrast",
+      "overflow_text",
+      "text_autofit_disabled",
+      "text_overlap"
+    ]
+  },
+  {
+    "priority": "P1",
+    "title": "コントラスト不足で可読性にリスクがある",
+    "slides": [
+      1,
+      13,
+      17,
+      18,
+      20
+    ],
+    "evidence": [
+      "slide 1: contrast_ratio; measured=4.42; threshold=4.5; source=rendered_image",
+      "slide 13: contrast_ratio; measured=4.17; threshold=4.5; source=rendered_image",
+      "slide 13: contrast_ratio; measured=3.1; threshold=4.5; source=rendered_image",
+      "slide 13: contrast_ratio; measured=4.23; threshold=4.5; source=rendered_image",
+      "slide 13: contrast_ratio; measured=3.55; threshold=4.5; source=rendered_image"
+    ],
+    "action": "文字色と背景色を調整し、通常文字 4.5:1 / 大きい文字 3.0:1 以上を満たす。",
+    "checks": [
+      "contrast_ratio"
+    ]
+  },
+  {
+    "priority": "P1",
+    "title": "構造、順序、欠落、色依存、改行、画像トリミングが理解を阻害するリスクがある",
+    "slides": [
+      1,
+      2,
+      4,
+      7,
+      10,
+      12,
+      13,
+      15
+    ],
+    "evidence": [
+      "slide 1: missing_required_element; measured=0title_candidate...; threshold=1title_candidate...; delta=1title_candidate...; source=structure_json/medium",
+      "slide 2: reading_order; measured=2inversions; threshold=2inversions; delta=1inversions; source=structure_json/medium",
+      "slide 4: missing_required_element; measured=0title_candidate...; threshold=1title_candidate...; delta=1title_candidate...; source=structure_json/medium",
+      "slide 7: reading_order; measured=2inversions; threshold=2inversions; delta=1inversions; source=structure_json/medium",
+      "slide 10: reading_order; measured=2inversions; threshold=2inversions; delta=1inversions; source=structure_json/medium"
+    ],
+    "action": "機械 evidence の対象要素を確認し、テンプレート構造、読む順、非色手掛かり、見出し、必須要素、改行、画像トリミングを直す。",
+    "checks": [
+      "color_only_meaning",
+      "heading_hierarchy_broken",
+      "key_area_cropped",
+      "missing_required_element",
+      "reading_order",
+      "wrap_break_changes_meaning"
+    ]
+  },
+  {
+    "priority": "P2",
+    "title": "テンプレート/ブランドルールから外れているが、許容判断できる項目がある",
+    "slides": [
+      1,
+      2,
+      3,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "evidence": [
+      "slide 1: safe_margins; bbox=[52, 50, 316, 88]",
+      "slide 2: alignment_drift: near-aligned objects drift beyond 2pt within 24pt group: center_x+23.69pt",
+      "slide 2: alignment_drift: near-aligned objects drift beyond 2pt within 24pt group: center_x+4.46pt",
+      "slide 2: alignment_drift: near-aligned objects drift beyond 2pt within 24pt group: center_y+6.75pt"
+    ],
+    "action": "SHIFT AI テンプレートとして意図した表現なら許容ルールへ寄せ、そうでなければマスター/スタイルを直す。",
+    "checks": [
+      "alignment_left_top",
+      "alt_text_required",
+      "background_color_palette",
+      "font_family",
+      "font_size_scale",
+      "image_aspect_distortion",
+      "image_upscale_ratio",
+      "inner_padding_imbalance",
+      "line_height",
+      "object_gap_too_small",
+      "overflow_images",
+      "overflow_shapes",
+      "safe_margins",
+      "safe_text_area_text",
+      "slide_size",
+      "text_color_allowlist"
+    ]
+  },
+  {
+    "priority": "P3",
+    "title": "座標の微小な丸めズレがある",
+    "slides": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "evidence": [
+      "slide 1: geometry_rounding; bbox=[88, 278, 578.32, 66]",
+      "slide 1: geometry_rounding; bbox=[683.77, 278, 97.2, 66]",
+      "slide 1: geometry_rounding; bbox=[88, 445.5, 1119.28, 135]",
+      "slide 1: geometry_rounding; bbox=[88, 660, 294, 40.5]",
+      "slide 2: geometry_rounding; bbox=[90, 27, 301.27, 54]"
+    ],
+    "action": "見た目に問題がなければ後回し。テンプレート整備時に一括補正する。",
+    "checks": [
+      "geometry_rounding"
+    ]
+  }
+]

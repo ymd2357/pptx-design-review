@@ -1,0 +1,5161 @@
+[
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 3",
+    "message": "fill color #DDEEDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF'] (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#DDEEDD",
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 4,
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#DDEEDD",
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 4
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#DDDDDD",
+        "color_token": "border.default",
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 5",
+    "message": "fill color #FFDDDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF'] (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#FFDDDD",
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 6,
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#FFDDDD",
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 6
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#EDD2E2",
+        "color_token": null,
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "font_size_scale",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 2",
+    "message": "font size 16.0pt normalized from 16.0pt not within 1pt of scale [20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "size_pt": 16.0,
+      "nearest_allowed_size_pt": 20,
+      "actual_size_pt": 16.0,
+      "normalization_scale": 1.0,
+      "tolerance_pt": 1.0,
+      "runs": 1,
+      "cells": [],
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 3,
+      "check_id": "font_size_scale",
+      "evidence": {
+        "size_pt": 16.0,
+        "nearest_allowed_size_pt": 20,
+        "actual_size_pt": 16.0,
+        "normalization_scale": 1.0,
+        "tolerance_pt": 1.0,
+        "runs": 1,
+        "cells": [],
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 3
+      },
+      "fixability": "auto_fix_candidate",
+      "fixability_rule": "font_size",
+      "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+      "candidate_values": {
+        "size_pt": 20,
+        "allowed_size_scale_pt": [
+          20,
+          22,
+          24,
+          28,
+          32,
+          36,
+          40,
+          48,
+          56,
+          64,
+          80
+        ]
+      },
+      "manual_required_reason": null,
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "font_size_scale",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 4",
+    "message": "font size 16.0pt normalized from 16.0pt not within 1pt of scale [20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "size_pt": 16.0,
+      "nearest_allowed_size_pt": 20,
+      "actual_size_pt": 16.0,
+      "normalization_scale": 1.0,
+      "tolerance_pt": 1.0,
+      "runs": 1,
+      "cells": [],
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 5,
+      "check_id": "font_size_scale",
+      "evidence": {
+        "size_pt": 16.0,
+        "nearest_allowed_size_pt": 20,
+        "actual_size_pt": 16.0,
+        "normalization_scale": 1.0,
+        "tolerance_pt": 1.0,
+        "runs": 1,
+        "cells": [],
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 5
+      },
+      "fixability": "auto_fix_candidate",
+      "fixability_rule": "font_size",
+      "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+      "candidate_values": {
+        "size_pt": 20,
+        "allowed_size_scale_pt": [
+          20,
+          22,
+          24,
+          28,
+          32,
+          36,
+          40,
+          48,
+          56,
+          64,
+          80
+        ]
+      },
+      "manual_required_reason": null,
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "font_size_scale",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 6",
+    "message": "font size 16.0pt normalized from 16.0pt not within 1pt of scale [20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "size_pt": 16.0,
+      "nearest_allowed_size_pt": 20,
+      "actual_size_pt": 16.0,
+      "normalization_scale": 1.0,
+      "tolerance_pt": 1.0,
+      "runs": 1,
+      "cells": [],
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 7,
+      "check_id": "font_size_scale",
+      "evidence": {
+        "size_pt": 16.0,
+        "nearest_allowed_size_pt": 20,
+        "actual_size_pt": 16.0,
+        "normalization_scale": 1.0,
+        "tolerance_pt": 1.0,
+        "runs": 1,
+        "cells": [],
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 7
+      },
+      "fixability": "auto_fix_candidate",
+      "fixability_rule": "font_size",
+      "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+      "candidate_values": {
+        "size_pt": 20,
+        "allowed_size_scale_pt": [
+          20,
+          22,
+          24,
+          28,
+          32,
+          36,
+          40,
+          48,
+          56,
+          64,
+          80
+        ]
+      },
+      "manual_required_reason": null,
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 2",
+    "message": "text outside safe text area: left+21.0pt (recurring on 3 slides: 1-3)",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        90.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        90.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 3,
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          90.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          90.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ],
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 3
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_color_allowlist",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 1",
+    "message": "text color #222222 not in allowlist ['#000000', '#0072B2', '#1E112D', '#333333', '#474747', '#5C5C5C', '#666666', '#707070', '#858585', '#999999', '#A51E6D', '#E6033D', '#FEFEFE', '#FFFFFF'] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#222222",
+      "runs": 1,
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 2,
+      "check_id": "text_color_allowlist",
+      "evidence": {
+        "color_hex": "#222222",
+        "runs": 1,
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 2
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_color",
+      "fixability_reason": "color substitution requires semantic and brand review",
+      "candidate_values": {
+        "color_hex": "#1E112D",
+        "color_token": "text.alt_dark",
+        "allowed_colors_hex": [
+          "#000000",
+          "#0072B2",
+          "#1E112D",
+          "#333333",
+          "#474747",
+          "#5C5C5C",
+          "#666666",
+          "#707070",
+          "#858585",
+          "#999999",
+          "#A51E6D",
+          "#E6033D",
+          "#FEFEFE",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "color substitution requires semantic and brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_color_allowlist",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 2",
+    "message": "text color #555555 not in allowlist ['#000000', '#0072B2', '#1E112D', '#333333', '#474747', '#5C5C5C', '#666666', '#707070', '#858585', '#999999', '#A51E6D', '#E6033D', '#FEFEFE', '#FFFFFF'] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#555555",
+      "runs": 1,
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 3,
+      "check_id": "text_color_allowlist",
+      "evidence": {
+        "color_hex": "#555555",
+        "runs": 1,
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 3
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_color",
+      "fixability_reason": "color substitution requires semantic and brand review",
+      "candidate_values": {
+        "color_hex": "#5C5C5C",
+        "color_token": "brand.black.b700",
+        "allowed_colors_hex": [
+          "#000000",
+          "#0072B2",
+          "#1E112D",
+          "#333333",
+          "#474747",
+          "#5C5C5C",
+          "#666666",
+          "#707070",
+          "#858585",
+          "#999999",
+          "#A51E6D",
+          "#E6033D",
+          "#FEFEFE",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "color substitution requires semantic and brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_color_allowlist",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 4",
+    "message": "text color #555555 not in allowlist ['#000000', '#0072B2', '#1E112D', '#333333', '#474747', '#5C5C5C', '#666666', '#707070', '#858585', '#999999', '#A51E6D', '#E6033D', '#FEFEFE', '#FFFFFF'] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#555555",
+      "runs": 1,
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 5,
+      "check_id": "text_color_allowlist",
+      "evidence": {
+        "color_hex": "#555555",
+        "runs": 1,
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 5
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_color",
+      "fixability_reason": "color substitution requires semantic and brand review",
+      "candidate_values": {
+        "color_hex": "#5C5C5C",
+        "color_token": "brand.black.b700",
+        "allowed_colors_hex": [
+          "#000000",
+          "#0072B2",
+          "#1E112D",
+          "#333333",
+          "#474747",
+          "#5C5C5C",
+          "#666666",
+          "#707070",
+          "#858585",
+          "#999999",
+          "#A51E6D",
+          "#E6033D",
+          "#FEFEFE",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "color substitution requires semantic and brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_color_allowlist",
+    "slide_index": 0,
+    "slide_id": null,
+    "shape_id": null,
+    "shape_name": "TextBox 6",
+    "message": "text color #555555 not in allowlist ['#000000', '#0072B2', '#1E112D', '#333333', '#474747', '#5C5C5C', '#666666', '#707070', '#858585', '#999999', '#A51E6D', '#E6033D', '#FEFEFE', '#FFFFFF'] (1 run(s)) (recurring on 3 slides: 1-3)",
+    "detail": {
+      "color_hex": "#555555",
+      "runs": 1,
+      "affected_slides": [
+        1,
+        2,
+        3
+      ],
+      "occurrences": 3,
+      "example_slide_index": 1,
+      "example_shape_id": 7,
+      "check_id": "text_color_allowlist",
+      "evidence": {
+        "color_hex": "#555555",
+        "runs": 1,
+        "affected_slides": [
+          1,
+          2,
+          3
+        ],
+        "occurrences": 3,
+        "example_slide_index": 1,
+        "example_shape_id": 7
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_color",
+      "fixability_reason": "color substitution requires semantic and brand review",
+      "candidate_values": {
+        "color_hex": "#5C5C5C",
+        "color_token": "brand.black.b700",
+        "allowed_colors_hex": [
+          "#000000",
+          "#0072B2",
+          "#1E112D",
+          "#333333",
+          "#474747",
+          "#5C5C5C",
+          "#666666",
+          "#707070",
+          "#858585",
+          "#999999",
+          "#A51E6D",
+          "#E6033D",
+          "#FEFEFE",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "color substitution requires semantic and brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "error",
+    "check": "text_overlap",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 7,
+    "shape_name": "TextBox 6",
+    "message": "text frames overlap by 12960.0pt^2 (>1pt^2): TextBox 6#7 / TextBox 7#8",
+    "detail": {
+      "shape_a": {
+        "shape_id": 7,
+        "shape_name": "TextBox 6",
+        "design_element": "default",
+        "kind": "text",
+        "source_order_index": 6,
+        "bbox_pt": [
+          60.0,
+          450.0,
+          680.0,
+          36.0
+        ]
+      },
+      "shape_b": {
+        "shape_id": 8,
+        "shape_name": "TextBox 7",
+        "design_element": "default",
+        "kind": "text",
+        "source_order_index": 7,
+        "bbox_pt": [
+          60.0,
+          450.0,
+          360.0,
+          360.0
+        ]
+      },
+      "overlap_area_pt2": 12960.0,
+      "overlap_bbox_pt": [
+        60.0,
+        450.0,
+        360.0,
+        36.0
+      ],
+      "threshold_pt2": 1.0,
+      "multi_step_candidates": [
+        {
+          "strategy": "move_shape_b",
+          "geometry": {
+            "left": 60.0,
+            "top": 490.0,
+            "width": 360.0,
+            "height": 360.0
+          },
+          "reason": "vertical nudge to clear overlap"
+        },
+        {
+          "strategy": "shrink_font_size",
+          "target_shape_id": 8,
+          "font_size_pt": 22,
+          "from_pt": 24.0,
+          "reason": "smaller font size on the dominant shape may resolve overlap"
+        },
+        {
+          "strategy": "shrink_shape_b_height",
+          "geometry": {
+            "left": 60.0,
+            "top": 450.0,
+            "width": 360.0,
+            "height": 320.0
+          },
+          "reason": "reduce shape_b height to remove overlap area"
+        }
+      ],
+      "check_id": "text_overlap",
+      "evidence": {
+        "shape_a": {
+          "shape_id": 7,
+          "shape_name": "TextBox 6",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 6,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            680.0,
+            36.0
+          ]
+        },
+        "shape_b": {
+          "shape_id": 8,
+          "shape_name": "TextBox 7",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 7,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            360.0,
+            360.0
+          ]
+        },
+        "overlap_area_pt2": 12960.0,
+        "overlap_bbox_pt": [
+          60.0,
+          450.0,
+          360.0,
+          36.0
+        ],
+        "threshold_pt2": 1.0,
+        "multi_step_candidates": [
+          {
+            "strategy": "move_shape_b",
+            "geometry": {
+              "left": 60.0,
+              "top": 490.0,
+              "width": 360.0,
+              "height": 360.0
+            },
+            "reason": "vertical nudge to clear overlap"
+          },
+          {
+            "strategy": "shrink_font_size",
+            "target_shape_id": 8,
+            "font_size_pt": 22,
+            "from_pt": 24.0,
+            "reason": "smaller font size on the dominant shape may resolve overlap"
+          },
+          {
+            "strategy": "shrink_shape_b_height",
+            "geometry": {
+              "left": 60.0,
+              "top": 450.0,
+              "width": 360.0,
+              "height": 320.0
+            },
+            "reason": "reduce shape_b height to remove overlap area"
+          }
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "overlap",
+      "fixability_reason": "overlap repair requires layout decision",
+      "candidate_values": null,
+      "manual_required_reason": "overlap repair requires layout decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "reading_order",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 2,
+    "shape_name": "TextBox 1",
+    "message": "selection/source order disagrees with visual top-left order (2 inversion(s))",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "visual_order": [
+        {
+          "shape_id": 2,
+          "shape_name": "TextBox 1",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 1,
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ]
+        },
+        {
+          "shape_id": 3,
+          "shape_name": "TextBox 2",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 2,
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 4,
+          "shape_name": "TextBox 3",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 3,
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            100.0
+          ]
+        },
+        {
+          "shape_id": 5,
+          "shape_name": "TextBox 4",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 4,
+          "bbox_pt": [
+            60.0,
+            270.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 10,
+          "shape_name": "TextBox 9",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 9,
+          "bbox_pt": [
+            0.0,
+            310.0,
+            360.0,
+            100.0
+          ]
+        },
+        {
+          "shape_id": 7,
+          "shape_name": "TextBox 6",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 6,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 8,
+          "shape_name": "TextBox 7",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 7,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            360.0,
+            360.0
+          ]
+        },
+        {
+          "shape_id": 9,
+          "shape_name": "TextBox 8",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 8,
+          "bbox_pt": [
+            760.0,
+            270.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 6,
+          "shape_name": "TextBox 5",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 5,
+          "bbox_pt": [
+            1200.0,
+            310.0,
+            240.0,
+            100.0
+          ]
+        }
+      ],
+      "reading_units": [
+        {
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ],
+          "records": [
+            {
+              "shape_id": 2,
+              "shape_name": "TextBox 1",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 1,
+              "bbox_pt": [
+                40.0,
+                20.0,
+                1360.0,
+                50.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ],
+          "records": [
+            {
+              "shape_id": 3,
+              "shape_name": "TextBox 2",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 2,
+              "bbox_pt": [
+                60.0,
+                90.0,
+                680.0,
+                36.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            100.0
+          ],
+          "records": [
+            {
+              "shape_id": 4,
+              "shape_name": "TextBox 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 3,
+              "bbox_pt": [
+                60.0,
+                130.0,
+                360.0,
+                100.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            0.0,
+            270.0,
+            740.0,
+            540.0
+          ],
+          "records": [
+            {
+              "shape_id": 5,
+              "shape_name": "TextBox 4",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 4,
+              "bbox_pt": [
+                60.0,
+                270.0,
+                680.0,
+                36.0
+              ]
+            },
+            {
+              "shape_id": 10,
+              "shape_name": "TextBox 9",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 9,
+              "bbox_pt": [
+                0.0,
+                310.0,
+                360.0,
+                100.0
+              ]
+            },
+            {
+              "shape_id": 7,
+              "shape_name": "TextBox 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                60.0,
+                450.0,
+                680.0,
+                36.0
+              ]
+            },
+            {
+              "shape_id": 8,
+              "shape_name": "TextBox 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                60.0,
+                450.0,
+                360.0,
+                360.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            760.0,
+            270.0,
+            680.0,
+            140.0
+          ],
+          "records": [
+            {
+              "shape_id": 9,
+              "shape_name": "TextBox 8",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 8,
+              "bbox_pt": [
+                760.0,
+                270.0,
+                680.0,
+                36.0
+              ]
+            },
+            {
+              "shape_id": 6,
+              "shape_name": "TextBox 5",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 5,
+              "bbox_pt": [
+                1200.0,
+                310.0,
+                240.0,
+                100.0
+              ]
+            }
+          ]
+        }
+      ],
+      "source_order": [
+        {
+          "shape_id": 2,
+          "shape_name": "TextBox 1",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 1,
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ]
+        },
+        {
+          "shape_id": 3,
+          "shape_name": "TextBox 2",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 2,
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 4,
+          "shape_name": "TextBox 3",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 3,
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            100.0
+          ]
+        },
+        {
+          "shape_id": 5,
+          "shape_name": "TextBox 4",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 4,
+          "bbox_pt": [
+            60.0,
+            270.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 6,
+          "shape_name": "TextBox 5",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 5,
+          "bbox_pt": [
+            1200.0,
+            310.0,
+            240.0,
+            100.0
+          ]
+        },
+        {
+          "shape_id": 7,
+          "shape_name": "TextBox 6",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 6,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 8,
+          "shape_name": "TextBox 7",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 7,
+          "bbox_pt": [
+            60.0,
+            450.0,
+            360.0,
+            360.0
+          ]
+        },
+        {
+          "shape_id": 9,
+          "shape_name": "TextBox 8",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 8,
+          "bbox_pt": [
+            760.0,
+            270.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 10,
+          "shape_name": "TextBox 9",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 9,
+          "bbox_pt": [
+            0.0,
+            310.0,
+            360.0,
+            100.0
+          ]
+        }
+      ],
+      "inversions": [
+        {
+          "visual_first": {
+            "shape_id": 10,
+            "shape_name": "TextBox 9",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 9,
+            "bbox_pt": [
+              0.0,
+              310.0,
+              360.0,
+              100.0
+            ]
+          },
+          "visual_second": {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              680.0,
+              36.0
+            ]
+          }
+        },
+        {
+          "visual_first": {
+            "shape_id": 10,
+            "shape_name": "TextBox 9",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 9,
+            "bbox_pt": [
+              0.0,
+              310.0,
+              360.0,
+              100.0
+            ]
+          },
+          "visual_second": {
+            "shape_id": 8,
+            "shape_name": "TextBox 7",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 7,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              360.0,
+              360.0
+            ]
+          }
+        }
+      ],
+      "measured_value": 2,
+      "threshold": 2,
+      "delta": 1,
+      "unit": "inversions",
+      "check_id": "reading_order",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "visual_order": [
+          {
+            "shape_id": 2,
+            "shape_name": "TextBox 1",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 1,
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ]
+          },
+          {
+            "shape_id": 3,
+            "shape_name": "TextBox 2",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 2,
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 4,
+            "shape_name": "TextBox 3",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 3,
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              100.0
+            ]
+          },
+          {
+            "shape_id": 5,
+            "shape_name": "TextBox 4",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 4,
+            "bbox_pt": [
+              60.0,
+              270.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 10,
+            "shape_name": "TextBox 9",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 9,
+            "bbox_pt": [
+              0.0,
+              310.0,
+              360.0,
+              100.0
+            ]
+          },
+          {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 8,
+            "shape_name": "TextBox 7",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 7,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              360.0,
+              360.0
+            ]
+          },
+          {
+            "shape_id": 9,
+            "shape_name": "TextBox 8",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 8,
+            "bbox_pt": [
+              760.0,
+              270.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 6,
+            "shape_name": "TextBox 5",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 5,
+            "bbox_pt": [
+              1200.0,
+              310.0,
+              240.0,
+              100.0
+            ]
+          }
+        ],
+        "reading_units": [
+          {
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ],
+            "records": [
+              {
+                "shape_id": 2,
+                "shape_name": "TextBox 1",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 1,
+                "bbox_pt": [
+                  40.0,
+                  20.0,
+                  1360.0,
+                  50.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ],
+            "records": [
+              {
+                "shape_id": 3,
+                "shape_name": "TextBox 2",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 2,
+                "bbox_pt": [
+                  60.0,
+                  90.0,
+                  680.0,
+                  36.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              100.0
+            ],
+            "records": [
+              {
+                "shape_id": 4,
+                "shape_name": "TextBox 3",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 3,
+                "bbox_pt": [
+                  60.0,
+                  130.0,
+                  360.0,
+                  100.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              0.0,
+              270.0,
+              740.0,
+              540.0
+            ],
+            "records": [
+              {
+                "shape_id": 5,
+                "shape_name": "TextBox 4",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 4,
+                "bbox_pt": [
+                  60.0,
+                  270.0,
+                  680.0,
+                  36.0
+                ]
+              },
+              {
+                "shape_id": 10,
+                "shape_name": "TextBox 9",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 9,
+                "bbox_pt": [
+                  0.0,
+                  310.0,
+                  360.0,
+                  100.0
+                ]
+              },
+              {
+                "shape_id": 7,
+                "shape_name": "TextBox 6",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 6,
+                "bbox_pt": [
+                  60.0,
+                  450.0,
+                  680.0,
+                  36.0
+                ]
+              },
+              {
+                "shape_id": 8,
+                "shape_name": "TextBox 7",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 7,
+                "bbox_pt": [
+                  60.0,
+                  450.0,
+                  360.0,
+                  360.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              760.0,
+              270.0,
+              680.0,
+              140.0
+            ],
+            "records": [
+              {
+                "shape_id": 9,
+                "shape_name": "TextBox 8",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 8,
+                "bbox_pt": [
+                  760.0,
+                  270.0,
+                  680.0,
+                  36.0
+                ]
+              },
+              {
+                "shape_id": 6,
+                "shape_name": "TextBox 5",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 5,
+                "bbox_pt": [
+                  1200.0,
+                  310.0,
+                  240.0,
+                  100.0
+                ]
+              }
+            ]
+          }
+        ],
+        "source_order": [
+          {
+            "shape_id": 2,
+            "shape_name": "TextBox 1",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 1,
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ]
+          },
+          {
+            "shape_id": 3,
+            "shape_name": "TextBox 2",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 2,
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 4,
+            "shape_name": "TextBox 3",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 3,
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              100.0
+            ]
+          },
+          {
+            "shape_id": 5,
+            "shape_name": "TextBox 4",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 4,
+            "bbox_pt": [
+              60.0,
+              270.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 6,
+            "shape_name": "TextBox 5",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 5,
+            "bbox_pt": [
+              1200.0,
+              310.0,
+              240.0,
+              100.0
+            ]
+          },
+          {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 8,
+            "shape_name": "TextBox 7",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 7,
+            "bbox_pt": [
+              60.0,
+              450.0,
+              360.0,
+              360.0
+            ]
+          },
+          {
+            "shape_id": 9,
+            "shape_name": "TextBox 8",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 8,
+            "bbox_pt": [
+              760.0,
+              270.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 10,
+            "shape_name": "TextBox 9",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 9,
+            "bbox_pt": [
+              0.0,
+              310.0,
+              360.0,
+              100.0
+            ]
+          }
+        ],
+        "inversions": [
+          {
+            "visual_first": {
+              "shape_id": 10,
+              "shape_name": "TextBox 9",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 9,
+              "bbox_pt": [
+                0.0,
+                310.0,
+                360.0,
+                100.0
+              ]
+            },
+            "visual_second": {
+              "shape_id": 7,
+              "shape_name": "TextBox 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                60.0,
+                450.0,
+                680.0,
+                36.0
+              ]
+            }
+          },
+          {
+            "visual_first": {
+              "shape_id": 10,
+              "shape_name": "TextBox 9",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 9,
+              "bbox_pt": [
+                0.0,
+                310.0,
+                360.0,
+                100.0
+              ]
+            },
+            "visual_second": {
+              "shape_id": 8,
+              "shape_name": "TextBox 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                60.0,
+                450.0,
+                360.0,
+                360.0
+              ]
+            }
+          }
+        ],
+        "measured_value": 2,
+        "threshold": 2,
+        "delta": 1,
+        "unit": "inversions"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "reading_order",
+      "fixability_reason": "order repair requires logical content decision",
+      "candidate_values": null,
+      "manual_required_reason": "order repair requires logical content decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "reading_order",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 2,
+    "shape_name": "TextBox 1",
+    "message": "selection/source order disagrees with visual top-left order (2 inversion(s))",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "visual_order": [
+        {
+          "shape_id": 2,
+          "shape_name": "TextBox 1",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 1,
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ]
+        },
+        {
+          "shape_id": 3,
+          "shape_name": "TextBox 2",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 2,
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 7,
+          "shape_name": "TextBox 6",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 6,
+          "bbox_pt": [
+            760.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 4,
+          "shape_name": "TextBox 3",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 3,
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            120.0
+          ]
+        },
+        {
+          "shape_id": 8,
+          "shape_name": "TextBox 7",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 7,
+          "bbox_pt": [
+            760.0,
+            130.0,
+            360.0,
+            60.0
+          ]
+        },
+        {
+          "shape_id": 5,
+          "shape_name": "TextBox 4",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 4,
+          "bbox_pt": [
+            60.0,
+            290.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 6,
+          "shape_name": "TextBox 5",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 5,
+          "bbox_pt": [
+            60.0,
+            330.0,
+            360.0,
+            151.2
+          ]
+        }
+      ],
+      "reading_units": [
+        {
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ],
+          "records": [
+            {
+              "shape_id": 2,
+              "shape_name": "TextBox 1",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 1,
+              "bbox_pt": [
+                40.0,
+                20.0,
+                1360.0,
+                50.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ],
+          "records": [
+            {
+              "shape_id": 3,
+              "shape_name": "TextBox 2",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 2,
+              "bbox_pt": [
+                60.0,
+                90.0,
+                680.0,
+                36.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            760.0,
+            90.0,
+            680.0,
+            36.0
+          ],
+          "records": [
+            {
+              "shape_id": 7,
+              "shape_name": "TextBox 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                760.0,
+                90.0,
+                680.0,
+                36.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            120.0
+          ],
+          "records": [
+            {
+              "shape_id": 4,
+              "shape_name": "TextBox 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 3,
+              "bbox_pt": [
+                60.0,
+                130.0,
+                360.0,
+                120.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            760.0,
+            130.0,
+            360.0,
+            60.0
+          ],
+          "records": [
+            {
+              "shape_id": 8,
+              "shape_name": "TextBox 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                760.0,
+                130.0,
+                360.0,
+                60.0
+              ]
+            }
+          ]
+        },
+        {
+          "bbox_pt": [
+            60.0,
+            290.0,
+            680.0,
+            191.2
+          ],
+          "records": [
+            {
+              "shape_id": 5,
+              "shape_name": "TextBox 4",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 4,
+              "bbox_pt": [
+                60.0,
+                290.0,
+                680.0,
+                36.0
+              ]
+            },
+            {
+              "shape_id": 6,
+              "shape_name": "TextBox 5",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 5,
+              "bbox_pt": [
+                60.0,
+                330.0,
+                360.0,
+                151.2
+              ]
+            }
+          ]
+        }
+      ],
+      "source_order": [
+        {
+          "shape_id": 2,
+          "shape_name": "TextBox 1",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 1,
+          "bbox_pt": [
+            40.0,
+            20.0,
+            1360.0,
+            50.0
+          ]
+        },
+        {
+          "shape_id": 3,
+          "shape_name": "TextBox 2",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 2,
+          "bbox_pt": [
+            60.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 4,
+          "shape_name": "TextBox 3",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 3,
+          "bbox_pt": [
+            60.0,
+            130.0,
+            360.0,
+            120.0
+          ]
+        },
+        {
+          "shape_id": 5,
+          "shape_name": "TextBox 4",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 4,
+          "bbox_pt": [
+            60.0,
+            290.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 6,
+          "shape_name": "TextBox 5",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 5,
+          "bbox_pt": [
+            60.0,
+            330.0,
+            360.0,
+            151.2
+          ]
+        },
+        {
+          "shape_id": 7,
+          "shape_name": "TextBox 6",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 6,
+          "bbox_pt": [
+            760.0,
+            90.0,
+            680.0,
+            36.0
+          ]
+        },
+        {
+          "shape_id": 8,
+          "shape_name": "TextBox 7",
+          "design_element": "default",
+          "kind": "text",
+          "source_order_index": 7,
+          "bbox_pt": [
+            760.0,
+            130.0,
+            360.0,
+            60.0
+          ]
+        }
+      ],
+      "inversions": [
+        {
+          "visual_first": {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              760.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          "visual_second": {
+            "shape_id": 4,
+            "shape_name": "TextBox 3",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 3,
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              120.0
+            ]
+          }
+        },
+        {
+          "visual_first": {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              760.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          "visual_second": {
+            "shape_id": 5,
+            "shape_name": "TextBox 4",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 4,
+            "bbox_pt": [
+              60.0,
+              290.0,
+              680.0,
+              36.0
+            ]
+          }
+        }
+      ],
+      "measured_value": 2,
+      "threshold": 2,
+      "delta": 1,
+      "unit": "inversions",
+      "check_id": "reading_order",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "visual_order": [
+          {
+            "shape_id": 2,
+            "shape_name": "TextBox 1",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 1,
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ]
+          },
+          {
+            "shape_id": 3,
+            "shape_name": "TextBox 2",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 2,
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              760.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 4,
+            "shape_name": "TextBox 3",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 3,
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              120.0
+            ]
+          },
+          {
+            "shape_id": 8,
+            "shape_name": "TextBox 7",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 7,
+            "bbox_pt": [
+              760.0,
+              130.0,
+              360.0,
+              60.0
+            ]
+          },
+          {
+            "shape_id": 5,
+            "shape_name": "TextBox 4",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 4,
+            "bbox_pt": [
+              60.0,
+              290.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 6,
+            "shape_name": "TextBox 5",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 5,
+            "bbox_pt": [
+              60.0,
+              330.0,
+              360.0,
+              151.2
+            ]
+          }
+        ],
+        "reading_units": [
+          {
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ],
+            "records": [
+              {
+                "shape_id": 2,
+                "shape_name": "TextBox 1",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 1,
+                "bbox_pt": [
+                  40.0,
+                  20.0,
+                  1360.0,
+                  50.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ],
+            "records": [
+              {
+                "shape_id": 3,
+                "shape_name": "TextBox 2",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 2,
+                "bbox_pt": [
+                  60.0,
+                  90.0,
+                  680.0,
+                  36.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              760.0,
+              90.0,
+              680.0,
+              36.0
+            ],
+            "records": [
+              {
+                "shape_id": 7,
+                "shape_name": "TextBox 6",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 6,
+                "bbox_pt": [
+                  760.0,
+                  90.0,
+                  680.0,
+                  36.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              120.0
+            ],
+            "records": [
+              {
+                "shape_id": 4,
+                "shape_name": "TextBox 3",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 3,
+                "bbox_pt": [
+                  60.0,
+                  130.0,
+                  360.0,
+                  120.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              760.0,
+              130.0,
+              360.0,
+              60.0
+            ],
+            "records": [
+              {
+                "shape_id": 8,
+                "shape_name": "TextBox 7",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 7,
+                "bbox_pt": [
+                  760.0,
+                  130.0,
+                  360.0,
+                  60.0
+                ]
+              }
+            ]
+          },
+          {
+            "bbox_pt": [
+              60.0,
+              290.0,
+              680.0,
+              191.2
+            ],
+            "records": [
+              {
+                "shape_id": 5,
+                "shape_name": "TextBox 4",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 4,
+                "bbox_pt": [
+                  60.0,
+                  290.0,
+                  680.0,
+                  36.0
+                ]
+              },
+              {
+                "shape_id": 6,
+                "shape_name": "TextBox 5",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 5,
+                "bbox_pt": [
+                  60.0,
+                  330.0,
+                  360.0,
+                  151.2
+                ]
+              }
+            ]
+          }
+        ],
+        "source_order": [
+          {
+            "shape_id": 2,
+            "shape_name": "TextBox 1",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 1,
+            "bbox_pt": [
+              40.0,
+              20.0,
+              1360.0,
+              50.0
+            ]
+          },
+          {
+            "shape_id": 3,
+            "shape_name": "TextBox 2",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 2,
+            "bbox_pt": [
+              60.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 4,
+            "shape_name": "TextBox 3",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 3,
+            "bbox_pt": [
+              60.0,
+              130.0,
+              360.0,
+              120.0
+            ]
+          },
+          {
+            "shape_id": 5,
+            "shape_name": "TextBox 4",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 4,
+            "bbox_pt": [
+              60.0,
+              290.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 6,
+            "shape_name": "TextBox 5",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 5,
+            "bbox_pt": [
+              60.0,
+              330.0,
+              360.0,
+              151.2
+            ]
+          },
+          {
+            "shape_id": 7,
+            "shape_name": "TextBox 6",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 6,
+            "bbox_pt": [
+              760.0,
+              90.0,
+              680.0,
+              36.0
+            ]
+          },
+          {
+            "shape_id": 8,
+            "shape_name": "TextBox 7",
+            "design_element": "default",
+            "kind": "text",
+            "source_order_index": 7,
+            "bbox_pt": [
+              760.0,
+              130.0,
+              360.0,
+              60.0
+            ]
+          }
+        ],
+        "inversions": [
+          {
+            "visual_first": {
+              "shape_id": 7,
+              "shape_name": "TextBox 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                760.0,
+                90.0,
+                680.0,
+                36.0
+              ]
+            },
+            "visual_second": {
+              "shape_id": 4,
+              "shape_name": "TextBox 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 3,
+              "bbox_pt": [
+                60.0,
+                130.0,
+                360.0,
+                120.0
+              ]
+            }
+          },
+          {
+            "visual_first": {
+              "shape_id": 7,
+              "shape_name": "TextBox 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                760.0,
+                90.0,
+                680.0,
+                36.0
+              ]
+            },
+            "visual_second": {
+              "shape_id": 5,
+              "shape_name": "TextBox 4",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 4,
+              "bbox_pt": [
+                60.0,
+                290.0,
+                680.0,
+                36.0
+              ]
+            }
+          }
+        ],
+        "measured_value": 2,
+        "threshold": 2,
+        "delta": 1,
+        "unit": "inversions"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "reading_order",
+      "fixability_reason": "order repair requires logical content decision",
+      "candidate_values": null,
+      "manual_required_reason": "order repair requires logical content decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        100.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        100.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          100.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          100.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 92.8,
+      "free_space_pt": 64.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -32.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        100.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 67.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 92.8,
+        "free_space_pt": 64.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -32.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          100.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 67.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 5,
+    "shape_name": "TextBox 4",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        270.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        270.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          270.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          270.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text outside safe text area: right+81.0pt",
+    "detail": {
+      "bbox_pt": [
+        1200.0,
+        310.0,
+        240.0,
+        100.0
+      ],
+      "actual_bbox_pt": [
+        1200.0,
+        310.0,
+        240.0,
+        100.0
+      ],
+      "overflow_sides_pt": {
+        "right": 81.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          1200.0,
+          310.0,
+          240.0,
+          100.0
+        ],
+        "actual_bbox_pt": [
+          1200.0,
+          310.0,
+          240.0,
+          100.0
+        ],
+        "overflow_sides_pt": {
+          "right": 81.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "badge_alignment",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "badge container text is not centered (expected alignment=CENTER, vertical_anchor=MIDDLE)",
+    "detail": {
+      "shape_kind": "badge",
+      "bbox_pt": [
+        1200.0,
+        310.0,
+        240.0,
+        100.0
+      ],
+      "text_excerpt": "右はみ出し",
+      "text_length": 5,
+      "aspect_ratio": 2.4,
+      "misaligned": [
+        {
+          "axis": "vertical_anchor",
+          "actual": "TOP_default",
+          "expected": "MIDDLE"
+        },
+        {
+          "axis": "alignment",
+          "actual": "LEFT_default",
+          "expected": "CENTER"
+        }
+      ],
+      "evidence_source": "pptx_xml",
+      "evidence_confidence": "high",
+      "fixability": "auto_fix_candidate",
+      "fixability_reason": "mechanical paragraph CENTER and text-frame MIDDLE alignment change for badge container",
+      "candidate_values": {
+        "alignment": "CENTER",
+        "vertical_anchor": "MIDDLE"
+      },
+      "measurement_confidence": null,
+      "measured_value": 2,
+      "threshold": 0,
+      "delta": 2,
+      "unit": "misaligned_axes",
+      "check_id": "badge_alignment",
+      "evidence": {
+        "shape_kind": "badge",
+        "bbox_pt": [
+          1200.0,
+          310.0,
+          240.0,
+          100.0
+        ],
+        "text_excerpt": "右はみ出し",
+        "text_length": 5,
+        "aspect_ratio": 2.4,
+        "misaligned": [
+          {
+            "axis": "vertical_anchor",
+            "actual": "TOP_default",
+            "expected": "MIDDLE"
+          },
+          {
+            "axis": "alignment",
+            "actual": "LEFT_default",
+            "expected": "CENTER"
+          }
+        ],
+        "evidence_source": "pptx_xml",
+        "evidence_confidence": "high",
+        "fixability": "auto_fix_candidate",
+        "fixability_reason": "badge_center_alignment",
+        "candidate_values": {
+          "alignment": "CENTER",
+          "vertical_anchor": "MIDDLE"
+        },
+        "measurement_confidence": "high",
+        "measured_value": 2,
+        "threshold": 0,
+        "delta": 2,
+        "unit": "misaligned_axes"
+      },
+      "fixability_rule": "badge_alignment",
+      "manual_required_reason": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 92.8,
+      "free_space_pt": 64.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -32.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        1200.0,
+        310.0,
+        240.0,
+        100.0
+      ],
+      "box_width_pt": 240.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 67.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 92.8,
+        "free_space_pt": 64.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -32.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          1200.0,
+          310.0,
+          240.0,
+          100.0
+        ],
+        "box_width_pt": 240.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 67.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 7,
+    "shape_name": "TextBox 6",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        450.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        450.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          450.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          450.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 7,
+    "shape_name": "TextBox 6",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        450.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        450.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          450.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          450.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "text outside safe text area: left+21.0pt, bottom+80.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        450.0,
+        360.0,
+        360.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        450.0,
+        360.0,
+        360.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0,
+        "bottom": 80.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          450.0,
+          360.0,
+          360.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          450.0,
+          360.0,
+          360.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0,
+          "bottom": 80.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "fill color #FFDDDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF']",
+    "detail": {
+      "color_hex": "#FFDDDD",
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#FFDDDD"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#EDD2E2",
+        "color_token": null,
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "fill color #FFDDDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF']",
+    "detail": {
+      "color_hex": "#FFDDDD",
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#FFDDDD"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#EDD2E2",
+        "color_token": null,
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 352.8,
+      "free_space_pt": 324.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -162.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        60.0,
+        450.0,
+        360.0,
+        360.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 327.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 352.8,
+        "free_space_pt": 324.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -162.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          60.0,
+          450.0,
+          360.0,
+          360.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 327.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 9,
+    "shape_name": "TextBox 8",
+    "message": "text outside safe text area: right+81.0pt",
+    "detail": {
+      "bbox_pt": [
+        760.0,
+        270.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        760.0,
+        270.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "right": 81.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          760.0,
+          270.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          760.0,
+          270.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "right": 81.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "font_size_scale",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 9,
+    "shape_name": "TextBox 8",
+    "message": "font size 16.0pt normalized from 16.0pt not within 1pt of scale [20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80] (1 run(s))",
+    "detail": {
+      "size_pt": 16.0,
+      "nearest_allowed_size_pt": 20,
+      "actual_size_pt": 16.0,
+      "normalization_scale": 1.0,
+      "tolerance_pt": 1.0,
+      "runs": 1,
+      "cells": [],
+      "check_id": "font_size_scale",
+      "evidence": {
+        "size_pt": 16.0,
+        "nearest_allowed_size_pt": 20,
+        "actual_size_pt": 16.0,
+        "normalization_scale": 1.0,
+        "tolerance_pt": 1.0,
+        "runs": 1,
+        "cells": []
+      },
+      "fixability": "auto_fix_candidate",
+      "fixability_rule": "font_size",
+      "fixability_reason": "nearest allowed font size can be applied when pptx_fix fit checks pass",
+      "candidate_values": {
+        "size_pt": 20,
+        "allowed_size_scale_pt": [
+          20,
+          22,
+          24,
+          28,
+          32,
+          36,
+          40,
+          48,
+          56,
+          64,
+          80
+        ]
+      },
+      "manual_required_reason": null,
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_color_allowlist",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 9,
+    "shape_name": "TextBox 8",
+    "message": "text color #555555 not in allowlist ['#000000', '#0072B2', '#1E112D', '#333333', '#474747', '#5C5C5C', '#666666', '#707070', '#858585', '#999999', '#A51E6D', '#E6033D', '#FEFEFE', '#FFFFFF'] (1 run(s))",
+    "detail": {
+      "color_hex": "#555555",
+      "runs": 1,
+      "check_id": "text_color_allowlist",
+      "evidence": {
+        "color_hex": "#555555",
+        "runs": 1
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_color",
+      "fixability_reason": "color substitution requires semantic and brand review",
+      "candidate_values": {
+        "color_hex": "#5C5C5C",
+        "color_token": "brand.black.b700",
+        "allowed_colors_hex": [
+          "#000000",
+          "#0072B2",
+          "#1E112D",
+          "#333333",
+          "#474747",
+          "#5C5C5C",
+          "#666666",
+          "#707070",
+          "#858585",
+          "#999999",
+          "#A51E6D",
+          "#E6033D",
+          "#FEFEFE",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "color substitution requires semantic and brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 10,
+    "shape_name": "TextBox 9",
+    "message": "text outside safe text area: left+81.0pt",
+    "detail": {
+      "bbox_pt": [
+        0.0,
+        310.0,
+        360.0,
+        100.0
+      ],
+      "actual_bbox_pt": [
+        0.0,
+        310.0,
+        360.0,
+        100.0
+      ],
+      "overflow_sides_pt": {
+        "left": 81.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          0.0,
+          310.0,
+          360.0,
+          100.0
+        ],
+        "actual_bbox_pt": [
+          0.0,
+          310.0,
+          360.0,
+          100.0
+        ],
+        "overflow_sides_pt": {
+          "left": 81.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 10,
+    "shape_name": "TextBox 9",
+    "message": "fill color #FFDDDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF']",
+    "detail": {
+      "color_hex": "#FFDDDD",
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#FFDDDD"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#EDD2E2",
+        "color_token": null,
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 1,
+    "slide_id": 256,
+    "shape_id": 10,
+    "shape_name": "TextBox 9",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 92.8,
+      "free_space_pt": 64.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -32.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        0.0,
+        310.0,
+        360.0,
+        100.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 67.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 92.8,
+        "free_space_pt": 64.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -32.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          0.0,
+          310.0,
+          360.0,
+          100.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 67.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        120.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        120.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          120.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          120.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 112.8,
+      "free_space_pt": 84.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -42.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        120.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 87.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 112.8,
+        "free_space_pt": 84.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -42.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          120.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 87.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 5,
+    "shape_name": "TextBox 4",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        290.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        290.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          290.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          290.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        330.0,
+        360.0,
+        151.2
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        330.0,
+        360.0,
+        151.2
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          330.0,
+          360.0,
+          151.2
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          330.0,
+          360.0,
+          151.2
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "geometry_rounding",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "geometry is not rounded to integer pt: h=151.2pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        330.0,
+        360.0,
+        151.2
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        330.0,
+        360.0,
+        151.2
+      ],
+      "drifted": {
+        "h": 151.2
+      },
+      "check_id": "geometry_rounding",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          330.0,
+          360.0,
+          151.2
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          330.0,
+          360.0,
+          151.2
+        ],
+        "drifted": {
+          "h": 151.2
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "geometry",
+      "fixability_reason": "requires manual review",
+      "candidate_values": {
+        "rounded_values_pt": {
+          "h": 151
+        },
+        "rounded_bbox_pt": [
+          60,
+          330,
+          360,
+          151
+        ]
+      },
+      "manual_required_reason": "requires manual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 144.0,
+      "free_space_pt": 115.2,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -57.6,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        60.0,
+        330.0,
+        360.0,
+        151.2
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 118.8
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 144.0,
+        "free_space_pt": 115.2,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -57.6,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          60.0,
+          330.0,
+          360.0,
+          151.2
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 118.8
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 7,
+    "shape_name": "TextBox 6",
+    "message": "text outside safe text area: right+81.0pt",
+    "detail": {
+      "bbox_pt": [
+        760.0,
+        90.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        760.0,
+        90.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "right": 81.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          760.0,
+          90.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          760.0,
+          90.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "right": 81.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "background_color_palette",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "fill color #DDEEDD not in palette ['#0072B2', '#009E73', '#039578', '#1CA086', '#1E112D', '#32BED2', '#333333', '#35AA93', '#474747', '#4FB5A1', '#56B4E9', '#5C5C5C', '#673BA0', '#68BFAE', '#707070', '#81CABC', '#858585', '#8C52FF', '#999999', '#9AD5C9', '#A51E6D', '#ADADAD', '#AE357C', '#B3DFD7', '#B74B8A', '#C06299', '#C2C2C2', '#C978A7', '#CC79A7', '#CDEAE4', '#D28FB6', '#D55E00', '#D6D6D6', '#DBA5C5', '#DDDDDD', '#E4BCD3', '#E6033D', '#E69F00', '#E6F4F2', '#EBEBEB', '#EDD2E2', '#EEEEEE', '#F6E9F0', '#F7F7F7', '#FF5757', '#FFBC2A', '#FFE177', '#FFF9CF', '#FFFFFF']",
+    "detail": {
+      "color_hex": "#DDEEDD",
+      "check_id": "background_color_palette",
+      "evidence": {
+        "color_hex": "#DDEEDD"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "fill_color",
+      "fixability_reason": "fill color substitution requires brand review",
+      "candidate_values": {
+        "color_hex": "#DDDDDD",
+        "color_token": "border.default",
+        "allowed_colors_hex": [
+          "#0072B2",
+          "#009E73",
+          "#039578",
+          "#1CA086",
+          "#1E112D",
+          "#32BED2",
+          "#333333",
+          "#35AA93",
+          "#474747",
+          "#4FB5A1",
+          "#56B4E9",
+          "#5C5C5C",
+          "#673BA0",
+          "#68BFAE",
+          "#707070",
+          "#81CABC",
+          "#858585",
+          "#8C52FF",
+          "#999999",
+          "#9AD5C9",
+          "#A51E6D",
+          "#ADADAD",
+          "#AE357C",
+          "#B3DFD7",
+          "#B74B8A",
+          "#C06299",
+          "#C2C2C2",
+          "#C978A7",
+          "#CC79A7",
+          "#CDEAE4",
+          "#D28FB6",
+          "#D55E00",
+          "#D6D6D6",
+          "#DBA5C5",
+          "#DDDDDD",
+          "#E4BCD3",
+          "#E6033D",
+          "#E69F00",
+          "#E6F4F2",
+          "#EBEBEB",
+          "#EDD2E2",
+          "#EEEEEE",
+          "#F6E9F0",
+          "#F7F7F7",
+          "#FF5757",
+          "#FFBC2A",
+          "#FFE177",
+          "#FFF9CF",
+          "#FFFFFF"
+        ]
+      },
+      "manual_required_reason": "fill color substitution requires brand review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 52.8,
+      "free_space_pt": 24.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -12.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        760.0,
+        130.0,
+        360.0,
+        60.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 27.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 52.8,
+        "free_space_pt": 24.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -12.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          760.0,
+          130.0,
+          360.0,
+          60.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 27.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        80.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        80.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          80.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          80.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 4,
+    "shape_name": "TextBox 3",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 72.8,
+      "free_space_pt": 44.0,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -22.0,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        60.0,
+        130.0,
+        360.0,
+        80.0
+      ],
+      "box_width_pt": 360.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 47.6
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 72.8,
+        "free_space_pt": 44.0,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -22.0,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          60.0,
+          130.0,
+          360.0,
+          80.0
+        ],
+        "box_width_pt": 360.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 47.6
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 5,
+    "shape_name": "TextBox 4",
+    "message": "text outside safe text area: left+21.0pt",
+    "detail": {
+      "bbox_pt": [
+        60.0,
+        260.0,
+        680.0,
+        36.0
+      ],
+      "actual_bbox_pt": [
+        60.0,
+        260.0,
+        680.0,
+        36.0
+      ],
+      "overflow_sides_pt": {
+        "left": 21.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          60.0,
+          260.0,
+          680.0,
+          36.0
+        ],
+        "actual_bbox_pt": [
+          60.0,
+          260.0,
+          680.0,
+          36.0
+        ],
+        "overflow_sides_pt": {
+          "left": 21.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "safe_text_area_text",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text outside safe text area: right+81.0pt",
+    "detail": {
+      "bbox_pt": [
+        900.0,
+        300.0,
+        540.0,
+        129.6
+      ],
+      "actual_bbox_pt": [
+        900.0,
+        300.0,
+        540.0,
+        129.6
+      ],
+      "overflow_sides_pt": {
+        "right": 81.0
+      },
+      "safe_text_area_pt": [
+        81,
+        40,
+        1278,
+        690
+      ],
+      "check_id": "safe_text_area_text",
+      "evidence": {
+        "bbox_pt": [
+          900.0,
+          300.0,
+          540.0,
+          129.6
+        ],
+        "actual_bbox_pt": [
+          900.0,
+          300.0,
+          540.0,
+          129.6
+        ],
+        "overflow_sides_pt": {
+          "right": 81.0
+        },
+        "safe_text_area_pt": [
+          81,
+          40,
+          1278,
+          690
+        ]
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "bbox_fit",
+      "fixability_reason": "requires layout hierarchy decision",
+      "candidate_values": null,
+      "manual_required_reason": "requires layout hierarchy decision",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "geometry_rounding",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "geometry is not rounded to integer pt: h=129.6pt",
+    "detail": {
+      "bbox_pt": [
+        900.0,
+        300.0,
+        540.0,
+        129.6
+      ],
+      "actual_bbox_pt": [
+        900.0,
+        300.0,
+        540.0,
+        129.6
+      ],
+      "drifted": {
+        "h": 129.6
+      },
+      "check_id": "geometry_rounding",
+      "evidence": {
+        "bbox_pt": [
+          900.0,
+          300.0,
+          540.0,
+          129.6
+        ],
+        "actual_bbox_pt": [
+          900.0,
+          300.0,
+          540.0,
+          129.6
+        ],
+        "drifted": {
+          "h": 129.6
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "geometry",
+      "fixability_reason": "requires manual review",
+      "candidate_values": {
+        "rounded_values_pt": {
+          "h": 130
+        },
+        "rounded_bbox_pt": [
+          900,
+          300,
+          540,
+          130
+        ]
+      },
+      "manual_required_reason": "requires manual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 6,
+    "shape_name": "TextBox 5",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 24.0,
+      "line_height_pt": 28.8,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 28.8,
+      "inner_height_pt": 122.4,
+      "free_space_pt": 93.6,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -46.8,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        900.0,
+        300.0,
+        540.0,
+        129.6
+      ],
+      "box_width_pt": 540.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 97.2
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 24.0,
+        "line_height_pt": 28.8,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 28.8,
+        "inner_height_pt": 122.4,
+        "free_space_pt": 93.6,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -46.8,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          900.0,
+          300.0,
+          540.0,
+          129.6
+        ],
+        "box_width_pt": 540.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 97.2
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_canvas_overflow",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "longest text unit 374.0pt exceeds canvas-remaining 332.8pt from text_start_x=1107.2pt (word_wrap=True; overflow +41.2pt)",
+    "detail": {
+      "bbox_pt": [
+        1100.0,
+        490.0,
+        200.0,
+        122.4
+      ],
+      "actual_bbox_pt": [
+        1100.0,
+        490.0,
+        200.0,
+        122.4
+      ],
+      "canvas_pt": [
+        1440,
+        810
+      ],
+      "text_render": {
+        "font_size_pt": 20.0,
+        "effective_font_source": "run_explicit",
+        "autofit": "NONE (0)",
+        "text_start_x_pt": 1107.2,
+        "canvas_remaining_pt": 332.8,
+        "longest_unit_pt": 374.0,
+        "word_wrap": true,
+        "margins_pt": {
+          "left": 7.2,
+          "right": 7.2
+        }
+      },
+      "overflow_by_pt": 41.2,
+      "text_excerpt": "Supercalifragilisticexpialidocious",
+      "check_id": "text_canvas_overflow",
+      "evidence": {
+        "bbox_pt": [
+          1100.0,
+          490.0,
+          200.0,
+          122.4
+        ],
+        "actual_bbox_pt": [
+          1100.0,
+          490.0,
+          200.0,
+          122.4
+        ],
+        "canvas_pt": [
+          1440,
+          810
+        ],
+        "text_render": {
+          "font_size_pt": 20.0,
+          "effective_font_source": "run_explicit",
+          "autofit": "NONE (0)",
+          "text_start_x_pt": 1107.2,
+          "canvas_remaining_pt": 332.8,
+          "longest_unit_pt": 374.0,
+          "word_wrap": true,
+          "margins_pt": {
+            "left": 7.2,
+            "right": 7.2
+          }
+        },
+        "overflow_by_pt": 41.2,
+        "text_excerpt": "Supercalifragilisticexpialidocious"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_canvas_reflow",
+      "fixability_reason": "text content cannot be wrapped to fit within canvas right edge; resolve by enabling word_wrap / shrinking box.width to canvas / shrinking font_size (multi_step)",
+      "candidate_values": null,
+      "manual_required_reason": "text content cannot be wrapped to fit within canvas right edge; resolve by enabling word_wrap / shrinking box.width to canvas / shrinking font_size (multi_step)",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "geometry_rounding",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "geometry is not rounded to integer pt: h=122.4pt",
+    "detail": {
+      "bbox_pt": [
+        1100.0,
+        490.0,
+        200.0,
+        122.4
+      ],
+      "actual_bbox_pt": [
+        1100.0,
+        490.0,
+        200.0,
+        122.4
+      ],
+      "drifted": {
+        "h": 122.4
+      },
+      "check_id": "geometry_rounding",
+      "evidence": {
+        "bbox_pt": [
+          1100.0,
+          490.0,
+          200.0,
+          122.4
+        ],
+        "actual_bbox_pt": [
+          1100.0,
+          490.0,
+          200.0,
+          122.4
+        ],
+        "drifted": {
+          "h": 122.4
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "geometry",
+      "fixability_reason": "requires manual review",
+      "candidate_values": {
+        "rounded_values_pt": {
+          "h": 122
+        },
+        "rounded_bbox_pt": [
+          1100,
+          490,
+          200,
+          122
+        ]
+      },
+      "manual_required_reason": "requires manual review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "text_vertical_balance",
+    "slide_index": 3,
+    "slide_id": 258,
+    "shape_id": 8,
+    "shape_name": "TextBox 7",
+    "message": "text fits but vertical padding/visual center is imbalanced: dead_space_ratio_non_middle, top_anchor_bottom_dead_space, visual_center_offset",
+    "detail": {
+      "anchor": "NONE",
+      "font_size_pt": 20.0,
+      "line_height_pt": 24.0,
+      "paragraphs": 1,
+      "estimated_text_height_pt": 24.0,
+      "inner_height_pt": 115.2,
+      "free_space_pt": 91.2,
+      "margin_top_pt": 3.6,
+      "margin_bottom_pt": 3.6,
+      "visual_center_offset_pt": -45.6,
+      "triggered_rules": [
+        "dead_space_ratio_non_middle",
+        "top_anchor_bottom_dead_space",
+        "visual_center_offset"
+      ],
+      "bbox_pt": [
+        1100.0,
+        490.0,
+        200.0,
+        122.4
+      ],
+      "box_width_pt": 200.0,
+      "actual_padding_pt": {
+        "top": 3.6,
+        "bottom": 94.8
+      },
+      "thresholds": {
+        "dead_space_ratio_max": 0.4,
+        "top_or_bottom_dead_space_pt_max": 60.0,
+        "middle_anchor_padding_asymmetry_pt_max": 12.0,
+        "visual_center_offset_ratio_max": 0.2,
+        "min_box_height_pt": 30.0
+      },
+      "check_id": "text_vertical_balance",
+      "evidence": {
+        "anchor": "NONE",
+        "font_size_pt": 20.0,
+        "line_height_pt": 24.0,
+        "paragraphs": 1,
+        "estimated_text_height_pt": 24.0,
+        "inner_height_pt": 115.2,
+        "free_space_pt": 91.2,
+        "margin_top_pt": 3.6,
+        "margin_bottom_pt": 3.6,
+        "visual_center_offset_pt": -45.6,
+        "triggered_rules": [
+          "dead_space_ratio_non_middle",
+          "top_anchor_bottom_dead_space",
+          "visual_center_offset"
+        ],
+        "bbox_pt": [
+          1100.0,
+          490.0,
+          200.0,
+          122.4
+        ],
+        "box_width_pt": 200.0,
+        "actual_padding_pt": {
+          "top": 3.6,
+          "bottom": 94.8
+        },
+        "thresholds": {
+          "dead_space_ratio_max": 0.4,
+          "top_or_bottom_dead_space_pt_max": 60.0,
+          "middle_anchor_padding_asymmetry_pt_max": 12.0,
+          "visual_center_offset_ratio_max": 0.2,
+          "min_box_height_pt": 30.0
+        }
+      },
+      "fixability": "manual_required",
+      "fixability_rule": "text_vertical_balance",
+      "fixability_reason": "vertical balance repair requires visual review",
+      "candidate_values": null,
+      "manual_required_reason": "vertical balance repair requires visual review",
+      "measurement_confidence": null
+    }
+  }
+]

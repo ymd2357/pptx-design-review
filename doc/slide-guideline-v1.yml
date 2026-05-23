@@ -1,0 +1,4092 @@
+meta:
+  version: "0.1.0-draft"
+  generated_at_utc: "2026-04-26"
+  based_on:
+    - "doc/slide-guideline-v0.yml"
+    - "doc/design-system-review-v0.md"
+  sources:
+    - pptx: "slide-guideline/【e-learning】guideline.pptx"
+      rules_yaml: "slide-guideline/yaml/【e-learning】guideline.rules.yaml"
+    - pptx: "tmp/canva-export-DAG_P9bfpug-1769251822309.pptx"
+      rules_yaml: "slide-guideline/yaml/canva-export-DAG_P9bfpug-1769251822309.rules.yaml"
+      role: "historical_reference_only"
+  status: "scope_locked"
+  priorities:
+    - "readability_for_learning"
+    - "brand_expression"
+    - "production_speed"
+  notes: >
+    This draft locks delivery to screen-only and disables text auto-fit.
+    PowerPoint is the only in-scope authoring tool. Canva export remains a
+    historical reference source, not an editing or compatibility target.
+    LMS is considered only as a final PPTX/PDF display context; upload,
+    SCORM, quiz integration, and video conversion are out of scope.
+  scope_decision_notes:
+    - >
+      PowerPoint is the source of truth because the review and repair tooling
+      operates on editable PPTX packages and uses PowerPoint-compatible slide
+      geometry, text frames, relationships, and rendering assumptions.
+    - >
+      Canva appears only because one historical export was used while deriving
+      observed token values. That file can explain where a value came from, but
+      it must not create Canva editing, template, export, or compatibility
+      requirements for this guideline.
+    - >
+      LMS is relevant only as the place where the final PPTX/PDF may be viewed.
+      The guideline should therefore protect readability inside a typical
+      embedded document viewer, but it should not cover LMS upload workflows,
+      SCORM packaging, quiz integration, tracking, or video conversion.
+    - >
+      PDF is in scope as a static delivery/export format for checking rendered
+      output. PDF editing and print-specific optimization are outside the
+      current scope.
+    - >
+      Mobile-first viewing is outside the current scope because the slide
+      system is defined for 16:9 screen delivery. Mobile viewing may be used as
+      a secondary smoke check, not as a layout driver.
+
+# -----------------------------------------------------------------------------
+# Scope (locked)
+# -----------------------------------------------------------------------------
+scope:
+  scope_owner: "PPTX design review tooling"
+  decision_date: "2026-04-26"
+  decision_basis:
+    - "Editable source deck is PPTX"
+    - "Automated lint/fix/repair tools operate on PPTX package structure"
+    - "Primary review target is screen-readable e-learning slide delivery"
+  authoring_tools_priority:
+    - "PowerPoint"
+  delivery_formats_priority:
+    - "PPTX"
+    - "PDF"
+  viewing_environments_priority:
+    - "PC fullscreen"
+    - "Projector"
+    - "LMS embedded viewer (PPTX/PDF display only)"
+  screen_only: true
+  final_distribution_contexts:
+    - "LMS-hosted PPTX/PDF"
+  out_of_scope:
+    - "Canva editing"
+    - "Canva template compatibility"
+    - "Canva export validation"
+    - "LMS upload/integration"
+    - "SCORM packaging"
+    - "LMS quiz integration"
+    - "video conversion"
+    - "print optimization"
+    - "mobile-first viewing"
+  non_goals:
+    canva: >
+      Do not test, repair, or optimize Canva-authored templates. Historical
+      Canva-derived values may remain in sources only as provenance.
+    lms: >
+      Do not implement LMS APIs, upload flows, SCORM manifests, completion
+      tracking, quiz mapping, or player-specific behavior.
+    video: >
+      Do not define narration, subtitles, timing tracks, video safe areas, or
+      export pipelines in the current draft.
+    print: >
+      Do not optimize for printed handouts, printer margins, grayscale output,
+      or paper sizes in the current draft.
+
+  exceptions:
+    full_bleed_background:
+      allowed: true
+      constraint: "Text must stay within rules.slide.safe_text_area_pt."
+    full_bleed_photo:
+      allowed: true
+      constraint: "Text must stay within rules.slide.safe_text_area_pt. If text overlays photo, follow rules.imagery.text_on_photo."
+    dense_table:
+      allowed: true
+      constraint: "Only for unavoidable content. Use rules.data_viz.table. Cell text may use caption size_pt."
+    screenshot:
+      allowed: true
+      constraint: "Screenshots may be edge-to-edge. Any labels and captions must stay within rules.slide.safe_text_area_pt."
+    legal_footer:
+      allowed: true
+      constraint: "Only for required notices. Use caption style and keep within rules.slide.safe_text_area_pt."
+
+# -----------------------------------------------------------------------------
+# Distribution artifacts
+# -----------------------------------------------------------------------------
+distribution:
+  purpose: "Define the canonical PowerPoint master, derivative artifacts, asset storage, naming rules, and export settings for screen-delivered PPTX/PDF materials."
+  source_of_truth:
+    authoring_tool: "PowerPoint"
+    canonical_master:
+      role: "editable_slide_master"
+      path: "design-system/master/e-learning-master.pptx"
+      format: "pptx"
+      git_policy: "Track only when explicitly approved; generated PPTX artifacts stay out of git by default."
+    guideline_yaml:
+      path: "doc/slide-guideline-v1.yml"
+      role: "machine_readable_rules"
+    task_ledger:
+      path: "doc/tasks.md"
+      role: "local_task_status"
+
+  asset_storage:
+    root: "design-system/assets"
+    folders:
+      photos: "design-system/assets/photos"
+      screenshots: "design-system/assets/screenshots"
+      icons: "design-system/assets/icons"
+      logos: "design-system/assets/logos"
+      data_sources: "design-system/assets/data-sources"
+      exported_media: "tmp/exports/media"
+    source_tracking:
+      required_for_external_assets: true
+      metadata_file: "design-system/assets/asset-register.yml"
+      fields:
+        - "asset_id"
+        - "file_name"
+        - "owner_or_provider"
+        - "license_or_usage_basis"
+        - "created_or_retrieved_date"
+        - "allowed_use"
+    git_policy:
+      source_assets: "May be tracked when license permits and size is reasonable."
+      generated_exports: "Keep under tmp/ or another ignored location unless explicitly requested."
+
+  derivative_artifacts:
+    pptx_delivery:
+      role: "editable_delivery_copy"
+      path_pattern: "tmp/distribution/{deck_id}/{deck_id}.pptx"
+      generated: true
+      git_policy: "ignored"
+    pdf_delivery:
+      role: "static_delivery_copy"
+      path_pattern: "tmp/distribution/{deck_id}/{deck_id}.pdf"
+      generated: true
+      git_policy: "ignored"
+    review_images:
+      role: "visual_review_output"
+      path_pattern: "tmp/review/{deck_id}/slide-{slide_no:03}.png"
+      generated: true
+      git_policy: "ignored"
+    lint_report:
+      role: "machine_review_output"
+      path_pattern: "tmp/review/{deck_id}/lint.json"
+      generated: true
+      git_policy: "ignored"
+    examples:
+      role: "tool_generated_lint_fixtures"
+      path_pattern: "skills/pptx-design-reviewer/examples/{case}.pptx"
+      generated: true
+      git_policy: "ignored"
+
+  naming:
+    deck_id:
+      case: "lower-kebab-case"
+      allowed_chars: "a-z, 0-9, hyphen"
+      pattern: "^[a-z0-9]+(-[a-z0-9]+)*$"
+      examples:
+        - "risk-management-course"
+        - "compliance-basics"
+    master_file:
+      pattern: "{system_id}-master.pptx"
+      example: "e-learning-master.pptx"
+    delivery_files:
+      pptx: "{deck_id}.pptx"
+      pdf: "{deck_id}.pdf"
+      lint_json: "lint.json"
+      review_image: "slide-{slide_no:03}.png"
+    version_suffix:
+      optional: true
+      pattern: "{deck_id}.v{major}.{minor}.{patch}.{ext}"
+      use_when: "External review requires immutable handoff naming."
+
+  export_settings:
+    location: "distribution.export_settings"
+    pptx:
+      slide_size: "rules.slide.size_pt"
+      format: "pptx"
+      include_hidden_slides: false
+      require_lint_before_export: true
+      require_animation_removed: true
+    pdf:
+      format: "pdf"
+      intent: "screen_viewing"
+      include_speaker_notes: false
+      include_hidden_slides: false
+      preserve_hyperlinks: true
+      require_visual_review_after_export: true
+      print_optimization: false
+    review_images:
+      format: "png"
+      dpi_min: 144
+      background: "opaque"
+      naming: "distribution.naming.delivery_files.review_image"
+      purpose: "Before/after visual inspection and design review."
+
+  release_gate:
+    procedure_doc: "doc/distribution-release-gate.md"
+    required_checks:
+      - id: "guideline_yaml_parse"
+        type: "automated"
+        command: "node -e \"const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('doc/slide-guideline-v1.yml','utf8')); console.log('YAML OK')\""
+        pass_condition: "Command exits 0 and prints YAML OK."
+      - id: "markdown_lint"
+        type: "automated"
+        command: "npx --no-install markdownlint-cli2 doc/tasks.md AGENTS.md TASKS.md"
+        pass_condition: "Command exits 0 with 0 markdownlint errors."
+      - id: "pptx_lint_errors"
+        type: "automated"
+        command_template: "python3 skills/pptx-design-reviewer/scripts/pptx_lint.py \"tmp/distribution/${DECK_ID}/${DECK_ID}.pptx\" --severity error"
+        report_template: "python3 skills/pptx-design-reviewer/scripts/pptx_lint.py \"tmp/distribution/${DECK_ID}/${DECK_ID}.pptx\" --json > \"tmp/review/${DECK_ID}/lint.json\""
+        pass_condition: "Command exits 0 with no error-severity findings."
+      - id: "pdf_visual_review"
+        type: "manual"
+        checklist: "doc/distribution-release-gate.md#4-pdf-visual-review"
+        artifact_template: "tmp/distribution/${DECK_ID}/${DECK_ID}.pdf"
+        pass_condition: "PDF visual review confirms readable static rendering and records any notes under tmp/review/${DECK_ID}/."
+    generated_artifact_policy: "Do not commit generated PPTX, PDF, review images, or lint reports unless the user explicitly asks."
+    ignored_locations:
+      - "tmp/distribution/"
+      - "tmp/review/"
+      - "tmp/exports/"
+
+# -----------------------------------------------------------------------------
+# Tokens
+# - value: raw values only
+# - semantic: meaning-based aliases that resolve to value tokens
+# - component: reusable component-level defaults that resolve to semantic/value tokens
+# -----------------------------------------------------------------------------
+tokens:
+  naming:
+    value: "tokens.value.<category>.<name>"
+    semantic: "tokens.semantic.<domain>.<role>"
+    component: "tokens.component.<component>.<property>"
+    reference_syntax: "Use a dot-path string such as tokens.value.color.text_primary."
+    name_case: "lower_snake_case"
+    unit_suffix_policy:
+      measured_values: "Use _pt, _px, or _ratio_0_1 on leaf names where the unit is not already implied by the category."
+      colors: "Color leaf values are hex strings under color categories; use _hex only when the category does not make the unit clear."
+
+  unit:
+    layout: "pt"
+    imagery: "px"
+    color: "hex"
+    opacity: "ratio_0_1"
+
+  unit_rules:
+    pt: "Use for PowerPoint slide geometry, spacing, typography, radius, stroke width, and line height."
+    px: "Use only for source bitmap dimensions and raster export requirements."
+    hex: "Use uppercase #RRGGBB strings for colors."
+    ratio_0_1: "Use a decimal number from 0.0 to 1.0 for opacity, scale, and area ratios."
+
+  reference_policy:
+    value_tokens: "Raw values only. Do not reference semantic or component tokens from tokens.value."
+    semantic_tokens: "Must map to tokens.value.* leaf paths. Semantic tokens express usage or meaning, not new raw values."
+    component_tokens: "Must map to tokens.semantic.* when a semantic role exists, or tokens.value.* for low-level enums and component-specific values."
+    direct_values_allowed:
+      - "tokens.value.*"
+      - "tokens.naming"
+      - "tokens.unit"
+      - "tokens.unit_rules"
+      - "tokens.reference_policy"
+      - "rules.*"
+      - "observations.*"
+    references_required:
+      - "tokens.semantic.*"
+      - "tokens.component.* design values"
+    direct_values_exception: "Boolean switches and non-visual enum literals may remain direct in component tokens when no useful value/semantic token exists."
+
+  value:
+    slide:
+      aspect: "16:9"
+      size_pt:
+        w: 1440
+        h: 810
+
+    grid:
+      observed_grid_pt: 0.5
+      baseline_grid_pt: 6
+      gutter_pt: 18
+      columns: 12
+      column_width_pt: 90
+
+    layout:
+      safe_text_area_pt:
+        x: 81
+        y: 40
+        w: 1278
+        h: 690
+      content_width_pt: 1278
+      adjacent_object_gap_pt_min: 8
+
+    safe_margins_pt:
+      left: 81
+      right: 81
+      top: 40
+      bottom: 80
+
+    space_pt:
+      none: 0
+      xs: 6
+      sm: 12
+      md: 18
+      lg: 24
+      xl: 36
+      "2xl": 48
+      "3xl": 72
+      "4xl": 80
+
+    typography:
+      font_family_primary: "Noto Sans JP"
+      font_family_latin: "Avenir Next Arabic"
+      font_family_fallback: "Nunito Sans"
+      align:
+        horizontal_left: "Left"
+        horizontal_center: "Center"
+        vertical_top: "Top"
+        vertical_middle: "Middle"
+      autofit:
+        none: "None"
+      sizes_pt:
+        title: 80
+        large_title: 64
+        section_title: 56
+        cover_title: 48
+        large_heading: 40
+        heading: 36
+        subheading: 32
+        small_heading: 28
+        body: 24
+        small_body: 22
+        caption: 20
+      line_height_pt:
+        title: 90
+        section_title: 66
+        heading: 42
+        subheading: 36
+        body: 30
+        caption: 24
+      paragraph_spacing_pt:
+        after_heading: 12
+        after_body: 6
+      text_box_margins_pt:
+        left: 6
+        right: 6
+        top: 6
+        bottom: 6
+      lists:
+        bullet:
+          indent_pt: 36
+          hanging_pt: 12
+          level2_indent_pt: 54
+          level2_hanging_pt: 12
+
+    color:
+      background_base: "#FFFFFF"
+      neutral:
+        n0: "#FFFFFF"
+        n100: "#F7F7F7"
+        n200: "#EEEEEE"
+        n300: "#DDDDDD"
+        n500: "#999999"
+        n600: "#666666"
+        n700: "#333333"
+        n900: "#111111"
+      text_primary: "#333333"
+      text_alt_dark: "#1E112D"
+      text_inverse: "#FFFFFF"
+      accent_magenta: "#A51E6D"
+      brand:
+        primary:
+          p900: "#A51E6D"
+          p800: "#AE357C"
+          p700: "#B74B8A"
+          p600: "#C06299"
+          p500: "#C978A7"
+          p400: "#D28FB6"
+          p300: "#DBA5C5"
+          p200: "#E4BCD3"
+          p100: "#EDD2E2"
+          p50: "#F6E9F0"
+        black:
+          b900: "#333333"
+          b800: "#474747"
+          b700: "#5C5C5C"
+          b600: "#707070"
+          b500: "#858585"
+          b400: "#999999"
+          b300: "#ADADAD"
+          b200: "#C2C2C2"
+          b100: "#D6D6D6"
+          b50: "#EBEBEB"
+        secondary:
+          s900: "#039578"
+          s800: "#1CA086"
+          s700: "#35AA93"
+          s600: "#4FB5A1"
+          s500: "#68BFAE"
+          s400: "#81CABC"
+          s300: "#9AD5C9"
+          s200: "#B3DFD7"
+          s100: "#CDEAE4"
+          s50: "#E6F4F2"
+        gradient:
+          red: "#FF5757"
+          red_deep: "#E6033D"
+          cyan: "#32BED2"
+          purple: "#8C52FF"
+          purple_deep: "#673BA0"
+        gold:
+          base: "#FFBC2A"
+          light: "#FFE177"
+          pale: "#FFF9CF"
+        utility:
+          black: "#000000"
+          off_white: "#FEFEFE"
+      border_default: "#DDDDDD"
+      overlay_black: "#000000"
+      state:
+        success: "#009E73"
+        warning: "#E69F00"
+        danger: "#D55E00"
+        info: "#0072B2"
+      data_series:
+        series_1: "#A51E6D"
+        series_2: "#1E112D"
+        series_3: "#0072B2"
+        series_4: "#009E73"
+        series_5: "#E69F00"
+        series_6: "#D55E00"
+        series_7: "#56B4E9"
+        series_8: "#CC79A7"
+
+    imagery:
+      min_px:
+        full_bleed_bg:
+          w: 1920
+          h: 1080
+        half_width:
+          w: 960
+          h: 540
+      avoid_upscale_over_ratio: 1.0
+      text_overlay:
+        color: "#000000"
+        opacity_min: 0.40
+        opacity_max: 0.60
+
+    data_viz:
+      chart:
+        axis_line_width_pt: 1
+        tick_width_pt: 1
+        gridline_width_pt: 1
+        marker_size_pt: 8
+        annotation_leader_width_pt: 1
+      table:
+        header_row_height_pt: 42
+        row_height_pt: 36
+        cell_padding_x_pt: 12
+        cell_padding_y_pt: 6
+        gridline_width_pt: 1
+      number_format:
+        max_decimals: 1
+        percent_decimals: 0
+
+    animation:
+      transition:
+        none: "None"
+      duration_ms:
+        none: 0
+        fast: 150
+        standard: 250
+        maximum: 300
+      delay_ms:
+        none: 0
+
+    component_enum:
+      number_style_circle: "circle"
+
+    shapes:
+      radius_pt:
+        none: 0
+        sm: 6
+        md: 12
+        lg: 18
+      stroke_width_pt:
+        sm: 1
+        md: 2
+        lg: 4
+      stroke_dash:
+        solid: "solid"
+      shadow:
+        none:
+          enabled: false
+          color: "#000000"
+          opacity: 0.0
+          distance_pt: 0
+          blur_pt: 0
+          angle_deg: 0
+      divider:
+        width_pt: 1
+        color: "#DDDDDD"
+        margin_y_pt: 24
+
+  semantic:
+    layout:
+      safe_text_area_pt:
+        x: "tokens.value.layout.safe_text_area_pt.x"
+        y: "tokens.value.layout.safe_text_area_pt.y"
+        w: "tokens.value.layout.safe_text_area_pt.w"
+        h: "tokens.value.layout.safe_text_area_pt.h"
+      content_width_pt: "tokens.value.layout.content_width_pt"
+      columns:
+        count: "tokens.value.grid.columns"
+        gutter_pt: "tokens.value.grid.gutter_pt"
+        column_width_pt: "tokens.value.grid.column_width_pt"
+      baseline_grid_pt: "tokens.value.grid.baseline_grid_pt"
+      adjacent_object_gap_pt_min: "tokens.value.layout.adjacent_object_gap_pt_min"
+
+    space_pt:
+      none: "tokens.value.space_pt.none"
+      xs: "tokens.value.space_pt.xs"
+      sm: "tokens.value.space_pt.sm"
+      md: "tokens.value.space_pt.md"
+      lg: "tokens.value.space_pt.lg"
+      xl: "tokens.value.space_pt.xl"
+      "2xl": "tokens.value.space_pt.2xl"
+      "3xl": "tokens.value.space_pt.3xl"
+      "4xl": "tokens.value.space_pt.4xl"
+
+    type:
+      title:
+        size_pt: "tokens.value.typography.sizes_pt.title"
+        line_height_pt: "tokens.value.typography.line_height_pt.title"
+      section_title:
+        size_pt: "tokens.value.typography.sizes_pt.section_title"
+        line_height_pt: "tokens.value.typography.line_height_pt.section_title"
+      heading:
+        size_pt: "tokens.value.typography.sizes_pt.heading"
+        line_height_pt: "tokens.value.typography.line_height_pt.heading"
+      subheading:
+        size_pt: "tokens.value.typography.sizes_pt.subheading"
+        line_height_pt: "tokens.value.typography.line_height_pt.subheading"
+      body:
+        size_pt: "tokens.value.typography.sizes_pt.body"
+        line_height_pt: "tokens.value.typography.line_height_pt.body"
+      caption:
+        size_pt: "tokens.value.typography.sizes_pt.caption"
+        line_height_pt: "tokens.value.typography.line_height_pt.caption"
+
+    color:
+      background:
+        base: "tokens.value.color.background_base"
+        muted: "tokens.value.color.neutral.n100"
+      text:
+        primary: "tokens.value.color.text_primary"
+        alt_dark: "tokens.value.color.text_alt_dark"
+        inverse: "tokens.value.color.text_inverse"
+        muted: "tokens.value.color.neutral.n600"
+      accent:
+        magenta: "tokens.value.color.accent_magenta"
+      brand:
+        primary: "tokens.value.color.brand.primary"
+        black: "tokens.value.color.brand.black"
+        secondary: "tokens.value.color.brand.secondary"
+        gradient: "tokens.value.color.brand.gradient"
+        gold: "tokens.value.color.brand.gold"
+        utility: "tokens.value.color.brand.utility"
+      border:
+        default: "tokens.value.color.border_default"
+      neutral:
+        n0: "tokens.value.color.neutral.n0"
+        n100: "tokens.value.color.neutral.n100"
+        n200: "tokens.value.color.neutral.n200"
+        n300: "tokens.value.color.neutral.n300"
+        n500: "tokens.value.color.neutral.n500"
+        n600: "tokens.value.color.neutral.n600"
+        n700: "tokens.value.color.neutral.n700"
+        n900: "tokens.value.color.neutral.n900"
+      state:
+        success: "tokens.value.color.state.success"
+        warning: "tokens.value.color.state.warning"
+        danger: "tokens.value.color.state.danger"
+        info: "tokens.value.color.state.info"
+      data_series:
+        - "tokens.value.color.data_series.series_1"
+        - "tokens.value.color.data_series.series_2"
+        - "tokens.value.color.data_series.series_3"
+        - "tokens.value.color.data_series.series_4"
+        - "tokens.value.color.data_series.series_5"
+        - "tokens.value.color.data_series.series_6"
+        - "tokens.value.color.data_series.series_7"
+        - "tokens.value.color.data_series.series_8"
+
+    shapes:
+      radius_pt:
+        none: "tokens.value.shapes.radius_pt.none"
+        sm: "tokens.value.shapes.radius_pt.sm"
+        md: "tokens.value.shapes.radius_pt.md"
+        lg: "tokens.value.shapes.radius_pt.lg"
+      stroke_width_pt:
+        sm: "tokens.value.shapes.stroke_width_pt.sm"
+        md: "tokens.value.shapes.stroke_width_pt.md"
+        lg: "tokens.value.shapes.stroke_width_pt.lg"
+      stroke_dash:
+        solid: "tokens.value.shapes.stroke_dash.solid"
+      shadow:
+        none: "tokens.value.shapes.shadow.none"
+      divider:
+        width_pt: "tokens.value.shapes.divider.width_pt"
+        color: "tokens.value.shapes.divider.color"
+        margin_y_pt: "tokens.value.shapes.divider.margin_y_pt"
+
+    data_viz:
+      chart:
+        axis_line_width_pt: "tokens.value.data_viz.chart.axis_line_width_pt"
+        tick_width_pt: "tokens.value.data_viz.chart.tick_width_pt"
+        gridline_width_pt: "tokens.value.data_viz.chart.gridline_width_pt"
+        marker_size_pt: "tokens.value.data_viz.chart.marker_size_pt"
+        annotation_leader_width_pt: "tokens.value.data_viz.chart.annotation_leader_width_pt"
+      table:
+        header_row_height_pt: "tokens.value.data_viz.table.header_row_height_pt"
+        row_height_pt: "tokens.value.data_viz.table.row_height_pt"
+        cell_padding_x_pt: "tokens.value.data_viz.table.cell_padding_x_pt"
+        cell_padding_y_pt: "tokens.value.data_viz.table.cell_padding_y_pt"
+        gridline_width_pt: "tokens.value.data_viz.table.gridline_width_pt"
+      number_format:
+        max_decimals: "tokens.value.data_viz.number_format.max_decimals"
+        percent_decimals: "tokens.value.data_viz.number_format.percent_decimals"
+
+    animation:
+      transition:
+        none: "tokens.value.animation.transition.none"
+      duration_ms:
+        none: "tokens.value.animation.duration_ms.none"
+        fast: "tokens.value.animation.duration_ms.fast"
+        standard: "tokens.value.animation.duration_ms.standard"
+        maximum: "tokens.value.animation.duration_ms.maximum"
+      delay_ms:
+        none: "tokens.value.animation.delay_ms.none"
+
+  component:
+    text_box:
+      margins_pt:
+        left: "tokens.semantic.space_pt.xs"
+        right: "tokens.semantic.space_pt.xs"
+        top: "tokens.semantic.space_pt.xs"
+        bottom: "tokens.semantic.space_pt.xs"
+      align:
+        horizontal: "tokens.value.typography.align.horizontal_left"
+        vertical: "tokens.value.typography.align.vertical_top"
+      autofit: "tokens.value.typography.autofit.none"
+
+    card:
+      padding_pt: "tokens.semantic.space_pt.lg"
+      radius_pt: "tokens.semantic.shapes.radius_pt.md"
+      border_width_pt: "tokens.semantic.shapes.stroke_width_pt.sm"
+      border_dash: "tokens.semantic.shapes.stroke_dash.solid"
+      border_color: "tokens.semantic.color.border.default"
+      background_color: "tokens.semantic.color.background.muted"
+      shadow: "tokens.semantic.shapes.shadow.none"
+
+    callout:
+      padding_pt: "tokens.semantic.space_pt.lg"
+      radius_pt: "tokens.semantic.shapes.radius_pt.md"
+      border_width_pt: "tokens.semantic.shapes.stroke_width_pt.md"
+      border_dash: "tokens.semantic.shapes.stroke_dash.solid"
+      title_type: "tokens.semantic.type.subheading"
+      body_type: "tokens.semantic.type.body"
+      shadow: "tokens.semantic.shapes.shadow.none"
+      variants:
+        info:
+          border_color: "tokens.semantic.color.state.info"
+          background_color: "tokens.semantic.color.background.muted"
+        warning:
+          border_color: "tokens.semantic.color.state.warning"
+          background_color: "tokens.semantic.color.background.muted"
+        danger:
+          border_color: "tokens.semantic.color.state.danger"
+          background_color: "tokens.semantic.color.background.muted"
+        success:
+          border_color: "tokens.semantic.color.state.success"
+          background_color: "tokens.semantic.color.background.muted"
+
+    image_with_caption:
+      radius_pt: "tokens.semantic.shapes.radius_pt.md"
+      caption_type: "tokens.semantic.type.caption"
+      caption_margin_top_pt: "tokens.semantic.space_pt.xs"
+
+    divider:
+      stroke_width_pt: "tokens.semantic.shapes.divider.width_pt"
+      stroke_color: "tokens.semantic.shapes.divider.color"
+      stroke_dash: "tokens.semantic.shapes.stroke_dash.solid"
+      margin_top_pt: "tokens.semantic.shapes.divider.margin_y_pt"
+      margin_bottom_pt: "tokens.semantic.shapes.divider.margin_y_pt"
+      shadow: "tokens.semantic.shapes.shadow.none"
+
+    footer_progress:
+      enabled: true
+      height_pt: "tokens.semantic.space_pt.md"
+      type: "tokens.semantic.type.caption"
+      text_color: "tokens.semantic.color.text.muted"
+
+    step_list:
+      number_style: "tokens.value.component_enum.number_style_circle"
+      number_size_pt: "tokens.semantic.type.body.size_pt"
+      gap_pt: "tokens.semantic.space_pt.sm"
+      title_type: "tokens.semantic.type.subheading"
+      body_type: "tokens.semantic.type.body"
+
+    quiz:
+      question_type: "tokens.semantic.type.heading"
+      choice_type: "tokens.semantic.type.body"
+      explanation_type: "tokens.semantic.type.body"
+      correct_mark_color: "tokens.semantic.color.state.success"
+      wrong_mark_color: "tokens.semantic.color.state.danger"
+
+    table_basic:
+      header_type: "tokens.semantic.type.caption"
+      cell_type: "tokens.semantic.type.caption"
+      header_row_height_pt: "tokens.semantic.data_viz.table.header_row_height_pt"
+      row_height_pt: "tokens.semantic.data_viz.table.row_height_pt"
+      cell_padding_x_pt: "tokens.semantic.data_viz.table.cell_padding_x_pt"
+      cell_padding_y_pt: "tokens.semantic.data_viz.table.cell_padding_y_pt"
+      header_background: "tokens.semantic.color.background.muted"
+      header_text_color: "tokens.semantic.color.text.primary"
+      cell_text_color: "tokens.semantic.color.text.primary"
+      gridline_color: "tokens.semantic.color.border.default"
+      gridline_width_pt: "tokens.semantic.data_viz.table.gridline_width_pt"
+
+    chart_basic:
+      title_type: "tokens.semantic.type.body"
+      axis_label_type: "tokens.semantic.type.caption"
+      tick_label_type: "tokens.semantic.type.caption"
+      legend_type: "tokens.semantic.type.caption"
+      data_label_type: "tokens.semantic.type.caption"
+      annotation_type: "tokens.semantic.type.caption"
+      text_color: "tokens.semantic.color.text.primary"
+      muted_text_color: "tokens.semantic.color.text.muted"
+      series_colors: "tokens.semantic.color.data_series"
+      axis_line_color: "tokens.semantic.color.border.default"
+      axis_line_width_pt: "tokens.semantic.data_viz.chart.axis_line_width_pt"
+      tick_width_pt: "tokens.semantic.data_viz.chart.tick_width_pt"
+      gridline_color: "tokens.semantic.color.border.default"
+      gridline_width_pt: "tokens.semantic.data_viz.chart.gridline_width_pt"
+      marker_size_pt: "tokens.semantic.data_viz.chart.marker_size_pt"
+
+# -----------------------------------------------------------------------------
+# Layout templates (machine-readable skeletons)
+# -----------------------------------------------------------------------------
+layout_templates:
+  unit: "pt"
+  coordinate_system:
+    origin: "top_left"
+    slide_size_pt:
+      w: "tokens.value.slide.size_pt.w"
+      h: "tokens.value.slide.size_pt.h"
+    column_indexing: "1_based"
+    slot_geometry: "Use col_start/col_span for horizontal placement and y_pt/h_pt for vertical placement."
+
+  grid:
+    columns: "tokens.semantic.layout.columns.count"
+    gutter_pt: "tokens.semantic.layout.columns.gutter_pt"
+    column_width_pt: "tokens.semantic.layout.columns.column_width_pt"
+    baseline_grid_pt: "tokens.semantic.layout.baseline_grid_pt"
+    safe_text_area_pt: "tokens.semantic.layout.safe_text_area_pt"
+
+  margin_scale_pt:
+    none: "tokens.semantic.space_pt.none"
+    xs: "tokens.semantic.space_pt.xs"
+    sm: "tokens.semantic.space_pt.sm"
+    md: "tokens.semantic.space_pt.md"
+    lg: "tokens.semantic.space_pt.lg"
+    xl: "tokens.semantic.space_pt.xl"
+    "2xl": "tokens.semantic.space_pt.2xl"
+    "3xl": "tokens.semantic.space_pt.3xl"
+    "4xl": "tokens.semantic.space_pt.4xl"
+
+  slot_defaults:
+    snap_to_baseline: true
+    baseline_grid_pt: "tokens.semantic.layout.baseline_grid_pt"
+    inset_pt: "tokens.semantic.space_pt.xs"
+    text_box_margins_pt: "tokens.component.text_box.margins_pt"
+    safe_text_area_required_for_text: true
+
+  minimum_template_ids:
+    - "title"
+    - "one_message"
+    - "two_column"
+    - "diagram"
+    - "table"
+    - "caution"
+    - "summary"
+    - "quiz"
+
+  upstream_minimum_template_map:
+    source: "doc/design-system-review-v0.md section 3"
+    title:
+      source_label: "タイトル"
+      template_id: "title"
+    one_message:
+      source_label: "1メッセージ"
+      template_id: "one_message"
+    two_column:
+      source_label: "2カラム"
+      template_id: "two_column"
+    diagram:
+      source_label: "図解"
+      template_id: "diagram"
+    table:
+      source_label: "表"
+      template_id: "table"
+    caution:
+      source_label: "注意"
+      template_id: "caution"
+    summary:
+      source_label: "まとめ"
+      template_id: "summary"
+    quiz:
+      source_label: "確認問題"
+      template_id: "quiz"
+
+  templates:
+    title:
+      purpose: "Course, chapter, or major cover slide."
+      slots:
+        title:
+          kind: "text"
+          type: "tokens.semantic.type.title"
+          col_start: 1
+          col_span: 12
+          y_pt: 180
+          h_pt: 180
+          align_horizontal: "Center"
+        subtitle:
+          kind: "text"
+          type: "tokens.semantic.type.subheading"
+          col_start: 2
+          col_span: 10
+          y_pt: 378
+          h_pt: 72
+          align_horizontal: "Center"
+        footer:
+          kind: "text"
+          type: "tokens.semantic.type.caption"
+          col_start: 1
+          col_span: 12
+          y_pt: 690
+          h_pt: 36
+
+    section_divider:
+      purpose: "Section break with a single clear learning topic."
+      slots:
+        section_label:
+          kind: "text"
+          type: "tokens.semantic.type.caption"
+          col_start: 1
+          col_span: 3
+          y_pt: 96
+          h_pt: 30
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.section_title"
+          col_start: 1
+          col_span: 10
+          y_pt: 240
+          h_pt: 132
+        supporting_text:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 1
+          col_span: 8
+          y_pt: 396
+          h_pt: 90
+
+    one_message:
+      purpose: "Default explanation slide with heading and one primary body block."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        body:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 1
+          col_span: 9
+          y_pt: 150
+          h_pt: 450
+        footer_progress:
+          kind: "component"
+          component: "tokens.component.footer_progress"
+          col_start: 1
+          col_span: 12
+          y_pt: 690
+          h_pt: 30
+
+    two_column:
+      purpose: "Compare or explain two parallel topics."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        left_panel:
+          kind: "content"
+          col_start: 1
+          col_span: 6
+          y_pt: 150
+          h_pt: 456
+          padding_pt: "tokens.semantic.space_pt.lg"
+        right_panel:
+          kind: "content"
+          col_start: 7
+          col_span: 6
+          y_pt: 150
+          h_pt: 456
+          padding_pt: "tokens.semantic.space_pt.lg"
+
+    diagram:
+      purpose: "Explain a visual structure, process, screenshot, or photo alongside text."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        media:
+          kind: "image"
+          component: "tokens.component.image_with_caption"
+          col_start: 1
+          col_span: 7
+          y_pt: 150
+          h_pt: 456
+        body:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 8
+          col_span: 5
+          y_pt: 150
+          h_pt: 360
+        caption:
+          kind: "text"
+          type: "tokens.semantic.type.caption"
+          col_start: 1
+          col_span: 7
+          y_pt: 618
+          h_pt: 48
+
+    table:
+      purpose: "Present a compact data table with a clear heading and optional note."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        table:
+          kind: "component"
+          component: "tokens.component.table_basic"
+          col_start: 1
+          col_span: 12
+          y_pt: 150
+          h_pt: 420
+          max_rows: 8
+          max_columns: 6
+        note:
+          kind: "text"
+          type: "tokens.semantic.type.caption"
+          col_start: 1
+          col_span: 12
+          y_pt: 594
+          h_pt: 54
+
+    caution:
+      purpose: "Call out an important warning, exception, or operational note."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        caution:
+          kind: "component"
+          component: "tokens.component.callout"
+          variant: "warning"
+          col_start: 2
+          col_span: 10
+          y_pt: 180
+          h_pt: 300
+        supporting_text:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 2
+          col_span: 10
+          y_pt: 510
+          h_pt: 96
+
+    step_list:
+      purpose: "Show ordered actions, process steps, or key sequence."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        steps:
+          kind: "component"
+          component: "tokens.component.step_list"
+          col_start: 1
+          col_span: 12
+          y_pt: 150
+          h_pt: 480
+          max_items: 5
+          item_gap_pt: "tokens.semantic.space_pt.md"
+
+    quiz:
+      purpose: "Ask one question with multiple choices and optional explanation."
+      slots:
+        question:
+          kind: "text"
+          type: "tokens.component.quiz.question_type"
+          col_start: 1
+          col_span: 12
+          y_pt: 60
+          h_pt: 108
+        choices:
+          kind: "component"
+          component: "tokens.component.quiz"
+          col_start: 2
+          col_span: 10
+          y_pt: 192
+          h_pt: 330
+          max_items: 4
+          item_gap_pt: "tokens.semantic.space_pt.md"
+        explanation:
+          kind: "text"
+          type: "tokens.component.quiz.explanation_type"
+          col_start: 2
+          col_span: 10
+          y_pt: 552
+          h_pt: 108
+
+    summary:
+      purpose: "Close a topic with key takeaways."
+      slots:
+        heading:
+          kind: "text"
+          type: "tokens.semantic.type.heading"
+          col_start: 1
+          col_span: 12
+          y_pt: 54
+          h_pt: 66
+        takeaways:
+          kind: "text"
+          type: "tokens.semantic.type.body"
+          col_start: 1
+          col_span: 8
+          y_pt: 150
+          h_pt: 390
+          max_items: 4
+        next_action:
+          kind: "component"
+          component: "tokens.component.callout"
+          col_start: 9
+          col_span: 4
+          y_pt: 150
+          h_pt: 240
+
+# -----------------------------------------------------------------------------
+# Rules (enforcement targets)
+# -----------------------------------------------------------------------------
+rules:
+  slide:
+    aspect: "16:9"
+    size_pt:
+      w: 1440
+      h: 810
+      role: "base_coordinate_system"
+    size_policy:
+      allow_proportional_16_9: true
+      lint_normalization: >
+        1440x810pt is the base coordinate system, not the only accepted PPTX
+        canvas size. For proportional 16:9 decks, lint scales coordinates,
+        typography sizes, line heights, and image display dimensions to the
+        base coordinate system before applying thresholds.
+
+    safe_margins_pt_min:
+      left: 81
+      right: 81
+      top: 40
+      bottom: 80
+
+    safe_text_area_pt:
+      x: 81
+      y: 40
+      w: 1278
+      h: 690
+
+    layout_grid:
+      columns: 12
+      gutter_pt: 18
+      column_width_pt: 90
+      baseline_grid_pt: 6
+
+    object_spacing:
+      default_adjacent_gap_pt_min: 0
+      element_marker: "ds:element"
+      element_gap_pt_min:
+        default: 0
+        peer_object: "tokens.semantic.layout.adjacent_object_gap_pt_min"
+      semantic_pair_gap_pt_min:
+        title_subtitle: 8.0
+        label_group: 16.0
+      semantic_pair_detection:
+        title_subtitle:
+          axis: "vertical"
+          upper_font_size_pt_min: 28.0
+          lower_font_size_pt_max: 24.0
+          x_align_tolerance_pt: 24.0
+          condition: "Two stacked text shapes with similar left-x where the upper shape has a title-scale font and the lower shape has a smaller subtitle-scale font."
+        label_group:
+          axis: "horizontal"
+          font_size_diff_pt_max: 1.5
+          y_align_tolerance_pt: 8.0
+          condition: "Two text shapes in the same row (vertical centers within tolerance) sharing nearly identical font sizes."
+      applies_when: "Two normalized object bounding boxes are adjacent on one axis and overlap on the opposite axis."
+      rule_application: "Take the maximum of element_gap_pt_min (from ds:element) and semantic_pair_gap_pt_min (from inferred title_subtitle / label_group pair) for the threshold. Missing or unknown elements default to 0 and do not emit object_gap_too_small unless a semantic pair is detected."
+      excludes:
+        - "intentional_grouping"
+        - "intentional_overlap_or_layering"
+        - "container_child_relationship"
+        - "decorative_template_element"
+
+    layout_templates:
+      registry: "layout_templates.templates"
+      minimum_template_ids: "layout_templates.minimum_template_ids"
+      margin_scale_pt: "layout_templates.margin_scale_pt"
+      slot_defaults: "layout_templates.slot_defaults"
+      required_grid:
+        columns: "rules.slide.layout_grid.columns"
+        gutter_pt: "rules.slide.layout_grid.gutter_pt"
+        column_width_pt: "rules.slide.layout_grid.column_width_pt"
+        baseline_grid_pt: "rules.slide.layout_grid.baseline_grid_pt"
+      slot_requirements:
+        horizontal_grid: "Slots must define col_start and col_span on the 12-column grid."
+        vertical_grid: "Text and shape slots should place y_pt and h_pt on the baseline grid."
+        safe_text_area: "Text slots must remain within rules.slide.safe_text_area_pt unless an explicit scope exception applies."
+
+    defaults:
+      text_align: "Left"
+      text_vertical_align: "Top"
+      text_autofit: "None"
+
+    overflow:
+      # Hard rule: elements must not go outside the slide canvas.
+      text_right_margin_pt_min: 0
+      text_left_margin_pt_min: 0
+      text_top_margin_pt_min: 0
+      text_bottom_margin_pt_min: 0
+      shape_right_margin_pt_min: 0
+      shape_left_margin_pt_min: 0
+      shape_top_margin_pt_min: 0
+      shape_bottom_margin_pt_min: 0
+      image_right_margin_pt_min: 0
+      image_left_margin_pt_min: 0
+      image_top_margin_pt_min: 0
+      image_bottom_margin_pt_min: 0
+
+    safe_area_enforcement:
+      text_within_safe_text_area:
+        enabled: true
+        severity: "warning"
+      non_text_within_safe_margins:
+        enabled: true
+        severity: "warning"
+
+    geometry_rounding:
+      geometry_snap_pt: 0.5
+      recommend_integer_pt: true
+      normalize_geometry_to_integer_pt: true
+      normalize_strategy:
+        x_round_to_pt: 1
+        y_round_to_pt: 1
+        w_round_to_pt: 1
+        h_round_to_pt: 1
+      baseline_alignment:
+        enabled: true
+        target_grid_pt: 6
+        severity: "warning"
+        applies_to:
+          - "text_boxes"
+          - "shapes"
+
+  typography:
+    fonts:
+      primary:
+        family: "Noto Sans JP"
+        weights:
+          - "Medium"
+          - "Bold"
+      latin:
+        family: "Avenir Next Arabic"
+      fallback:
+        family: "Nunito Sans"
+
+    size_scale_pt:
+      title: 80
+      large_title: 64
+      section_title: 56
+      cover_title: 48
+      large_heading: 40
+      heading: 36
+      subheading: 32
+      small_heading: 28
+      body: 24
+      small_body: 22
+      caption: 20
+    size_tolerance_pt: 1
+
+    line_height_pt:
+      title: 90
+      section_title: 66
+      heading: 42
+      subheading: 36
+      body: 30
+      caption: 24
+    line_height_tolerance_pt: 2
+
+    minimum_pt:
+      body: 24
+      caption: 20
+
+    text_styles:
+      title:
+        type: "tokens.semantic.type.title"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Bold"
+        line_height: "rules.typography.line_height_pt.title"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: 0
+        max_lines: 2
+      section_title:
+        type: "tokens.semantic.type.section_title"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Bold"
+        line_height: "rules.typography.line_height_pt.section_title"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: 0
+        max_lines: 2
+      heading:
+        type: "tokens.semantic.type.heading"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Bold"
+        line_height: "rules.typography.line_height_pt.heading"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: "rules.typography.paragraph_spacing_pt.after_heading"
+        max_lines: 3
+      subheading:
+        type: "tokens.semantic.type.subheading"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Bold"
+        line_height: "rules.typography.line_height_pt.subheading"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: "rules.typography.paragraph_spacing_pt.after_heading"
+        max_lines: 3
+      body:
+        type: "tokens.semantic.type.body"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Medium"
+        line_height: "rules.typography.line_height_pt.body"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: "rules.typography.paragraph_spacing_pt.after_body"
+        max_lines: 6
+      caption:
+        type: "tokens.semantic.type.caption"
+        family: "tokens.value.typography.font_family_primary"
+        weight: "Medium"
+        line_height: "rules.typography.line_height_pt.caption"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: 0
+        max_lines: 2
+
+    text_box_margins_pt:
+      left: 6
+      right: 6
+      top: 6
+      bottom: 6
+
+    text_autofit:
+      allowed: false
+      allowed_modes: []
+
+    alignment:
+      default_horizontal: "Left"
+      default_vertical: "Top"
+      allowed_horizontal:
+        - "Left"
+        - "Center"
+      allowed_vertical:
+        - "Top"
+        - "Middle"
+
+    paragraph_spacing_pt:
+      after_heading: 12
+      after_body: 6
+
+    paragraph:
+      line_height:
+        unit: "pt"
+        mode: "fixed"
+        source: "tokens.semantic.type.<style>.line_height_pt"
+        tolerance_pt: "rules.typography.line_height_tolerance_pt"
+        allow_auto_line_spacing: false
+      spacing:
+        unit: "pt"
+        before_default_pt: 0
+        after_default_pt: "rules.typography.paragraph_spacing_pt.after_body"
+        after_heading_pt: "rules.typography.paragraph_spacing_pt.after_heading"
+        after_body_pt: "rules.typography.paragraph_spacing_pt.after_body"
+        consecutive_same_style_collapse: false
+      block_limits:
+        body_max_lines: "rules.typography.readability.recommended_max_lines_per_block_body"
+        body_max_chars_per_line: "rules.typography.readability.recommended_max_chars_per_line_body"
+
+    lists:
+      bullet:
+        indent_pt: 36
+        hanging_pt: 12
+        level2_indent_pt: 54
+        level2_hanging_pt: 12
+        marker: "bullet"
+        text_style: "rules.typography.text_styles.body"
+        paragraph_spacing_before_pt: 0
+        paragraph_spacing_after_pt: "rules.typography.paragraph_spacing_pt.after_body"
+        line_height: "rules.typography.line_height_pt.body"
+        level_rules:
+          level_1:
+            indent_pt: 36
+            hanging_pt: 12
+            text_style: "rules.typography.text_styles.body"
+          level_2:
+            indent_pt: 54
+            hanging_pt: 12
+            text_style: "rules.typography.text_styles.caption"
+      max_levels: 2
+      max_items_per_slide: "rules.typography.readability.recommended_max_bullets_per_slide"
+      require_parallel_structure: true
+
+    emphasis:
+      allowed:
+        bold: true
+        accent_color: true
+        underline: false
+        italic: false
+        all_caps: false
+      bold:
+        weight: "Bold"
+        allowed_styles:
+          - "heading"
+          - "subheading"
+          - "body"
+          - "caption"
+      accent_color:
+        color: "tokens.semantic.color.accent.magenta"
+        max_runs_per_text_box: 2
+        max_chars_per_run: 18
+      combined_emphasis:
+        max_methods_per_run: 1
+        allowed_combinations: []
+
+    fallback_tolerance:
+      fallback_family: "tokens.value.typography.font_family_fallback"
+      allowed_when_primary_missing: true
+      size_delta_pt_max: 0
+      line_height_delta_pt_max: 2
+      paragraph_spacing_delta_pt_max: 0
+      text_box_overflow_tolerance_pt: 4
+      width_reflow_tolerance_ratio_max: 0.05
+      require_manual_review_on_overflow: true
+
+    readability:
+      recommended_max_chars_per_line_body: 26
+      recommended_max_lines_per_block_body: 6
+      recommended_max_bullets_per_slide: 6
+
+  color:
+    model:
+      principle: "Allowed color hex values are not interchangeable. Raw palette values, semantic roles, usage policies, pair policies, and repair policies must stay separate."
+      layers:
+        raw_palette: "rules.color.palette and tokens.value.color.* store color values and scale families only."
+        semantic_roles: "tokens.semantic.color.* assigns usage meaning such as text.primary, background.base, accent.magenta, state.info, and data_series."
+        usage_policy: "rules.color.allowlist defines where semantic roles may be used."
+        pair_policy: "rules.color.allowlist.text_on_background defines approved text/background combinations."
+        repair_policy: "rules.color.repair_candidates defines what automated fixes may choose for each repair context."
+      prohibited_flattening:
+        - "Do not mix accent, state, data_series, fill, and body-text roles into one generic text repair candidate list."
+        - "Do not use unrelated neutral/accent/state colors for contrast repair when a same-family palette color can pass contrast."
+        - "Do not choose contrast repair colors only by nearest RGB distance across all allowed colors."
+
+    palette:
+      background:
+        base: "#FFFFFF"
+        muted: "#F7F7F7"
+      neutral:
+        n0: "#FFFFFF"
+        n100: "#F7F7F7"
+        n200: "#EEEEEE"
+        n300: "#DDDDDD"
+        n500: "#999999"
+        n600: "#666666"
+        n700: "#333333"
+        n900: "#111111"
+      text:
+        primary: "#333333"
+        alt_dark: "#1E112D"
+        inverse: "#FFFFFF"
+        muted: "#666666"
+      border:
+        default: "#DDDDDD"
+      accent:
+        magenta: "#A51E6D"
+      brand:
+        usage_policy:
+          primary_and_black_default: true
+          secondary_allowed_when_needed: true
+          source: "/Users/yamadakenichi/Downloads/design_guideline.pptx"
+        primary:
+          p900: "#A51E6D"
+          p800: "#AE357C"
+          p700: "#B74B8A"
+          p600: "#C06299"
+          p500: "#C978A7"
+          p400: "#D28FB6"
+          p300: "#DBA5C5"
+          p200: "#E4BCD3"
+          p100: "#EDD2E2"
+          p50: "#F6E9F0"
+        black:
+          b900: "#333333"
+          b800: "#474747"
+          b700: "#5C5C5C"
+          b600: "#707070"
+          b500: "#858585"
+          b400: "#999999"
+          b300: "#ADADAD"
+          b200: "#C2C2C2"
+          b100: "#D6D6D6"
+          b50: "#EBEBEB"
+        secondary:
+          s900: "#039578"
+          s800: "#1CA086"
+          s700: "#35AA93"
+          s600: "#4FB5A1"
+          s500: "#68BFAE"
+          s400: "#81CABC"
+          s300: "#9AD5C9"
+          s200: "#B3DFD7"
+          s100: "#CDEAE4"
+          s50: "#E6F4F2"
+        gradient:
+          red: "#FF5757"
+          red_deep: "#E6033D"
+          cyan: "#32BED2"
+          purple: "#8C52FF"
+          purple_deep: "#673BA0"
+        gold:
+          base: "#FFBC2A"
+          light: "#FFE177"
+          pale: "#FFF9CF"
+        utility:
+          black: "#000000"
+          off_white: "#FEFEFE"
+      state:
+        success: "#009E73"
+        warning: "#E69F00"
+        danger: "#D55E00"
+        info: "#0072B2"
+      data_series:
+        series_1: "#A51E6D"
+        series_2: "#1E112D"
+        series_3: "#0072B2"
+        series_4: "#009E73"
+        series_5: "#E69F00"
+        series_6: "#D55E00"
+        series_7: "#56B4E9"
+        series_8: "#CC79A7"
+
+    allowlist:
+      mode: "recommended"
+      backgrounds:
+        page:
+          - role: "base"
+            color: "tokens.semantic.color.background.base"
+            hex: "#FFFFFF"
+          - role: "muted"
+            color: "tokens.semantic.color.background.muted"
+            hex: "#F7F7F7"
+        surface:
+          - role: "neutral_0"
+            color: "tokens.semantic.color.neutral.n0"
+            hex: "#FFFFFF"
+          - role: "neutral_100"
+            color: "tokens.semantic.color.neutral.n100"
+            hex: "#F7F7F7"
+          - role: "neutral_200"
+            color: "tokens.semantic.color.neutral.n200"
+            hex: "#EEEEEE"
+      grays:
+        text:
+          - role: "primary"
+            color: "tokens.semantic.color.text.primary"
+            hex: "#333333"
+          - role: "muted"
+            color: "tokens.semantic.color.text.muted"
+            hex: "#666666"
+          - role: "alt_dark"
+            color: "tokens.semantic.color.text.alt_dark"
+            hex: "#1E112D"
+        border:
+          - role: "default"
+            color: "tokens.semantic.color.border.default"
+            hex: "#DDDDDD"
+        fill:
+          - role: "neutral_0"
+            color: "tokens.semantic.color.neutral.n0"
+            hex: "#FFFFFF"
+          - role: "neutral_100"
+            color: "tokens.semantic.color.neutral.n100"
+            hex: "#F7F7F7"
+          - role: "neutral_200"
+            color: "tokens.semantic.color.neutral.n200"
+            hex: "#EEEEEE"
+          - role: "neutral_300"
+            color: "tokens.semantic.color.neutral.n300"
+            hex: "#DDDDDD"
+      accents:
+        primary:
+          role: "magenta"
+          color: "tokens.semantic.color.accent.magenta"
+          hex: "#A51E6D"
+          allowed_uses:
+            - "section_marker"
+            - "callout_border"
+            - "emphasis_text"
+            - "small_fill"
+        primary_tints:
+          role: "magenta_tints"
+          colors: "tokens.semantic.color.brand.primary"
+          allowed_uses:
+            - "table_header"
+            - "zebra_row_background"
+            - "callout_background"
+            - "subtle_section_background"
+        secondary:
+          role: "secondary_green"
+          colors: "tokens.semantic.color.brand.secondary"
+          allowed_uses:
+            - "secondary_marker"
+            - "supporting_diagram"
+            - "secondary_table_highlight"
+        special:
+          gradient_colors: "tokens.semantic.color.brand.gradient"
+          gold_colors: "tokens.semantic.color.brand.gold"
+          utility_colors: "tokens.semantic.color.brand.utility"
+          allowed_uses:
+            - "design_guideline_defined_gradient"
+            - "gold_badge_or_marker"
+            - "design_guideline_annotation_text"
+      state_colors:
+        success:
+          color: "tokens.semantic.color.state.success"
+          hex: "#009E73"
+          allowed_uses:
+            - "status_icon"
+            - "status_border"
+            - "small_marker"
+        warning:
+          color: "tokens.semantic.color.state.warning"
+          hex: "#E69F00"
+          allowed_uses:
+            - "status_icon"
+            - "status_border"
+            - "small_marker"
+        danger:
+          color: "tokens.semantic.color.state.danger"
+          hex: "#D55E00"
+          allowed_uses:
+            - "status_icon"
+            - "status_border"
+            - "small_marker"
+        info:
+          color: "tokens.semantic.color.state.info"
+          hex: "#0072B2"
+          allowed_uses:
+            - "status_icon"
+            - "status_border"
+            - "small_marker"
+            - "link_like_text"
+      text_on_background:
+        - role: "body_on_base"
+          text: "tokens.semantic.color.text.primary"
+          text_hex: "#333333"
+          background: "tokens.semantic.color.background.base"
+          background_hex: "#FFFFFF"
+          contrast_ratio: 12.63
+        - role: "body_on_muted"
+          text: "tokens.semantic.color.text.primary"
+          text_hex: "#333333"
+          background: "tokens.semantic.color.background.muted"
+          background_hex: "#F7F7F7"
+          contrast_ratio: 11.79
+        - role: "body_on_neutral_200"
+          text: "tokens.semantic.color.text.primary"
+          text_hex: "#333333"
+          background: "tokens.semantic.color.neutral.n200"
+          background_hex: "#EEEEEE"
+          contrast_ratio: 10.89
+        - role: "alt_dark_on_base"
+          text: "tokens.semantic.color.text.alt_dark"
+          text_hex: "#1E112D"
+          background: "tokens.semantic.color.background.base"
+          background_hex: "#FFFFFF"
+          contrast_ratio: 17.90
+        - role: "inverse_on_accent"
+          text: "tokens.semantic.color.text.inverse"
+          text_hex: "#FFFFFF"
+          background: "tokens.semantic.color.accent.magenta"
+          background_hex: "#A51E6D"
+          contrast_ratio: 6.99
+        - role: "inverse_on_info"
+          text: "tokens.semantic.color.text.inverse"
+          text_hex: "#FFFFFF"
+          background: "tokens.semantic.color.state.info"
+          background_hex: "#0072B2"
+          contrast_ratio: 5.19
+        - role: "primary_on_warning"
+          text: "tokens.semantic.color.text.primary"
+          text_hex: "#333333"
+          background: "tokens.semantic.color.state.warning"
+          background_hex: "#E69F00"
+          contrast_ratio: 5.61
+      prohibited:
+        text_on_background:
+          - role: "white_on_warning"
+            reason: "Below normal text contrast threshold."
+          - role: "white_on_success"
+            reason: "Below normal text contrast threshold."
+          - role: "white_on_danger"
+            reason: "Below normal text contrast threshold."
+
+    repair_candidates:
+      text:
+        hue_preserving_low_contrast:
+          purpose: "Automated repair for unreadable text. Preserve the original color family first, then choose a same-family color that passes contrast."
+          family_selection:
+            algorithm: "Find the nearest design-system palette color to the source foreground color, then use that color's family as the repair candidate family."
+          families:
+            neutral_black:
+              - token: "text.inverse"
+                hex: "#FFFFFF"
+              - token: "brand.utility.off_white"
+                hex: "#FEFEFE"
+              - token: "brand.black.b400"
+                hex: "#999999"
+              - token: "brand.black.b500"
+                hex: "#858585"
+              - token: "brand.black.b600"
+                hex: "#707070"
+              - token: "text.muted"
+                hex: "#666666"
+              - token: "brand.black.b700"
+                hex: "#5C5C5C"
+              - token: "brand.black.b800"
+                hex: "#474747"
+              - token: "text.primary"
+                hex: "#333333"
+              - token: "text.alt_dark"
+                hex: "#1E112D"
+              - token: "brand.utility.black"
+                hex: "#000000"
+            red:
+              - token: "brand.gradient.red"
+                hex: "#FF5757"
+              - token: "brand.gradient.red_deep"
+                hex: "#E6033D"
+              - token: "state.danger"
+                hex: "#D55E00"
+            magenta:
+              - token: "brand.primary.p500"
+                hex: "#C978A7"
+              - token: "brand.primary.p600"
+                hex: "#C06299"
+              - token: "brand.primary.p700"
+                hex: "#B74B8A"
+              - token: "brand.primary.p800"
+                hex: "#AE357C"
+              - token: "accent.magenta"
+                hex: "#A51E6D"
+            blue:
+              - token: "data_series.series_7"
+                hex: "#56B4E9"
+              - token: "brand.gradient.cyan"
+                hex: "#32BED2"
+              - token: "state.info"
+                hex: "#0072B2"
+            green:
+              - token: "brand.secondary.s500"
+                hex: "#68BFAE"
+              - token: "brand.secondary.s600"
+                hex: "#4FB5A1"
+              - token: "brand.secondary.s700"
+                hex: "#35AA93"
+              - token: "brand.secondary.s800"
+                hex: "#1CA086"
+              - token: "brand.secondary.s900"
+                hex: "#039578"
+              - token: "state.success"
+                hex: "#009E73"
+          selection:
+            algorithm: "Within the selected family, choose the closest color to the source foreground that meets the required contrast ratio."
+            fallback: "If no same-family color passes, fall back to the neutral_black family and choose the closest passing neutral."
+        inverse_text_low_contrast:
+          purpose: "Repair text that is intended to remain inverse text on dark/accent/status backgrounds."
+          candidate_order:
+            - role: "inverse"
+              color: "tokens.semantic.color.text.inverse"
+              token: "text.inverse"
+              hex: "#FFFFFF"
+            - role: "off_white"
+              color: "tokens.semantic.color.brand.utility"
+              token: "brand.utility.off_white"
+              hex: "#FEFEFE"
+          selection:
+            algorithm: "Use only when the background role is dark/accent/status and inverse text is semantically valid."
+        emphasis_text_low_contrast:
+          purpose: "Repair emphasized or link-like text only when the source role is already emphasis, state, or link-like."
+          candidate_order:
+            - role: "accent_magenta"
+              color: "tokens.semantic.color.accent.magenta"
+              token: "accent.magenta"
+              hex: "#A51E6D"
+            - role: "info"
+              color: "tokens.semantic.color.state.info"
+              token: "state.info"
+              hex: "#0072B2"
+          selection:
+            algorithm: "Do not use for ordinary body text. Use only when the source role or component context indicates emphasis/link/status."
+
+    contrast_gate:
+      enabled: true
+      source_of_truth: "rules.accessibility.contrast_ratio_min"
+
+    accent_area_ratio_max: 0.10
+    accent_area:
+      ratio_max_per_slide: "rules.color.accent_area_ratio_max"
+      counted_roles:
+        - "tokens.semantic.color.accent.magenta"
+        - "tokens.semantic.color.state.success"
+        - "tokens.semantic.color.state.warning"
+        - "tokens.semantic.color.state.danger"
+        - "tokens.semantic.color.state.info"
+      excluded_roles:
+        - "tokens.semantic.color.text.primary"
+        - "tokens.semantic.color.text.muted"
+        - "tokens.semantic.color.border.default"
+      review_threshold_ratio: 0.08
+
+    lint_palette:
+      description: "Single source of truth for the lint color constants consumed by pptx_lint.py. The Python-side hardcoded duplicates were removed on 2026-05-20 when DS-COLOR-001 was completed; design_system_loader.load_lint_palette() now reads this section at pptx_lint import time."
+      allowed_text_colors_hex:
+        - "#000000"
+        - "#0072B2"
+        - "#1E112D"
+        - "#333333"
+        - "#474747"
+        - "#5C5C5C"
+        - "#666666"
+        - "#707070"
+        - "#858585"
+        - "#999999"
+        - "#A51E6D"
+        - "#E6033D"
+        - "#FEFEFE"
+        - "#FFFFFF"
+      allowed_fill_colors_hex:
+        - "#0072B2"
+        - "#009E73"
+        - "#039578"
+        - "#1CA086"
+        - "#1E112D"
+        - "#32BED2"
+        - "#333333"
+        - "#35AA93"
+        - "#474747"
+        - "#4FB5A1"
+        - "#56B4E9"
+        - "#5C5C5C"
+        - "#673BA0"
+        - "#68BFAE"
+        - "#707070"
+        - "#81CABC"
+        - "#858585"
+        - "#8C52FF"
+        - "#999999"
+        - "#9AD5C9"
+        - "#A51E6D"
+        - "#ADADAD"
+        - "#AE357C"
+        - "#B3DFD7"
+        - "#B74B8A"
+        - "#C06299"
+        - "#C2C2C2"
+        - "#C978A7"
+        - "#CC79A7"
+        - "#CDEAE4"
+        - "#D28FB6"
+        - "#D55E00"
+        - "#D6D6D6"
+        - "#DBA5C5"
+        - "#DDDDDD"
+        - "#E4BCD3"
+        - "#E6033D"
+        - "#E69F00"
+        - "#E6F4F2"
+        - "#EBEBEB"
+        - "#EDD2E2"
+        - "#EEEEEE"
+        - "#F6E9F0"
+        - "#F7F7F7"
+        - "#FF5757"
+        - "#FFBC2A"
+        - "#FFE177"
+        - "#FFF9CF"
+        - "#FFFFFF"
+      text_color_token_by_hex:
+        "#000000": "brand.utility.black"
+        "#333333": "text.primary"
+        "#474747": "brand.black.b800"
+        "#5C5C5C": "brand.black.b700"
+        "#666666": "text.muted"
+        "#707070": "brand.black.b600"
+        "#858585": "brand.black.b500"
+        "#999999": "brand.black.b400"
+        "#1E112D": "text.alt_dark"
+        "#FEFEFE": "brand.utility.off_white"
+        "#FFFFFF": "text.inverse"
+        "#E6033D": "brand.gradient.red_deep"
+        "#A51E6D": "accent.magenta"
+        "#0072B2": "state.info"
+      fill_color_token_by_hex:
+        "#FFFFFF": "background.base"
+        "#F7F7F7": "background.muted"
+        "#EEEEEE": "neutral.n200"
+        "#EBEBEB": "brand.black.b50"
+        "#DDDDDD": "border.default"
+        "#333333": "brand.black.b900"
+        "#F6E9F0": "brand.primary.p50"
+        "#A51E6D": "accent.magenta"
+        "#E6F4F2": "brand.secondary.s50"
+        "#039578": "brand.secondary.s900"
+        "#FFBC2A": "brand.gold.base"
+        "#1E112D": "data.dark"
+        "#0072B2": "state.info"
+        "#009E73": "state.success"
+        "#E69F00": "state.warning"
+        "#D55E00": "state.danger"
+      contrast_repair_color_families:
+        neutral_black:
+          - "#FFFFFF"
+          - "#FEFEFE"
+          - "#999999"
+          - "#858585"
+          - "#707070"
+          - "#666666"
+          - "#5C5C5C"
+          - "#474747"
+          - "#333333"
+          - "#1E112D"
+          - "#000000"
+        red:
+          - "#FF5757"
+          - "#E6033D"
+          - "#D55E00"
+        magenta:
+          - "#C978A7"
+          - "#C06299"
+          - "#B74B8A"
+          - "#AE357C"
+          - "#A51E6D"
+        blue:
+          - "#56B4E9"
+          - "#32BED2"
+          - "#0072B2"
+        green:
+          - "#68BFAE"
+          - "#4FB5A1"
+          - "#35AA93"
+          - "#1CA086"
+          - "#039578"
+          - "#009E73"
+      fill_repair_color_families:
+        neutral_black:
+          - "#FFFFFF"
+          - "#F7F7F7"
+          - "#EEEEEE"
+          - "#EBEBEB"
+          - "#DDDDDD"
+          - "#D6D6D6"
+          - "#C2C2C2"
+          - "#ADADAD"
+          - "#999999"
+          - "#858585"
+          - "#707070"
+          - "#5C5C5C"
+          - "#474747"
+          - "#333333"
+          - "#1E112D"
+        red:
+          - "#FF5757"
+          - "#E6033D"
+          - "#D55E00"
+        magenta:
+          - "#F6E9F0"
+          - "#EDD2E2"
+          - "#E4BCD3"
+          - "#DBA5C5"
+          - "#D28FB6"
+          - "#C978A7"
+          - "#C06299"
+          - "#B74B8A"
+          - "#AE357C"
+          - "#A51E6D"
+        blue:
+          - "#56B4E9"
+          - "#32BED2"
+          - "#0072B2"
+        green:
+          - "#E6F4F2"
+          - "#CDEAE4"
+          - "#B3DFD7"
+          - "#9AD5C9"
+          - "#81CABC"
+          - "#68BFAE"
+          - "#4FB5A1"
+          - "#35AA93"
+          - "#1CA086"
+          - "#039578"
+          - "#009E73"
+        gold:
+          - "#FFF9CF"
+          - "#FFE177"
+          - "#FFBC2A"
+          - "#E69F00"
+
+  imagery:
+    min_px:
+      full_bleed_bg:
+        w: 1920
+        h: 1080
+      half_width:
+        w: 960
+        h: 540
+
+    photo_tone:
+      allowed_subjects:
+        - "workplace"
+        - "people"
+        - "product_ui"
+        - "process"
+        - "abstract_texture"
+      treatment:
+        color_mode: "full_color"
+        saturation: "natural"
+        contrast: "medium"
+        brightness: "medium_to_high"
+        crop_style: "editorial_clear_subject"
+      prohibited:
+        - "heavy_filter"
+        - "low_resolution_stock_artifact"
+        - "busy_background_under_text"
+        - "decorative_blur_only"
+        - "unrelated_atmospheric_photo"
+      review_required_when:
+        - "faces_are_identifiable"
+        - "licensed_or_third_party_asset"
+        - "medical_or_sensitive_context"
+
+    scaling:
+      avoid_upscale_over_ratio: 1.0
+      crop_allowed: true
+      preserve_aspect_ratio: true
+      min_visible_subject_ratio: 0.70
+
+    text_on_photo:
+      allowed: true
+      allowed_text_styles:
+        - "rules.typography.text_styles.title"
+        - "rules.typography.text_styles.heading"
+        - "rules.typography.text_styles.body"
+      placement:
+        safe_text_area_required: true
+        avoid_subject_overlap: true
+        min_edge_margin_pt: "tokens.semantic.space_pt.md"
+      overlay:
+        color: "tokens.value.color.overlay_black"
+        color_hex: "#000000"
+        opacity_range: [0.40, 0.60]
+        default_opacity: 0.50
+      contrast:
+        source_of_truth: "rules.accessibility.contrast_ratio_min"
+        require_measured_after_overlay: true
+      prohibited:
+        - "text_directly_on_busy_photo_without_overlay"
+        - "text_crossing_face_or_primary_subject"
+
+    corners:
+      allowed_radius_pt:
+        - "tokens.semantic.shapes.radius_pt.none"
+        - "tokens.semantic.shapes.radius_pt.sm"
+        - "tokens.semantic.shapes.radius_pt.md"
+      default_radius_pt: "tokens.component.image_with_caption.radius_pt"
+      full_bleed_radius_pt: "tokens.semantic.shapes.radius_pt.none"
+      screenshot_radius_pt: "tokens.semantic.shapes.radius_pt.sm"
+
+    caption:
+      required_when:
+        - "image_contains_data"
+        - "image_needs_source"
+        - "screenshot_context_is_not_self_evident"
+        - "photo_meaning_is_not_obvious"
+      optional_when:
+        - "purely_decorative"
+        - "same_slide_heading_explains_image"
+      type: "caption"
+      text_style: "rules.typography.text_styles.caption"
+      size_pt: 20
+      line_height_pt: 24
+      margin_top_pt: 6
+      color: "tokens.semantic.color.text.muted"
+      max_lines: 2
+      placement: "below_image"
+
+    source:
+      required_for:
+        - "third_party_photo"
+        - "stock_photo"
+        - "screenshot"
+        - "chart_export"
+        - "external_logo"
+      decorative_internal_assets_may_omit: true
+      placement:
+        default: "caption_suffix"
+        alternatives:
+          - "speaker_notes"
+          - "appendix_sources_slide"
+      fields:
+        - "asset_id_or_file_name"
+        - "owner_or_provider"
+        - "license_or_usage_basis"
+        - "retrieved_or_created_date"
+      missing_source_policy: "replace_or_remove_before_final"
+
+    formats:
+      preferred:
+        photo: "jpg"
+        screenshot: "png"
+        icon: "svg_or_png"
+        transparent_cutout: "png"
+      accepted:
+        - "jpg"
+        - "jpeg"
+        - "png"
+        - "svg"
+      discouraged:
+        - "gif"
+        - "webp"
+        - "bmp"
+        - "tiff"
+      export:
+        raster_dpi_min: 144
+        preserve_transparency_for_png: true
+        embed_original_source_when_editable: false
+
+  shapes:
+    corner_radius:
+      allowed_pt:
+        - "tokens.semantic.shapes.radius_pt.none"
+        - "tokens.semantic.shapes.radius_pt.sm"
+        - "tokens.semantic.shapes.radius_pt.md"
+        - "tokens.semantic.shapes.radius_pt.lg"
+      default_pt: "tokens.semantic.shapes.radius_pt.md"
+      full_bleed_shape_pt: "tokens.semantic.shapes.radius_pt.none"
+      note: "Use lg only for large panels; use none for background geometry."
+    stroke:
+      allowed_width_pt:
+        - "tokens.semantic.shapes.stroke_width_pt.sm"
+        - "tokens.semantic.shapes.stroke_width_pt.md"
+        - "tokens.semantic.shapes.stroke_width_pt.lg"
+      default_width_pt: "tokens.semantic.shapes.stroke_width_pt.sm"
+      allowed_dash:
+        - "tokens.semantic.shapes.stroke_dash.solid"
+      default_dash: "tokens.semantic.shapes.stroke_dash.solid"
+      allowed_colors:
+        - "tokens.semantic.color.border.default"
+        - "tokens.semantic.color.accent.magenta"
+        - "tokens.semantic.color.state.info"
+        - "tokens.semantic.color.state.success"
+        - "tokens.semantic.color.state.warning"
+        - "tokens.semantic.color.state.danger"
+      default_color: "tokens.semantic.color.border.default"
+      prohibit_decorative_heavy_outlines: true
+    fill:
+      default_color: "tokens.semantic.color.background.muted"
+      allowed_colors:
+        - "tokens.semantic.color.background.base"
+        - "tokens.semantic.color.background.muted"
+        - "tokens.semantic.color.neutral.n200"
+        - "tokens.semantic.color.accent.magenta"
+        - "tokens.semantic.color.brand.primary"
+        - "tokens.semantic.color.brand.black"
+        - "tokens.semantic.color.brand.secondary"
+        - "tokens.semantic.color.brand.gradient"
+        - "tokens.semantic.color.brand.gold"
+      accent_fill_area_source: "rules.color.accent_area"
+    shadow:
+      allowed: false
+      allowed_tokens:
+        - "tokens.semantic.shapes.shadow.none"
+      reason: "Disable shadows to keep PPTX rendering stable across PowerPoint and PDF export."
+      replacement: "Use border, background tint, or spacing to separate layers."
+    divider:
+      component: "tokens.component.divider"
+      allowed_width_pt:
+        - "tokens.semantic.shapes.divider.width_pt"
+      allowed_color:
+        - "tokens.semantic.shapes.divider.color"
+      allowed_dash:
+        - "tokens.semantic.shapes.stroke_dash.solid"
+      min_margin_top_pt: "tokens.semantic.shapes.divider.margin_y_pt"
+      min_margin_bottom_pt: "tokens.semantic.shapes.divider.margin_y_pt"
+      placement: "Horizontal only; align to the 12-column content grid."
+
+  data_viz:
+    purpose: "Keep charts and tables readable in screen-delivered e-learning slides."
+    chart:
+      component: "tokens.component.chart_basic"
+      allowed_types:
+        - "bar"
+        - "column"
+        - "line"
+        - "scatter"
+        - "area"
+      discouraged_types:
+        pie: "Use only for 2-3 categories that total 100%; prefer bar charts for comparison."
+        doughnut: "Avoid unless the total and category count are immediately obvious."
+        "3d": "Prohibited because perspective distorts values and renders inconsistently."
+      layout:
+        safe_text_area_required: true
+        min_height_pt: 240
+        min_width_pt: 420
+        max_charts_per_slide: 2
+        require_title_or_slide_heading: true
+        source_note_style: "rules.typography.text_styles.caption"
+      color:
+        series_palette: "tokens.semantic.color.data_series"
+        max_series_without_review: 6
+        max_series_absolute: 8
+        use_palette_order: true
+        single_series_color: "tokens.semantic.color.accent.magenta"
+        comparison_baseline_color: "tokens.semantic.color.neutral.n500"
+        prohibited:
+          - "random_unmapped_series_colors"
+          - "gradient_fills"
+          - "pattern_fills_without_text_or_marker_label"
+        meaning_not_color_only: "rules.accessibility.dont_use_color_only"
+      axes:
+        x_axis:
+          visible: true
+          label_type: "rules.typography.text_styles.caption"
+          title_type: "rules.typography.text_styles.caption"
+          label_color: "tokens.semantic.color.text.primary"
+          title_color: "tokens.semantic.color.text.primary"
+          line_width_pt: "tokens.semantic.data_viz.chart.axis_line_width_pt"
+          line_color: "tokens.semantic.color.border.default"
+          tick_width_pt: "tokens.semantic.data_viz.chart.tick_width_pt"
+          tick_color: "tokens.semantic.color.border.default"
+          label_rotation_allowed: false
+        y_axis:
+          visible: true
+          label_type: "rules.typography.text_styles.caption"
+          title_type: "rules.typography.text_styles.caption"
+          label_color: "tokens.semantic.color.text.primary"
+          title_color: "tokens.semantic.color.text.primary"
+          line_width_pt: "tokens.semantic.data_viz.chart.axis_line_width_pt"
+          line_color: "tokens.semantic.color.border.default"
+          tick_width_pt: "tokens.semantic.data_viz.chart.tick_width_pt"
+          tick_color: "tokens.semantic.color.border.default"
+          start_at_zero_required_for:
+            - "bar"
+            - "column"
+            - "area"
+          truncated_axis_requires_annotation: true
+        scale:
+          max_major_ticks: 6
+          min_major_ticks: 3
+          avoid_dual_axis: true
+      gridlines:
+        major_y:
+          allowed: true
+          default_visible: true
+          width_pt: "tokens.semantic.data_viz.chart.gridline_width_pt"
+          color: "tokens.semantic.color.border.default"
+        major_x:
+          allowed: true
+          default_visible: false
+          width_pt: "tokens.semantic.data_viz.chart.gridline_width_pt"
+          color: "tokens.semantic.color.border.default"
+        minor:
+          allowed: false
+        opacity_note: "Use the neutral border token only; do not darken gridlines beyond text-muted contrast."
+      labels:
+        legend:
+          allowed: true
+          required_when_series_count_gt: 1
+          type: "rules.typography.text_styles.caption"
+          color: "tokens.semantic.color.text.primary"
+          placement:
+            - "top"
+            - "right"
+            - "bottom"
+          avoid_when_direct_labels_fit: true
+        data_labels:
+          allowed: true
+          type: "rules.typography.text_styles.caption"
+          color: "tokens.semantic.color.text.primary"
+          max_labels_without_review: 12
+          position: "outside_end_or_near_point"
+          avoid_overlap_required: true
+        axis_labels:
+          type: "rules.typography.text_styles.caption"
+          min_size_pt: "rules.typography.minimum_pt.caption"
+          max_lines: 2
+      annotations:
+        allowed: true
+        type: "rules.typography.text_styles.caption"
+        color: "tokens.semantic.color.text.primary"
+        leader_line_width_pt: "tokens.semantic.data_viz.chart.annotation_leader_width_pt"
+        leader_line_color: "tokens.semantic.color.border.default"
+        max_per_chart: 3
+        placement: "outside_plot_area_when_possible"
+        required_for:
+          - "truncated_axis"
+          - "forecast_or_estimate"
+          - "method_change"
+          - "outlier_explanation"
+        prohibited:
+          - "decorative_callouts_without_data_meaning"
+          - "annotation_covering_data_mark"
+      number_format:
+        max_decimals: "tokens.semantic.data_viz.number_format.max_decimals"
+        percent_decimals: "tokens.semantic.data_viz.number_format.percent_decimals"
+        thousands_separator: true
+        negative_style: "minus"
+        negative_example: "-1,234"
+        unit_placement: "suffix_with_space"
+        unit_examples:
+          - "1,200 件"
+          - "35%"
+          - "2.4 pt"
+        compact_large_numbers_allowed: true
+        compact_large_numbers:
+          threshold_abs_min: 10000
+          japanese_units_allowed:
+            - "万"
+            - "億"
+          english_units_allowed:
+            - "K"
+            - "M"
+        missing_or_not_applicable: "-"
+    table:
+      component: "tokens.component.table_basic"
+      use_for: "Exact values, sparse comparisons, and datasets where users must read individual cells."
+      avoid_for: "Dense raw exports better suited to appendix or external files."
+      text:
+        header_type: "rules.typography.text_styles.caption"
+        cell_type: "rules.typography.text_styles.caption"
+        header_color: "tokens.semantic.color.text.primary"
+        cell_color: "tokens.semantic.color.text.primary"
+        min_size_pt: "rules.typography.minimum_pt.caption"
+        max_lines_per_cell: 2
+      sizing:
+        header_row_height_pt: "tokens.semantic.data_viz.table.header_row_height_pt"
+        row_height_pt: "tokens.semantic.data_viz.table.row_height_pt"
+        cell_padding_x_pt: "tokens.semantic.data_viz.table.cell_padding_x_pt"
+        cell_padding_y_pt: "tokens.semantic.data_viz.table.cell_padding_y_pt"
+        max_rows_without_review: 8
+        max_columns_without_review: 5
+        fit_within_safe_text_area: true
+      style:
+        header_background: "tokens.semantic.color.background.muted"
+        body_background: "tokens.semantic.color.background.base"
+        zebra_rows_allowed: true
+        zebra_row_background: "tokens.semantic.color.background.muted"
+        gridline_width_pt: "tokens.semantic.data_viz.table.gridline_width_pt"
+        gridline_color: "tokens.semantic.color.border.default"
+        outer_border_required: false
+        vertical_gridlines_allowed: true
+        heavy_gridlines_prohibited: true
+      alignment:
+        text_columns: "left"
+        numeric_columns: "right"
+        header: "left"
+        totals_row: "right_for_numbers_left_for_labels"
+      number_format:
+        source: "rules.data_viz.chart.number_format"
+        align_decimals: true
+        repeat_unit_in_header_when_column_shares_unit: true
+      notes:
+        source_note_required_when_external_data: true
+        footnote_marker_style: "caption"
+
+  animation:
+    purpose: "Keep screen-delivered PPTX/PDF learning materials static, predictable, and readable without timing-dependent interaction."
+    allowed: false
+    final_distribution_policy: "Final PPTX/PDF must render all required slide content immediately on slide open."
+    slide_transitions:
+      allowed: false
+      allowed_types:
+        - "tokens.semantic.animation.transition.none"
+      default_type: "tokens.semantic.animation.transition.none"
+      duration_ms: "tokens.semantic.animation.duration_ms.none"
+      sound_allowed: false
+      auto_advance_allowed: false
+      after_ms: "tokens.semantic.animation.delay_ms.none"
+    object_animations:
+      allowed: false
+      object_animations_allowed: false
+      allowed_effects: []
+      duration_ms: "tokens.semantic.animation.duration_ms.none"
+      delay_ms: "tokens.semantic.animation.delay_ms.none"
+      repeat_allowed: false
+      trigger_allowed: false
+      motion_path_allowed: false
+      emphasis_animation_allowed: false
+    sequencing:
+      build_order_allowed: false
+      required_initial_visibility: "All instructional content needed to understand the slide must be visible before any user action."
+      order_source_when_exception_reviewed: "rules.accessibility.reading_order"
+      prohibited_orders:
+        - "meaning_depends_on_click_sequence"
+        - "content_hidden_until_auto_timer"
+        - "decorative_reveal_before_heading"
+    draft_exception_policy:
+      allowed_before_final_only: true
+      requires_manual_review: true
+      allowed_effects:
+        - "Appear"
+        - "Fade"
+      max_duration_ms: "tokens.semantic.animation.duration_ms.maximum"
+      max_delay_ms: "tokens.semantic.animation.delay_ms.none"
+      max_animated_objects_per_slide: 3
+      required_order: "Follow the same logical order as rules.accessibility.reading_order."
+      removal_required_before_final_distribution: true
+    lint_target:
+      transition_xml: "p:transition"
+      timing_xml: "p:timing"
+      check: "rules.lint.checks.animation_present"
+
+  accessibility:
+    purpose: "Make screen-delivered PPTX/PDF slides perceivable and understandable without relying on color, animation timing, or authoring-tool defaults."
+    contrast_ratio_min:
+      normal_text: 4.5
+      large_text: 3.0
+      non_text_graphics: 3.0
+    contrast_scope:
+      applies_to:
+        - "text"
+        - "icons"
+        - "chart_marks"
+        - "essential_lines"
+        - "text_on_photo"
+      measurement: "Use final rendered colors after fills, opacity, and photo overlays are applied."
+      large_text_definition:
+        min_size_pt: "rules.typography.size_scale_pt.heading"
+        min_weight: "Bold"
+      unknown_background_policy: "manual_review_required"
+    contrast_pairs_allowed:
+      source: "rules.color.allowlist.text_on_background"
+      require_pair_role: true
+      custom_pair_policy: "Allowed only when measured contrast_ratio meets rules.accessibility.contrast_ratio_min.normal_text or large_text as applicable."
+      minimum_fields:
+        - "role"
+        - "text_hex"
+        - "background_hex"
+        - "contrast_ratio"
+    contrast_pairs_prohibited:
+      source: "rules.color.allowlist.prohibited.text_on_background"
+
+    dont_use_color_only:
+      enabled: true
+      severity: "warning"
+      applies_to:
+        - "state"
+        - "correctness"
+        - "priority"
+        - "series_identity"
+        - "trend_direction"
+      required_secondary_cues:
+        state:
+          - "text_label"
+          - "icon_or_shape"
+        correct_wrong:
+          - "text_label"
+          - "symbol"
+        chart_series:
+          - "direct_label_or_legend"
+          - "marker_shape_or_line_style_when_series_count_gt_1"
+        trend:
+          - "arrow_or_text_delta"
+          - "numeric_label"
+      prohibited:
+        - "legend_or_status_explained_by_color_name_only"
+        - "red_green_difference_without_text_or_symbol"
+        - "chart_series_distinguished_only_by_hue"
+      check_method: "Review semantic roles and visible text/symbol labels; color differences alone must not be the only encoded meaning."
+
+    alt_text:
+      required: true
+      required_for:
+        - "photos"
+        - "screenshots"
+        - "charts_as_images"
+        - "icons_with_meaning"
+        - "diagrams"
+        - "logos"
+      decorative_allowed: true
+      decorative_value: "decorative"
+      decorative_requires_no_instructional_meaning: true
+      omitted_for:
+        - "purely_decorative_background_shapes"
+        - "repeated_progress_indicators_already_explained_by_text"
+      content_rules:
+        max_chars: 140
+        must_describe_function_not_visual_style: true
+        include_key_data_for_chart_images: true
+        include_action_context_for_screenshots: true
+        avoid_phrases:
+          - "image of"
+          - "picture of"
+      storage:
+        source_field: "PowerPoint object alt text title or description"
+        decorative_marker: "PowerPoint alt text description exactly 'decorative'"
+        speaker_notes_fallback_allowed: false
+      check_method: "Every meaningful image-like object has non-empty alt text; decorative objects use the configured decorative marker."
+
+    reading_order:
+      required: true
+      mode: "PowerPoint_selection_pane_order"
+      order: "top_to_bottom_left_to_right_with_template_slots"
+      source_of_truth:
+        primary: "PowerPoint Selection Pane order"
+        secondary: "layout_templates.templates.<template_id>.slots"
+      slot_priority:
+        title:
+          - "title"
+          - "subtitle"
+          - "footer"
+        section_divider:
+          - "section_label"
+          - "heading"
+          - "supporting_text"
+        one_message:
+          - "heading"
+          - "body"
+          - "footer_progress"
+        two_column:
+          - "heading"
+          - "left_panel"
+          - "right_panel"
+        diagram:
+          - "heading"
+          - "body"
+          - "media"
+          - "caption"
+        table:
+          - "heading"
+          - "table"
+          - "note"
+        caution:
+          - "heading"
+          - "caution"
+          - "supporting_text"
+        step_list:
+          - "heading"
+          - "steps"
+        quiz:
+          - "question"
+          - "choices"
+          - "explanation"
+        summary:
+          - "heading"
+          - "takeaways"
+          - "next_action"
+      grouped_objects_policy: "Group only when the grouped objects form one logical unit; otherwise ungroup before final review."
+      hidden_or_decorative_policy: "Decorative-only objects should not interrupt the reading order."
+      check_method: "Compare selection-pane sequence with the applicable template slot priority and visible logical reading sequence."
+
+    flashing_prohibited: true
+    media_and_motion:
+      flashing_threshold_hz_max: 3
+      animation_dependency_prohibited: true
+      source: "rules.animation"
+    lint_targets:
+      contrast_ratio:
+        severity: "warning"
+        source: "rules.accessibility.contrast_pairs_allowed"
+      color_only_meaning:
+        severity: "warning"
+        source: "rules.accessibility.dont_use_color_only"
+      alt_text_required:
+        severity: "warning"
+        source: "rules.accessibility.alt_text"
+      reading_order:
+        severity: "warning"
+        source: "rules.accessibility.reading_order"
+
+  lint:
+    mode: "review"
+    report_only: true
+
+    # PRI-001: Pn と未実装候補を lint 実装から独立して参照するため追加。
+    priorities:
+      basis: "Pn は finding 数ではなく、納品物への影響度で決める。"
+      axes:
+        readability: "画面表示で文字、図表、画像の内容を読めるか。"
+        comprehension: "構造、順序、折返し、欠落が理解や意味を阻害しないか。"
+        delivery_quality: "PPTX/PDF の静的配布で必要情報が失われず、提出物として破綻しないか。"
+        brand_template_divergence: "SHIFT AI テンプレート、色、余白、書体からの逸脱が許容範囲か。"
+        micro_fix_impact: "1pt 丸めなど微修正で済み、内容理解への影響が小さいか。"
+      levels:
+        P0:
+          definition: "読めない、見えない、欠落、文字化けなど、内容の成立を壊す。"
+          required_action: "納品前に必ず直す。"
+        P1:
+          definition: "可読性、理解、静的配布、アクセシビリティに直接リスクがある。"
+          required_action: "納品前に修正または明示的に許容判断する。"
+        P2:
+          definition: "ブランド、テンプレート、余白、書体などの逸脱で、品質判断が必要。"
+          required_action: "意図した表現なら許容し、そうでなければスタイルへ寄せる。"
+        P3:
+          definition: "座標丸めなど、見た目や理解への影響が小さい微修正。"
+          required_action: "テンプレート整備や一括補正時に処理する。"
+      unimplemented_can_be_p0_to_p2:
+        - id: "missing_required_element"
+          label: "欠落"
+        - id: "wrap_break_changes_meaning"
+          label: "意味が変わる折返し"
+        - id: "key_area_cropped"
+          label: "画像重要部の切れ"
+        - id: "heading_hierarchy_broken"
+          label: "階層崩れ"
+
+    # LINT-007: Finding.detail を修正判断に使える evidence として揃える。
+    finding_evidence_schema:
+      version: "0.1.0-draft"
+      applies_to: "pptx_lint.py Finding JSON output"
+      intent: >
+        Every finding must carry enough evidence to explain why it was
+        detected, whether it can be auto-fixed, and which guideline-conformant
+        values are plausible repair candidates.
+      output_shape:
+        required_top_level_fields:
+          - "check"
+          - "severity"
+          - "priority"
+          - "review_status"
+          - "slide_index"
+          - "slide_id"
+          - "shape_id"
+          - "shape_name"
+          - "shape_kind"
+          - "message"
+        required_evidence_fields:
+          - "target"
+          - "measurement"
+          - "evidence_source"
+          - "evidence_confidence"
+          - "fixability"
+          - "candidate_values"
+          - "group_key"
+          - "artifact_refs"
+        transitional_mapping: >
+          Existing Finding fields may remain top-level during migration, but
+          any value needed by auto-fix, review prioritization, or visual review
+          must also be available through this evidence schema.
+      enums:
+        review_status:
+          - "unreviewed"
+          - "fix_required"
+          - "accepted"
+          - "false_positive"
+          - "fixed"
+          - "out_of_scope"
+        judgement_reason:
+          accepted:
+            - "intentional_template_design"
+            - "within_visual_tolerance"
+            - "decorative_only"
+            - "brand_approved_exception"
+          fix_required:
+            - "auto_fixable"
+            - "manual_layout_fix"
+            - "manual_content_fix"
+            - "master_template_fix"
+            - "requires_design_decision"
+          fixed:
+            - "fixed_in_later_artifact"
+            - "fixed_by_rule_update"
+          false_positive:
+            - "lint_rule_too_strict"
+            - "measurement_error"
+            - "missing_context"
+          out_of_scope:
+            - "master_owns"
+            - "different_distribution"
+            - "legacy_asset_frozen"
+            - "partner_owned"
+        evidence_source:
+          - "pptx_xml"
+          - "rendered_image"
+          - "structure_json"
+          - "manual_review"
+        evidence_confidence:
+          - "high"
+          - "medium"
+          - "low"
+        fixability:
+          - "auto_fix_candidate"
+          - "manual_required"
+          - "not_applicable"
+          - "decorative_review"
+      field_definitions:
+        priority: "Pn value resolved from rules.lint.priority_catalog.<check>.priority."
+        review_status: "Review lifecycle state; automated lint starts as unreviewed."
+        judgement_reason: "Subtype of the review_status decision, drawn from enums.judgement_reason.<review_status>. Required when review_status is not unreviewed."
+        target: "Object describing the affected slide, shape, text run, table cell, or relation."
+        target.text_excerpt: "Short plain-text excerpt when the affected target is text."
+        target.bbox_pt: "Normalized [x, y, w, h] in guideline pt coordinates."
+        target.actual_bbox_pt: "Source PPTX [x, y, w, h] in actual slide pt coordinates."
+        target.rendered_bbox_px: "Rendered image [x, y, w, h] in pixel coordinates when image evidence exists."
+        measurement.measured_value: "Primary measured value that triggered the finding."
+        measurement.threshold: "Guideline limit, allowed set, or comparison target."
+        measurement.delta: "Signed or absolute difference from threshold when meaningful."
+        measurement.unit: "Unit such as pt, px, ratio, hex, enum, bool, or count."
+        measurement.supporting_values: "Check-specific raw values needed to recompute or verify the finding."
+        evidence_source: "Primary source used to produce measurement."
+        evidence_confidence: "Confidence in the measurement source and inference."
+        fixability: "Whether an automated fix may be attempted from JSON evidence alone."
+        manual_required_reason: "Required when fixability is manual_required or decorative_review."
+        candidate_values: "List of guideline-compliant alternatives with token/value/proof fields."
+        recommended_value: "Single preferred candidate when the tool can justify one."
+        group_key: "Stable key for bundling same-cause findings across slides."
+        artifact_refs: "Local generated artifact paths; keep tmp/review and generated PPTX out of git."
+      candidate_value_fields:
+        - "kind"
+        - "token_ref"
+        - "value"
+        - "predicted_measurement"
+        - "passes_threshold"
+        - "reason"
+      common_requirements:
+        automated_findings:
+          priority: "required"
+          review_status: "unreviewed"
+          evidence_source: "pptx_xml, rendered_image, or structure_json"
+          evidence_confidence: "high unless the check uses heuristic image or background inference"
+          group_key: "check plus stable bbox/relation/value signature"
+          artifact_refs: "empty list unless generated evidence exists"
+        manual_review_findings:
+          evidence_source: "manual_review"
+          evidence_confidence: "low until reviewer records the basis"
+          fixability: "manual_required"
+          manual_required_reason: "required"
+        auto_fix_candidate_findings:
+          candidate_values: "non-empty"
+          recommended_value: "required"
+          validation: "candidate must include predicted_measurement or before/after value proving it satisfies threshold"
+      check_specific_required_evidence:
+        slide_size:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+          required_measurement_fields:
+            - "actual_pt"
+            - "base_pt"
+            - "scale"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Canvas conversion can change layout and must be reviewed."
+        box_canvas_overflow:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "auto_fix_candidate"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+            - "overflow_sides_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "overflow_sides_pt"
+            - "canvas_pt"
+          candidate_values: "{shrink_right: target_width_pt, shrink_bottom: target_height_pt}; left/top の超過は manual_required で残す。"
+        text_box_overflow:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "text_render"
+            - "overflow_by_pt"
+          candidate_values: "multi_step: shrink_font_size / compress_line_height / expand_box_height のうち SPA で 1 つ選ぶ"
+        text_canvas_overflow:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "text_render"
+            - "overflow_by_pt"
+          candidate_values: "multi_step: enable_word_wrap / shrink_box_width_to_canvas / shrink_font_size のうち SPA で 1 つ選ぶ"
+        overflow_shapes:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "overflow_by_pt"
+            - "slide_canvas_pt"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Shape may be intentional decoration or structural content."
+        overflow_images:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "decorative_review"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "overflow_by_pt"
+            - "slide_canvas_pt"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Important crop area and full-bleed intent require review."
+        text_overlap:
+          evidence_source: "structure_json"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_a"
+            - "shape_b"
+            - "overlap_bbox_pt"
+          required_measurement_fields:
+            - "overlap_area_pt2"
+            - "threshold_pt2"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Readable repair requires layer, content, and layout judgment."
+        object_overlap:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_a"
+            - "shape_b"
+            - "overlap_bbox_pt"
+          required_measurement_fields:
+            - "overlap_area_pt2"
+            - "threshold_pt2"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Containment and intentional visual layering can be legitimate."
+        object_gap_too_small:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_a"
+            - "shape_b"
+          required_measurement_fields:
+            - "axis"
+            - "gap_pt"
+            - "threshold_pt"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Adjacent objects may be intentionally grouped."
+        safe_margins:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "decorative_review"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "overflow_by_pt"
+            - "safe_margin_pt"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Non-text objects may be intentional full-bleed or decorative elements."
+        safe_text_area_text:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "overflow_by_pt"
+            - "safe_text_area_pt"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Text can move, resize, or reflow; choose after checking readability."
+        font_family:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+            - "cells"
+          required_measurement_fields:
+            - "script"
+            - "font"
+            - "runs"
+            - "allowed_fonts"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          candidate_values: "Allowed family tokens from rules.typography.font_families."
+          manual_required_reason: "Font substitution can affect wrapping and East Asian glyph rendering."
+        font_size_scale:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+            - "cells"
+          required_measurement_fields:
+            - "actual_size_pt"
+            - "size_pt"
+            - "nearest_allowed_size_pt"
+            - "normalization_scale"
+            - "tolerance_pt"
+            - "runs"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Nearest allowed size tokens plus box-size alternatives."
+          manual_required_reason: "Font size, text box size, and wrapping must be judged together."
+        line_height:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+          required_measurement_fields:
+            - "line_spacing"
+            - "allowed_line_heights_pt"
+            - "tolerance_pt"
+            - "paragraphs"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Allowed fixed line-height tokens."
+          manual_required_reason: "Line-height changes can alter overflow and vertical balance."
+        text_autofit_disabled:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "auto_fix_candidate"
+          required_target_fields:
+            - "text_excerpt"
+          required_measurement_fields:
+            - "auto_size"
+            - "required_auto_size"
+            - "font_scale_percent"
+            - "font_shrink_percent"
+            - "base_font_size_pt"
+            - "effective_font_size_pt"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          candidate_values: "Set text_frame.auto_size to NONE."
+        animation_present:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+          required_measurement_fields:
+            - "animation_markers"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Static handoff needs a judgment about what information animation carried."
+        alignment_left_top:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+          required_measurement_fields:
+            - "alignment"
+            - "vertical_anchor"
+            - "expected_alignment"
+            - "expected_vertical_anchor"
+            - "paragraphs"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Non-left or non-top alignment may be intentional for headings or labels."
+        text_color_allowlist:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+          required_measurement_fields:
+            - "color_hex"
+            - "runs"
+            - "allowed_text_colors_hex"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          candidate_values: "Allowed text color tokens with contrast proof against background evidence."
+          manual_required_reason: "Color repair must preserve emphasis and contrast."
+        background_color_palette:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "scope"
+            - "cells"
+          required_measurement_fields:
+            - "color_hex"
+            - "allowed_fill_colors_hex"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          candidate_values: "Allowed fill/background color tokens."
+          manual_required_reason: "Palette repair depends on brand intent and contrast with foreground text."
+        image_upscale_ratio:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "actual_display_pt"
+            - "normalized_display_pt"
+          required_measurement_fields:
+            - "source_px"
+            - "display_px"
+            - "upscale_ratio"
+            - "source_aspect"
+            - "display_aspect"
+            - "aspect_delta_ratio"
+            - "max_upscale_ratio"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Display size that satisfies max upscale ratio, or replacement image resolution."
+          manual_required_reason: "Need to choose between resizing, cropping, or replacing the source asset."
+        image_aspect_distortion:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "actual_display_pt"
+            - "normalized_display_pt"
+          required_measurement_fields:
+            - "source_px"
+            - "source_aspect"
+            - "display_aspect"
+            - "aspect_delta_ratio"
+            - "max_aspect_delta_ratio"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Display dimensions preserving source aspect ratio."
+          manual_required_reason: "Aspect repair can change crop, layout, and visible content."
+        low_contrast:
+          evidence_source: "pptx_xml or rendered_image"
+          evidence_confidence: "medium for rendered_image inference, high for explicit solid pptx colors"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+            - "rendered_bbox_px"
+          required_measurement_fields:
+            - "measurement"
+            - "text_hex"
+            - "background_hex"
+            - "background_source"
+            - "contrast_ratio"
+            - "required_ratio"
+            - "low_contrast_threshold"
+            - "text_class"
+            - "font_size_pt"
+            - "runs"
+            - "foreground_pixels"
+            - "background_pixels"
+            - "sample_pixels"
+            - "original_run_colors_hex"
+            - "candidate_tokens"
+            - "recomputed_candidate_ratios"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          artifact_refs: "Rendered slide PNG and annotation PNG when --rendered-image-dir is used."
+          candidate_values: "Text/background color token pairs with recomputed contrast ratios."
+          manual_required_reason: "Rendered color inference and semantic emphasis require reviewer confirmation."
+        contrast_ratio:
+          evidence_source: "pptx_xml or rendered_image"
+          evidence_confidence: "medium for rendered_image inference, high for explicit solid pptx colors"
+          fixability: "manual_required"
+          required_target_fields:
+            - "text_excerpt"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+            - "rendered_bbox_px"
+          required_measurement_fields:
+            - "measurement"
+            - "text_hex"
+            - "background_hex"
+            - "background_source"
+            - "contrast_ratio"
+            - "required_ratio"
+            - "text_class"
+            - "font_size_pt"
+            - "runs"
+            - "foreground_pixels"
+            - "background_pixels"
+            - "sample_pixels"
+            - "original_run_colors_hex"
+            - "candidate_tokens"
+            - "recomputed_candidate_ratios"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          artifact_refs: "Rendered slide PNG and annotation PNG when --rendered-image-dir is used."
+          candidate_values: "Text/background color token pairs with recomputed contrast ratios."
+          manual_required_reason: "Color choice must preserve readability, emphasis, and brand intent."
+        color_only_meaning:
+          evidence_source: "structure_json"
+          evidence_confidence: "low"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "group"
+          required_measurement_fields:
+            - "colors"
+            - "non_color_cue_present"
+            - "triggered_rules"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Non-color cue choice requires semantic design decision."
+        alt_text_required:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_id"
+            - "shape_name"
+            - "shape_kind"
+          required_measurement_fields:
+            - "alt_title"
+            - "alt_description"
+            - "decorative_intent"
+            - "measured_value"
+            - "threshold"
+            - "unit"
+          manual_required_reason: "Need to decide whether the picture is meaningful or decorative."
+        reading_order:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+          required_measurement_fields:
+            - "visual_order"
+            - "source_order"
+            - "inversions"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Order repair requires logical content decision."
+        heading_hierarchy_broken:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "title_candidate"
+            - "largest_body_candidate"
+          required_measurement_fields:
+            - "title_candidate_count"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Repair requires selecting the slide type and mapping text boxes to design-system title/body slots."
+        key_area_cropped:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "shape_id"
+            - "shape_name"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "measurement"
+            - "crop_ratio"
+            - "horizontal_total_crop_ratio"
+            - "vertical_total_crop_ratio"
+            - "max_side_crop_ratio"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Crop repair requires important-area decision."
+        missing_required_element:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "missing_element"
+            - "top_text_candidates"
+          required_measurement_fields:
+            - "text_shape_count"
+            - "required_zone_pt"
+            - "required_font_size_pt_min"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Missing element repair requires content/template decision."
+        wrap_break_changes_meaning:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "slide_index"
+            - "text_excerpt"
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "line_count"
+            - "triggered_rules"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          manual_required_reason: "Line break repair requires copy/layout decision."
+        geometry_rounding:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "auto_fix_candidate"
+          required_target_fields:
+            - "bbox_pt"
+            - "actual_bbox_pt"
+          required_measurement_fields:
+            - "drifted"
+            - "integer_tolerance_pt"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Round x, y, w, h to integer pt values according to rules.lint.rounding_policy."
+        inner_padding_imbalance:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "container"
+            - "children"
+          required_measurement_fields:
+            - "padding_pt"
+            - "horizontal_ratio"
+            - "vertical_ratio"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Container resize, child movement, margin change, or font-size alternatives."
+          manual_required_reason: "Readable repair requires balancing container geometry and text layout."
+        card_grid_consistency:
+          evidence_source: "structure_json"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "row_containers"
+            - "inconsistent_containers"
+          required_measurement_fields:
+            - "group_medians"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "Normalize repeated card container size, row position, padding, and first-child placement as a group."
+          manual_required_reason: "Repeated-card repair requires template grouping intent review."
+        text_vertical_balance:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "manual_required"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "anchor"
+            - "font_size_pt"
+            - "line_height_pt"
+            - "paragraphs"
+            - "estimated_text_height_pt"
+            - "inner_height_pt"
+            - "free_space_pt"
+            - "margin_top_pt"
+            - "margin_bottom_pt"
+            - "visual_center_offset_pt"
+            - "actual_padding_pt"
+            - "triggered_rules"
+            - "thresholds"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "font_size, line_height, text_box_height, internal_margin, and vertical_anchor options."
+          manual_required_reason: "Five-axis visual balance requires comparing equivalent repair options."
+        decorative_isolated_lines:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "medium"
+          fixability: "decorative_review"
+          required_target_fields:
+            - "shape"
+            - "bbox_pt"
+          required_measurement_fields:
+            - "line_classification"
+            - "nearest_neighbor_gap_pt"
+            - "proximity_threshold_pt"
+          candidate_values: "None — never auto-removed. Reviewer decides keep or manual delete."
+          manual_required_reason: "Isolated decorative lines/connectors/arrows may be intentional ornament; auto removal must not be proposed."
+        badge_alignment:
+          evidence_source: "pptx_xml"
+          evidence_confidence: "high"
+          fixability: "auto_fix_candidate"
+          required_target_fields:
+            - "bbox_pt"
+            - "text_excerpt"
+          required_measurement_fields:
+            - "misaligned"
+            - "aspect_ratio"
+            - "text_length"
+            - "measured_value"
+            - "threshold"
+            - "delta"
+            - "unit"
+          candidate_values: "{alignment: CENTER, vertical_anchor: MIDDLE} - mechanical center alignment for badge."
+
+    # PRI-001: priority 出力が参照する ID 別の正本テーブル。
+    priority_catalog:
+      text_encoding:
+        status: "implemented_priority"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "文字化けしており、内容を正しく読めない"
+        action: "元原稿または正しい日本語から差し替える。"
+      text_overlap:
+        status: "implemented_lint"
+        priority: "P0"
+        axes:
+          - "readability"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "文字衝突で内容を読めない"
+        action: "重なったテキスト枠、行間、レイヤー順を分解して読み直せる状態にする。"
+      low_contrast:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "読めないコントラストで内容を判別できない"
+        action: "最終レンダリングで文字と背景を測定し、十分なコントラストへ直す。"
+      box_canvas_overflow:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "readability"
+        issue_title: "テキスト枠がスライド外にはみ出している"
+        action: "右下方向の超過は枠サイズを切る (文字位置は維持)。左上方向は手動で枠位置を調整する。"
+      text_box_overflow:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "judgement_fix"
+        impact_axis: "readability"
+        issue_title: "テキストが枠の高さに収まっていない"
+        action: "フォントサイズ縮小 / 行間圧縮 / 枠の高さ拡張 のいずれかを SPA で選んで適用する。"
+      text_canvas_overflow:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "judgement_fix"
+        impact_axis: "readability"
+        issue_title: "テキスト自体がスライド右端を超えている"
+        action: "word_wrap 有効化 / 枠の幅をスライドに合わせる / フォントサイズ縮小 のいずれかを SPA で選んで適用する。"
+      animation_present:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "静的配布で失われる情報がある可能性がある"
+        action: "PPTX/PDF 配布で必要な情報が静止状態でも読めるか確認し、不要な動きは削除する。"
+      alt_text_required:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "意味を持つ画像に代替テキストがない"
+        action: "画像の機能や内容を説明する代替テキストを入れる。"
+      color_only_meaning:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "色だけで意味を伝えている"
+        action: "ラベル、記号、形状など色以外の手掛かりを追加する。"
+      contrast_ratio:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "コントラスト不足で可読性にリスクがある"
+        action: "最終レンダリングの色を測定し、閾値を満たす配色へ直す。"
+      heading_hierarchy_broken:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "見出し・本文の階層がデザインシステムと合っていない"
+        action: "スライドタイプごとのテンプレートスロットに合わせ、見出しは title/heading 系、本文は body 系のサイズ・位置・順序へ戻す。"
+      image_aspect_distortion:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像の縦横比が崩れて内容や品質を損なう"
+        action: "画像を元比率で再配置し、必要ならトリミングを見直す。"
+      key_area_cropped:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "画像の重要部が切れて理解を阻害する"
+        action: "被写体、画面操作、図表ラベルなど重要部が残るようにトリミングを直す。"
+      line_height:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "行間が読みやすさを損なう可能性がある"
+        action: "本文量、行間、テキスト枠高さをセットで見直す。"
+      missing_required_element:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "必須要素が欠落して理解や納品品質を損なう"
+        action: "テンプレートスロットに必要な見出し、本文、注記、出典を補う。"
+      object_overlap:
+        status: "implemented_lint"
+        priority: "P1"
+        axes:
+          - "comprehension"
+          - "delivery_quality"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "オブジェクト重なりで内容や構造を追いにくい"
+        action: "重なり、近接不足、レイヤー順を確認し、意図しない被りを解消する。"
+      object_gap_too_small:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "隣接オブジェクトの間隔が狭く、構造を読み取りにくい"
+        action: "隣接要素の役割を確認し、意図した密着でなければ最低間隔を確保する。"
+      overflow_images:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像がスライド外にはみ出し、重要部が切れる可能性がある"
+        action: "画像の表示範囲とトリミングを確認し、必要な情報を画面内に戻す。"
+      overflow_shapes:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "図形がスライド外にはみ出し、構造を損なう可能性がある"
+        action: "図形の役割を確認し、情報要素なら画面内に戻す。"
+      reading_order:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "読み順が視覚順やテンプレート順と合っていない"
+        action: "Selection Pane の順序をテンプレートスロットと論理順へ合わせる。"
+      text_autofit_disabled:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "delivery_quality"
+        issue_title: "PowerPoint自動縮小で文字が読みにくくなるリスクがある"
+        action: "TEXT_TO_FIT_SHAPE による自動縮小を無効化し、枠サイズ・文字量・改行を明示的に調整する。"
+      wrap_break_changes_meaning:
+        status: "implemented_lint"
+        priority: "P1"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "comprehension"
+        issue_title: "折返しで意味が変わっている"
+        action: "意味単位で改行し、誤読を生む単語分割や係り受けの分断を避ける。"
+      background_color_palette:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "背景・塗り色がブランドパレット外にある"
+        action: "意図した表現なら許容し、そうでなければ許可パレットへ寄せる。"
+      font_family:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "書体がテンプレート指定から外れている"
+        action: "テンプレート書体へ戻すか、代替フォントの必要性を記録する。"
+      font_size_scale:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字サイズが定義スケールから外れている"
+        action: "文字サイズ、テキスト枠、改行をセットで調整する。"
+      image_upscale_ratio:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "画像解像度が不足し、納品品質を下げる可能性がある"
+        action: "高解像度画像へ差し替えるか、表示サイズを下げる。"
+      inner_padding_imbalance:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストボックス内余白バランスが不自然"
+        action: "内余白、縦位置、枠高さ、文字サイズをセットで整える。"
+      card_grid_consistency:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+          - "comprehension"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "同種カード群のサイズ・内側配置・同格テキスト位置が不統一"
+        action: "同一行のカードをグループとして見直し、カード幅・高さ・上端・内余白・主要子要素と同格テキストボックスの相対位置を揃える。"
+      safe_margins:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "非テキスト要素が安全余白から外れている"
+        action: "テンプレート上の意図したフルブリード以外は安全余白へ戻す。"
+        exception: "Template/decorative rasters named or described as background/header/footer/gradient/decoration assets are excluded."
+      safe_text_area_text:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストが安全領域から外れている"
+        action: "可読性とテンプレート意図を確認し、原則として安全領域へ戻す。"
+      slide_size:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "delivery_quality"
+        issue_title: "スライドサイズが基準比率から外れている"
+        action: "16:9 配布前提に合うサイズへ変換するか、例外理由を記録する。"
+      text_color_allowlist:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字色が許可リスト外にある"
+        action: "可読性を確認し、原則として許可された文字色へ戻す。"
+      alignment_left_top:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "文字揃えがテンプレート基準から外れている"
+        action: "中央揃えなど意図した表現でなければ左上基準へ戻す。"
+      geometry_rounding:
+        status: "implemented_lint"
+        priority: "P3"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "micro_fix_impact"
+        issue_title: "座標の微小な丸めズレがある"
+        action: "見た目に問題がなければ後回しにし、テンプレート整備時に一括補正する。"
+      decorative_isolated_lines:
+        status: "implemented_lint"
+        priority: "P2"
+        axes:
+          - "brand_template_divergence"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "孤立した装飾 line/connector/arrow が残っている"
+        action: "意図した装飾なら残す、不要なら手動で削除する。自動削除は行わない。"
+      badge_alignment:
+        status: "implemented_lint"
+        priority: "P1"
+        axes:
+          - "brand_template_divergence"
+        detection: "automated"
+        fix_policy: "auto_fix"
+        impact_axis: "brand_template_divergence"
+        issue_title: "バッジ内テキストの中央揃えがずれている"
+        action: "短文 badge コンテナの paragraph alignment を CENTER、text_frame.vertical_anchor を MIDDLE に揃える。"
+      text_vertical_balance:
+        status: "implemented_lint"
+        priority: "P2"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "brand_template_divergence"
+        issue_title: "テキストボックス内の縦余白バランスが視覚的に不自然"
+        action: "font size / line height / text box height / internal margin / vertical anchor をセットで見直し、フォントサイズ変更と枠サイズ変更を対等な選択肢として比較する。"
+        related_check: "rules.lint.priority_catalog.inner_padding_imbalance"
+
+    checks:
+      slide_size:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.slide_size"
+        detection: "Warn only when the PPTX canvas is not proportional to rules.slide.size_pt; proportional 16:9 decks are normalized before other checks."
+      box_canvas_overflow:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.box_canvas_overflow"
+        detection: "text shape (has_text_frame & text.strip()) の box bbox が slide canvas (0,0,SLIDE_W,SLIDE_H) の任意の辺を超える場合に発火。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。non-text shape の box overflow は overflow_shapes / overflow_images が引き続き担当する。"
+      text_box_overflow:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_box_overflow"
+        detection: "text shape の text を box.width で折り返した時の必要 height (lines × line_height) が box.height を超える場合に発火。DS-OVERFLOW-001 段階2 (2026-05-22)。"
+      text_canvas_overflow:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_canvas_overflow"
+        detection: "text を canvas 端 (wrap_w = min(box.width, canvas.right - box.left)) で強制改行した場合でも、wrap できない unit (word_wrap=False のとき text 全幅、または 1 単語/1 文字が wrap_w 超え) が canvas 右端を超える場合に発火。DS-OVERFLOW-001 段階3 (2026-05-23)。"
+      overflow_shapes:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.overflow_shapes"
+      overflow_images:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.overflow_images"
+        exception: "Template/decorative rasters named or described as background/header/footer/gradient/decoration assets are excluded."
+      text_overlap:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_overlap"
+        detection: "Detect normalized text-frame bbox pairs whose intersection area is greater than 1pt²."
+        thresholds:
+          overlap_area_pt2_min_exclusive: 1
+        multi_step_candidates:
+          ordered_strategies:
+            - "move_shape_b"
+            - "shrink_font_size"
+            - "shrink_shape_b_height"
+          rationale: "Nudge shape_b first; if overlap persists, smaller font on the dominant shape or shape_b height shrink are the next steps."
+      object_overlap:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.object_overlap"
+        detection: "Detect normalized bbox pairs with at least one non-text object whose intersection area is greater than 1pt², excluding structural containment relationships emitted by structure metadata."
+        thresholds:
+          overlap_area_pt2_min_exclusive: 1
+          structural_containment_overlap_ratio_min: 0.9
+      safe_margins:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.safe_margins"
+        exception: "Cover-slide brand marks in the upper-left cover area and template/decorative rasters are excluded from normal content safe-margin checks."
+      object_gap_too_small:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.object_gap_too_small"
+        detection: "Detect adjacent normalized object bboxes whose horizontal or vertical gap is below max(element_gap_pt_min by ds:element, semantic_pair_gap_pt_min by inferred title_subtitle / label_group pair) while the opposite axis overlaps. Missing or unknown elements default to 0 and do not warn unless a semantic pair is detected."
+        thresholds:
+          default_adjacent_gap_pt_min: "rules.slide.object_spacing.default_adjacent_gap_pt_min"
+          element_gap_pt_min: "rules.slide.object_spacing.element_gap_pt_min"
+          semantic_pair_gap_pt_min: "rules.slide.object_spacing.semantic_pair_gap_pt_min"
+      safe_text_area_text:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.safe_text_area_text"
+        detection: "Apply content safe text area to body text. Exclude cover and section divider slide types, template header titles, footers/page numbers, and approved full-width template subtitle text."
+      font_family:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.font_family"
+      font_size_scale:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.font_size_scale"
+      line_height:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.line_height"
+      text_autofit_disabled:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_autofit_disabled"
+      animation_present:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.animation_present"
+      alignment_left_top:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.alignment_left_top"
+      text_color_allowlist:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_color_allowlist"
+      background_color_palette:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.background_color_palette"
+      image_upscale_ratio:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.image_upscale_ratio"
+        detection: "Compare picture source pixel size with displayed PPTX size converted at 96px/in; warn above tokens.value.imagery.avoid_upscale_over_ratio. Exclude explicit template/decorative rasters such as gradient/header/background assets."
+      image_aspect_distortion:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.image_aspect_distortion"
+        detection: "Compare picture source aspect ratio with displayed box aspect ratio; warn when the relative delta exceeds 5%. Exclude explicit template/decorative rasters such as gradient/header/background assets."
+      low_contrast:
+        severity: "error"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.low_contrast"
+        detection: "With --rendered-image-dir, measure final PowerPoint-rendered pixels inside text bboxes and emit error when the inferred foreground/background ratio is below 3.0:1. Without rendered images, fall back to explicit RGB text color against solid fills or white slide background; unknown/image/gradient backgrounds remain manual review."
+      contrast_ratio:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.contrast_ratio"
+        detection: "With --rendered-image-dir, measure final PowerPoint-rendered pixels inside text bboxes and warn below rules.accessibility.contrast_ratio_min. Without rendered images, fall back to explicit RGB text color against solid fills or white slide background; unknown/image/gradient backgrounds remain manual review."
+      color_only_meaning:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.color_only_meaning"
+        detection: "Detect nearby same-size unlabeled shapes whose only machine-visible differentiator is fill color; emit a risk finding requiring non-color cue repair."
+      heading_hierarchy_broken:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.heading_hierarchy_broken"
+        detection: "Use normalized geometry and dominant font size as an automated proxy for design-system title/body hierarchy; warn when body text visually outranks the title slot or title ordering is inconsistent."
+      key_area_cropped:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.key_area_cropped"
+        detection: "Read picture crop metadata and warn when non-decorative image crop exceeds conservative side or axis-total thresholds."
+      missing_required_element:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.missing_required_element"
+        detection: "For non-empty slides, detect absence of a title/header candidate in the normalized top title zone."
+      alt_text_required:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.alt_text_required"
+        detection: "Check picture objects for non-empty PowerPoint alt text title or description; decorative exceptions require manual confirmation."
+      reading_order:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.reading_order"
+        detection: "Compare text shape source order with normalized top-left visual order and warn when inversion count exceeds threshold."
+      wrap_break_changes_meaning:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.wrap_break_changes_meaning"
+        detection: "Inspect explicit authored line breaks and warn when they split Latin words, numbers and units, bracket punctuation, or short fragments."
+      geometry_rounding:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.geometry_rounding"
+      inner_padding_imbalance:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.inner_padding_imbalance"
+        detection: "Detect design-system container elements with at least two child objects whose internal padding does not match the component padding rule. Missing or unknown ds:element containers use default 0 and do not warn."
+        thresholds:
+          child_count_min: 2
+          default_inner_padding_pt: 0
+          element_inner_padding_pt:
+            default: 0
+            card: "tokens.component.card.padding_pt"
+            callout: "tokens.component.callout.padding_pt"
+          padding_target_tolerance_pt: 4
+          padding_policy: "left/top should match the component padding target within tolerance; right/bottom must not be below the target. Cases requiring child resize or semantic regrouping are manual."
+      decorative_isolated_lines:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.decorative_isolated_lines"
+        detection: "Detect MSO_SHAPE_TYPE.LINE / arrow- or line-named auto_shape / very thin rectangles (thickness<=4pt, length>=20pt) whose nearest neighbor bbox gap is >=24pt. Emit a decorative_review finding with fixability=decorative_review; auto removal is never proposed."
+        thresholds:
+          proximity_pt_max: 24.0
+          thin_bar_thickness_pt_max: 4.0
+          thin_bar_length_pt_min: 20.0
+      badge_alignment:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.badge_alignment"
+        detection: "Detect shapes with a solid fill, short single-line text (length<=20), and a near-square / pill bounding box (aspect ratio between 0.5 and 2.5, max width 240pt, max height 120pt) whose paragraph alignment is not CENTER or whose text-frame vertical anchor is not MIDDLE. Emit an auto_fix_candidate with candidate_values={alignment:CENTER, vertical_anchor:MIDDLE}; alignment_left_top is suppressed on these shapes."
+        thresholds:
+          shape_max_width_pt: 240.0
+          shape_max_height_pt: 120.0
+          aspect_ratio_min: 0.5
+          aspect_ratio_max: 2.5
+          text_length_max: 20
+      card_grid_consistency:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.card_grid_consistency"
+        detection: "Detect repeated card containers in the same row whose container size, top position, padding, first-child relative placement, or same-role child text placement differs from the row median beyond tolerance."
+        thresholds:
+          group_min: 2
+          child_count_min: 2
+          row_center_tolerance_pt: 36
+          top_tolerance_pt: 4
+          size_tolerance_pt: 6
+          padding_tolerance_pt: 8
+          first_child_relative_tolerance_pt: 14
+      text_vertical_balance:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_vertical_balance"
+        evaluation_axes:
+          - "font_size"
+          - "line_height"
+          - "text_box_height"
+          - "internal_margin"
+          - "vertical_anchor"
+        detection: "Detect text boxes where content fits but internal vertical padding or visual center is unbalanced. Combines the 5 evaluation axes; warn when free vertical space, asymmetric internal padding, or visual-center offset exceeds thresholds defined in pptx_lint.py."
+        scope: "Visible text containers only; invisible text boxes without fill or stroke are selection geometry and are not evaluated as visual containers."
+        thresholds:
+          dead_space_ratio_max: 0.40
+          top_or_bottom_dead_space_pt_max: 60
+          middle_anchor_padding_asymmetry_pt_max: 12
+          visual_center_offset_ratio_max: 0.20
+          min_box_height_pt: 30
+        fix_strategy:
+          equal_options:
+            - "font_size_change"
+            - "text_box_size_change"
+          principle: "フォントサイズ変更とテキストボックスサイズ変更は対等な選択肢として扱い、片方を他方に内包させない。anchor、line height、internal margin と合わせて 5 軸で再設計する。"
+          excluded_from_auto_fix: true
+
+    # ========================================================================
+    # rules.lint.fix_policy
+    # ------------------------------------------------------------------------
+    # lint で検出される各 check に対する fix の取り扱い方針を宣言する単一の
+    # 正本テーブル。pptx_lint.py の _fixability_for_json、pptx_fix.py の
+    # CHECK_TO_RULE / FINDING_DRIVEN_RULES、pptx_review_priorities.py が
+    # 共通でここを参照する想定 (refactor 段階 2 以降で実装側を切替)。
+    #
+    # apply_mode:
+    #   - auto_fix       : lint が常に auto_fix_candidate を発行し、pptx_fix
+    #                      が即適用できる ("無条件で機械修正可" な mechanical
+    #                      系)。
+    #   - judgement_fix  : lint は manual_required (場合により
+    #                      auto_fix_candidate) を発行し、candidate_values も
+    #                      併走で出す。SPA で finding 単位の
+    #                      judgement_reason=auto_fixable が付与された
+    #                      finding のみ pptx_fix が apply する。REV-017 など
+    #                      の deck-level adopt/reject はこの apply の「後段」
+    #                      のレビューに位置づけられる (= apply ↔ adopt は
+    #                      異なるレイヤー)。
+    #   - no_fix         : 機械修正経路そのものが無い。lint 検出のみで終わる
+    #                      ("manual" は紛らわしいので no_fix とした)。原則
+    #                      として content / semantic / 素材入手が必要なもの、
+    #                      もしくは誤適用リスクが高いため機械修正を提案しな
+    #                      いと決めたもの。
+    #
+    # fix_rule: pptx_fix.py 側に登録された rule 名。apply_mode=no_fix のとき
+    #          は null。
+    #
+    # 段階 1: YAML 正本テーブルとして列挙のみ。
+    # 段階 2: pptx_lint.py / pptx_fix.py がここを参照するよう refactor (完)。
+    # 段階 3: 「apply_mode=judgement_fix は judgement 不在で apply しない」
+    #         厳格化 (仕様変更が伴うため別議論)。
+    # ========================================================================
+    fix_policy:
+      text_autofit_disabled:
+        apply_mode: auto_fix
+        fix_rule: autofit
+      font_size_scale:
+        apply_mode: auto_fix
+        fix_rule: font_size
+      line_height:
+        apply_mode: auto_fix
+        fix_rule: line_height
+      alignment_left_top:
+        apply_mode: auto_fix
+        fix_rule: alignment
+      badge_alignment:
+        apply_mode: auto_fix
+        fix_rule: badge_alignment
+      geometry_rounding:
+        apply_mode: judgement_fix
+        fix_rule: geometry
+        note: "drift が 0.1pt 未満なら lint 側で auto_fix_candidate に昇格 (実装条件)。"
+      low_contrast:
+        apply_mode: judgement_fix
+        fix_rule: contrast
+      contrast_ratio:
+        apply_mode: judgement_fix
+        fix_rule: contrast
+      font_family:
+        apply_mode: judgement_fix
+        fix_rule: font_family
+      text_color_allowlist:
+        apply_mode: judgement_fix
+        fix_rule: text_color
+      background_color_palette:
+        apply_mode: judgement_fix
+        fix_rule: fill_color
+      box_canvas_overflow:
+        apply_mode: auto_fix
+        fix_rule: box_canvas_clip
+        note: "text shape の box bbox が canvas 外。右下方向の超過は width/height を切る (text 絶対座標は不変)。左/上方向は box_canvas_clip rule 内で manual_required として skip (= box.left/top を動かすと text 位置が変わるので auto 対象外)。DS-OVERFLOW-001 段階1 (2026-05-21) で旧 overflow_text を置き換え。"
+      text_box_overflow:
+        apply_mode: judgement_fix
+        fix_rule: text_box_resize
+        note: "box.width で folded した text の required_h が box.height を超える。SPA で multi_step (shrink_font_size / compress_line_height / expand_box_height) から 1 つ選んで apply。DS-OVERFLOW-001 段階2 (2026-05-22)。"
+      text_canvas_overflow:
+        apply_mode: judgement_fix
+        fix_rule: text_canvas_reflow
+        note: "canvas 端強制改行でも wrap できない text 単位 (word_wrap=False の text 全幅、or 1 単語が wrap_w 超え) が canvas 右端を出る。SPA で multi_step (enable_word_wrap / shrink_box_width_to_canvas / shrink_font_size) を選んで apply。DS-OVERFLOW-001 段階3 (2026-05-23)。"
+      overflow_shapes:
+        apply_mode: judgement_fix
+        fix_rule: bbox_fit
+      overflow_images:
+        apply_mode: judgement_fix
+        fix_rule: bbox_fit
+      safe_margins:
+        apply_mode: judgement_fix
+        fix_rule: bbox_fit
+      safe_text_area_text:
+        apply_mode: judgement_fix
+        fix_rule: bbox_fit
+      text_overlap:
+        apply_mode: judgement_fix
+        fix_rule: overlap
+      object_overlap:
+        apply_mode: judgement_fix
+        fix_rule: overlap
+      object_gap_too_small:
+        apply_mode: judgement_fix
+        fix_rule: spacing
+      image_aspect_distortion:
+        apply_mode: judgement_fix
+        fix_rule: image_aspect
+      key_area_cropped:
+        apply_mode: judgement_fix
+        fix_rule: image_crop
+      reading_order:
+        apply_mode: judgement_fix
+        fix_rule: reading_order
+      animation_present:
+        apply_mode: judgement_fix
+        fix_rule: animation
+      wrap_break_changes_meaning:
+        apply_mode: judgement_fix
+        fix_rule: text_wrap
+        note: "widen_to_fit candidate あれば lint 側で auto_fix_candidate に昇格。"
+      heading_hierarchy_broken:
+        apply_mode: judgement_fix
+        fix_rule: heading_hierarchy
+      inner_padding_imbalance:
+        apply_mode: judgement_fix
+        fix_rule: inner_padding
+      card_grid_consistency:
+        apply_mode: judgement_fix
+        fix_rule: card_grid
+      text_vertical_balance:
+        apply_mode: judgement_fix
+        fix_rule: text_vertical_balance
+      image_upscale_ratio:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "画像差し替えが必要 (素材入手と再配置はオペレーター作業)。"
+      alt_text_required:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "著者の意味記述が必要。"
+      color_only_meaning:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "色以外の手がかり (ラベル / 記号 / 形状) の追加はデザイン判断。"
+      missing_required_element:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "content/template 判断が必要。"
+      decorative_isolated_lines:
+        apply_mode: judgement_fix
+        fix_rule: decorative_remove
+        note: "FIX-013 で judgement_fix 経路に移行 (2026-05-20)。lint は manual_required + candidate_values=[{strategy:remove_shape}] を出力。SPA で judgement_reason=auto_fixable に promote されたものだけ pptx_fix が shape を element tree から remove する (strict gate なので promote 必須、自動削除はしない原則を維持)。"
+      slide_size:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "比率変更は配布形態の再判断が必要。"
+
+    rounding_policy:
+      allow_grid_pt: 0.5
+      normalize_geometry_to_integer_pt: true
+      normalize_strategy:
+        x_round_to_pt: 1
+        y_round_to_pt: 1
+        w_round_to_pt: 1
+        h_round_to_pt: 1
+
+# -----------------------------------------------------------------------------
+# Observations (from sampled decks)
+# -----------------------------------------------------------------------------
+observations:
+  e_learning:
+    top_fonts:
+      - "Noto Sans JP Medium"
+      - "Noto Sans JP Bold"
+    frequent_sizes_pt:
+      - 24
+      - 28
+      - 32
+      - 36
+      - 56
+      - 80
+    frequent_text_colors:
+      - "#333333"
+      - "#FFFFFF"
+      - "#A51E6D"
+    issues:
+      - "Some text appears to overflow right edge in the source deck; enforce overflow rule above."
+
+  canva_export:
+    layout_signal:
+      - "Left margin for text is consistently 81pt across observed text boxes."
+    frequent_sizes_pt:
+      - 24
+      - 32
+      - 80
+    frequent_text_colors:
+      - "#1E112D"
+      - "#333333"
+      - "#A51E6D"
