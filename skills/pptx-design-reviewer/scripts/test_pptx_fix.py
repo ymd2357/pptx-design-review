@@ -1277,10 +1277,12 @@ def main() -> int:
             width_pt = sh.width / 12700
             # 改修後 ([[feedback-overflow-fix-priority]]): 右はみ出しは
             # box 全体を shift して box.right を canvas に揃える (width 不変)。
-            # 期待: left=1300→1240 (= canvas 1440 - width 200), width=200 保持。
-            if abs(left_pt - 1240) > 0.5:
+            # 期待: text 描画範囲 (margin 込み) を canvas に揃えるので、
+            # margin_right=7.2pt のとき new_left = 1300 - (200 - 7.2 + 1300 - 1440)
+            #                                 = 1300 - 52.8 ≈ 1247.2pt
+            if abs(left_pt - 1247.2) > 0.5:
                 failures.append(
-                    f"box_canvas_clip expected left shifted to 1240pt; got {left_pt:.2f}pt"
+                    f"box_canvas_clip expected left shifted to ~1247pt; got {left_pt:.2f}pt"
                 )
             if abs(top_pt - 40) > 0.5:
                 failures.append(

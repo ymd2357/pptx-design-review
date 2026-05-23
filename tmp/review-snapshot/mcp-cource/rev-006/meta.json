@@ -2,12 +2,7 @@
   "deck": "mcp-cource",
   "rev": "006",
   "threshold_ae_pixels": 1000,
-  "changed_slides": [
-    8,
-    27,
-    30,
-    32
-  ],
+  "changed_slides": [],
   "slide_diffs": [
     {
       "slide_no": 1,
@@ -46,8 +41,8 @@
     },
     {
       "slide_no": 8,
-      "ae_pixels": 27981,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 9,
@@ -141,8 +136,8 @@
     },
     {
       "slide_no": 27,
-      "ae_pixels": 47732,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 28,
@@ -156,8 +151,8 @@
     },
     {
       "slide_no": 30,
-      "ae_pixels": 30450,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 31,
@@ -166,8 +161,8 @@
     },
     {
       "slide_no": 32,
-      "ae_pixels": 42518,
-      "changed": true
+      "ae_pixels": 0,
+      "changed": false
     },
     {
       "slide_no": 33,

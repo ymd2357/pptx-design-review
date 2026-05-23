@@ -1377,15 +1377,61 @@ def _picture_crop_ratios(shape) -> Optional[dict[str, float]]:
     return ratios
 
 
-def shape_bbox_pt(shape) -> Optional[tuple]:
+_DML_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+
+
+def _absolute_bbox_emu(shape) -> Optional[tuple[int, int, int, int]]:
+    """shape の絶対 EMU 座標を返す。group shape 内の子要素は親 group の
+    xfrm.off + chOff/ext/chExt を考慮して slide canvas 上の絶対座標に変換
+    する。python-pptx の shape.left/.top は group 内ではローカル座標を
+    返すので、group transform を再帰適用しないと canvas はみ出し判定が
+    誤る ([[feedback-overflow-fix-priority]])。"""
     if shape.left is None or shape.top is None or shape.width is None or shape.height is None:
         return None
-    return (
-        emu_to_pt(shape.left),
-        emu_to_pt(shape.top),
-        emu_to_pt(shape.width),
-        emu_to_pt(shape.height),
-    )
+    x = float(shape.left)
+    y = float(shape.top)
+    w = float(shape.width)
+    h = float(shape.height)
+    parent = shape._element.getparent()
+    while parent is not None:
+        tag = parent.tag.split("}", 1)[-1] if "}" in parent.tag else parent.tag
+        if tag != "grpSp":
+            break
+        gxfrm = parent.find(f".//{_DML_NS}xfrm")
+        if gxfrm is not None:
+            goff = gxfrm.find(f"{_DML_NS}off")
+            gchoff = gxfrm.find(f"{_DML_NS}chOff")
+            gext = gxfrm.find(f"{_DML_NS}ext")
+            gchext = gxfrm.find(f"{_DML_NS}chExt")
+            if goff is not None and gchoff is not None:
+                gox = float(goff.get("x", "0"))
+                goy = float(goff.get("y", "0"))
+                gcx = float(gchoff.get("x", "0"))
+                gcy = float(gchoff.get("y", "0"))
+                sx = sy = 1.0
+                if gext is not None and gchext is not None:
+                    ex = float(gext.get("cx", "0"))
+                    ey = float(gext.get("cy", "0"))
+                    cex = float(gchext.get("cx", "1") or "1")
+                    cey = float(gchext.get("cy", "1") or "1")
+                    if cex:
+                        sx = ex / cex
+                    if cey:
+                        sy = ey / cey
+                x = gox + (x - gcx) * sx
+                y = goy + (y - gcy) * sy
+                w = w * sx
+                h = h * sy
+        parent = parent.getparent()
+    return (int(x), int(y), int(w), int(h))
+
+
+def shape_bbox_pt(shape) -> Optional[tuple]:
+    abs_emu = _absolute_bbox_emu(shape)
+    if abs_emu is None:
+        return None
+    x, y, w, h = abs_emu
+    return (emu_to_pt(x), emu_to_pt(y), emu_to_pt(w), emu_to_pt(h))
 
 
 def make_context(
@@ -1459,19 +1505,28 @@ def _estimate_text_render_lines(
     return max(total, 1)
 
 
-def _canvas_overflow_sides(x: float, y: float, w: float, h: float) -> dict[str, float]:
-    """canvas 端で描画要素が clip される方向のはみ出しのみ検出する。
-    上/左方向の bbox はみ出しは透明 textbox では描画に影響しないので
-    検出対象外 (= top/left の数値だけで判定すると過剰検出になる、
-    [[feedback-overflow-fix-priority]])。
-    """
+def _canvas_overflow_sides(
+    x: float, y: float, w: float, h: float,
+    margin_l: float = 0.0, margin_t: float = 0.0,
+    margin_r: float = 0.0, margin_b: float = 0.0,
+) -> dict[str, float]:
+    """text 描画範囲 (= box bbox から text_frame margin を差し引いた inner
+    rect) が canvas 端を超える方向を返す。box の論理座標だけで判定すると
+    透明 textbox の数値上のはみ出しを過剰検出するので、margin を含めた
+    描画位置で判定する ([[feedback-overflow-fix-priority]])。"""
     out: dict[str, float] = {}
-    right = x + w
-    bottom = y + h
-    if right > SLIDE_W_PT + TOL_PT:
-        out["right"] = round(right - SLIDE_W_PT, 2)
-    if bottom > SLIDE_H_PT + TOL_PT:
-        out["bottom"] = round(bottom - SLIDE_H_PT, 2)
+    text_left = x + margin_l
+    text_top = y + margin_t
+    text_right = x + w - margin_r
+    text_bottom = y + h - margin_b
+    if text_left < -TOL_PT:
+        out["left"] = round(-text_left, 2)
+    if text_top < -TOL_PT:
+        out["top"] = round(-text_top, 2)
+    if text_right > SLIDE_W_PT + TOL_PT:
+        out["right"] = round(text_right - SLIDE_W_PT, 2)
+    if text_bottom > SLIDE_H_PT + TOL_PT:
+        out["bottom"] = round(text_bottom - SLIDE_H_PT, 2)
     return out
 
 
@@ -1492,7 +1547,16 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
     decorative_reason = _decorative_template_raster_reason(shape)
     normalized = normalize_bbox(ctx, bbox)
     x, y, w, h = normalized
-    overflow_sides = _canvas_overflow_sides(x, y, w, h)
+    # text_frame margin を差し引いた描画位置で判定 (透明 textbox の bbox
+    # 数値だけのはみ出しを過剰検出しないため)。
+    if shape.has_text_frame:
+        ml = _text_frame_margin_pt_value(shape.text_frame, "margin_left")
+        mt = _text_frame_margin_pt_value(shape.text_frame, "margin_top")
+        mr = _text_frame_margin_pt_value(shape.text_frame, "margin_right")
+        mb = _text_frame_margin_pt_value(shape.text_frame, "margin_bottom")
+    else:
+        ml = mt = mr = mb = 0.0
+    overflow_sides = _canvas_overflow_sides(x, y, w, h, ml, mt, mr, mb)
 
     if shape.has_text_frame and shape.text_frame.text.strip():
         # 1) box_canvas_overflow: box bbox が canvas 外。

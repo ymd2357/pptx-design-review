@@ -2223,9 +2223,9 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
 
     if rule == "box_canvas_clip":
         # DS-OVERFLOW-001 ([[feedback-overflow-fix-priority]]):
-        # lint が右/下方向のはみ出しのみ検出するので、fix も box 全体を
-        # shift して box.right/bottom を canvas に揃える (width/height 不変、
-        # text 全体が canvas 内 visible に戻る)。
+        # lint は text 描画範囲 (margin 込み) で判定。fix も全方向の overflow
+        # に対し box 全体を shift して text 描画範囲を canvas 内に戻す
+        # (width/height 不変)。
         if shape is None:
             return None
         overflow = detail.get("overflow_sides_pt") or {}
@@ -2239,8 +2239,10 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         height_norm = before_geometry["height"] / sy
         right_over = float(overflow.get("right", 0) or 0)
         bottom_over = float(overflow.get("bottom", 0) or 0)
-        new_left = left_norm - right_over if right_over > 0 else left_norm
-        new_top = top_norm - bottom_over if bottom_over > 0 else top_norm
+        left_over = float(overflow.get("left", 0) or 0)
+        top_over = float(overflow.get("top", 0) or 0)
+        new_left = left_norm + max(0.0, left_over) - max(0.0, right_over)
+        new_top = top_norm + max(0.0, top_over) - max(0.0, bottom_over)
         new_w = width_norm
         new_h = height_norm
         if abs(new_left - left_norm) < 0.05 and abs(new_top - top_norm) < 0.05:
