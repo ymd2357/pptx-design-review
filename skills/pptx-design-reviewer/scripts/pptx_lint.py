@@ -424,29 +424,174 @@ def _text_excerpt(shape, limit: int = 80) -> str:
     return text[: limit - 3] + "..."
 
 
-def _estimate_text_width_pt(text: str, font_size_pt: float) -> float:
-    """Rough horizontal-extent estimate for mixed CJK + Latin text at a given
-    font size. CJK/Hiragana/Katakana glyphs count as full-width (1.0 × size);
-    everything else (Latin / digits / spaces / punctuation) as ~0.55× width.
-    The estimate is intentionally conservative on the wide side so that the
-    widen-to-fit auto-fix proposes a target wide enough for the real glyphs
-    rather than a value that ends up overflowing again.
+_FONT_PATH_CACHE: dict[str, Optional[str]] = {}
+_FONT_OBJECT_CACHE: dict[str, Any] = {}
+_FONT_SEARCH_DIRS = (
+    "/Users/yamadakenichi/Library/Fonts",
+    "/Library/Fonts",
+    "/System/Library/Fonts",
+    "/System/Library/Fonts/Supplemental",
+)
+# Latin/EA font 名 → 候補ファイル名 (lower) の mapping
+_FONT_FILE_HINTS = {
+    "calibri": ("calibri.ttf",),
+    "calibri bold": ("calibrib.ttf",),
+    "calibri (ms) bold": ("calibrib.ttf",),
+    "noto sans jp": ("notosansjp[wght].ttf", "notosansjp-regular.otf", "notosansjp-regular.ttf"),
+    "noto sans jp bold": ("notosansjp[wght].ttf", "notosansjp-bold.otf"),
+}
+_FALLBACK_HALF_WIDTH = 0.55  # font が見つからないときの近似 fallback
+_FALLBACK_FULL_WIDTH = 1.0
+
+
+def _find_font_path(font_name: str) -> Optional[str]:
+    """font 名から ttf/otf path を解決。見つからなければ None。"""
+    if not font_name:
+        return None
+    key = font_name.lower()
+    if key in _FONT_PATH_CACHE:
+        return _FONT_PATH_CACHE[key]
+    import os
+    candidates = _FONT_FILE_HINTS.get(key, ())
+    for d in _FONT_SEARCH_DIRS:
+        if not os.path.isdir(d):
+            continue
+        # 完全一致候補から探す
+        for hint in candidates:
+            full = os.path.join(d, hint)
+            if os.path.isfile(full):
+                _FONT_PATH_CACHE[key] = full
+                return full
+            for entry in os.listdir(d):
+                if entry.lower() == hint:
+                    full = os.path.join(d, entry)
+                    _FONT_PATH_CACHE[key] = full
+                    return full
+        # 部分一致 fallback (font 名を space 抜きで比較)
+        compact = font_name.replace(" ", "").lower()
+        for entry in os.listdir(d):
+            if compact in entry.replace(" ", "").lower():
+                full = os.path.join(d, entry)
+                _FONT_PATH_CACHE[key] = full
+                return full
+    _FONT_PATH_CACHE[key] = None
+    return None
+
+
+def _load_font(font_path: str):
+    """fontTools の TTFont を cache 経由で取得。fontTools 未インストール時 None。"""
+    if font_path in _FONT_OBJECT_CACHE:
+        return _FONT_OBJECT_CACHE[font_path]
+    try:
+        from fontTools.ttLib import TTFont  # type: ignore
+    except ImportError:
+        _FONT_OBJECT_CACHE[font_path] = None
+        return None
+    try:
+        font = TTFont(font_path)
+    except Exception:
+        font = None
+    _FONT_OBJECT_CACHE[font_path] = font
+    return font
+
+
+def _glyph_advance_pt(font, ch: str, font_size_pt: float) -> Optional[float]:
+    if font is None:
+        return None
+    try:
+        upm = font["head"].unitsPerEm
+        cmap = font.getBestCmap()
+        gname = cmap.get(ord(ch))
+        if gname is None:
+            return None
+        adv = font["hmtx"][gname][0]
+        return adv / upm * font_size_pt
+    except Exception:
+        return None
+
+
+def _glyph_rsb_pt(font, ch: str, font_size_pt: float) -> Optional[float]:
+    """末尾文字の right sidebearing を返す (advance - xMax)。font の glyf table
+    から bounding box を取得して計算。"""
+    if font is None:
+        return None
+    try:
+        upm = font["head"].unitsPerEm
+        cmap = font.getBestCmap()
+        gname = cmap.get(ord(ch))
+        if gname is None:
+            return None
+        adv = font["hmtx"][gname][0]
+        if "glyf" in font:
+            glyf = font["glyf"][gname]
+            try:
+                glyf.recalcBounds(font["glyf"])
+            except Exception:
+                pass
+            xmax = getattr(glyf, "xMax", None)
+            if xmax is None:
+                return None
+            rsb = adv - xmax
+        elif "CFF " in font or "CFF2" in font:
+            # CFF/CFF2 outline は別途解析が必要。簡略のため None。
+            return None
+        else:
+            return None
+        return rsb / upm * font_size_pt
+    except Exception:
+        return None
+
+
+# 旧: rsb 補正後の renderer 残差 +0.110 × font_size は **font fallback** 由来
+# (= 元 pptx の "Calibri (MS) Bold" 等 Mac PostScript 名を Chromium が解決
+# できず sans-serif fallback)。`pptx_normalize_fonts.py` を前処理に挟むと
+# 残差は -2.62pt (= pixel 量子化レベル) まで縮小するため buffer 不要。
+# 詳細: [[feedback-pptx-font-normalize]]
+_RENDERER_RESIDUAL_RATIO = 0.0
+
+
+def _estimate_text_width_pt(
+    text: str, font_size_pt: float,
+    latin_font_name: Optional[str] = None,
+    ea_font_name: Optional[str] = None,
+) -> float:
+    """font metrics (fontTools) から実描画 text width を返す:
+    width = sum(advance) - last_char_rsb + 0.110 × font_size
+    - advance: 各文字の advance (font の hmtx より)
+    - last_char_rsb: 末尾文字の right sidebearing (= advance - xMax)
+    - 0.110 × font_size: 実測 (2026-05-24) で得た renderer 残差 (汎用性は要検証)
+    font が見つからない / CFF outline の rsb 取れない場合は近似値に fallback。
     """
     if not text:
         return 0.0
-    full = 0
-    half = 0
+    latin_font = _load_font(_find_font_path(latin_font_name or "Calibri Bold"))
+    ea_font = _load_font(_find_font_path(ea_font_name or "Noto Sans JP"))
+
+    def _font_for(ch: str):
+        is_cjk = (
+            "぀" <= ch <= "ヿ"
+            or "㐀" <= ch <= "鿿"
+            or "＀" <= ch <= "￯"
+            or "　" <= ch <= "〿"
+        )
+        return ea_font if is_cjk else latin_font, is_cjk
+
+    sum_advance = 0.0
     for ch in text:
-        if (
-            "぀" <= ch <= "ヿ"          # Hiragana + Katakana
-            or "㐀" <= ch <= "鿿"        # CJK Unified Ideographs
-            or "＀" <= ch <= "￯"        # Halfwidth/Fullwidth forms
-            or "　" <= ch <= "〿"        # CJK Symbols & Punctuation
-        ):
-            full += 1
-        else:
-            half += 1
-    return font_size_pt * (full + half * 0.55)
+        font, is_cjk = _font_for(ch)
+        adv = _glyph_advance_pt(font, ch, font_size_pt)
+        if adv is None:
+            adv = font_size_pt * (_FALLBACK_FULL_WIDTH if is_cjk else _FALLBACK_HALF_WIDTH)
+        sum_advance += adv
+    # 末尾文字 rsb を引く
+    last_ch = text[-1]
+    last_font, _ = _font_for(last_ch)
+    last_rsb = _glyph_rsb_pt(last_font, last_ch, font_size_pt)
+    if last_rsb is None:
+        last_rsb = 0.0
+    # renderer 残差を加算 (実測)
+    renderer_residual = _RENDERER_RESIDUAL_RATIO * font_size_pt
+    return sum_advance - last_rsb + renderer_residual
 
 
 def _text_frame_has_inline_break(text_frame) -> bool:
