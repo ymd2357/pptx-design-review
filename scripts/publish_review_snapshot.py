@@ -8,6 +8,12 @@ With two-layer font pipeline output:
     python3 scripts/publish_review_snapshot.py --deck mcp-cource --rev 007 \
       --lint-json tmp/review/mcp-cource/font-pipeline-rev-007/review-artifact.json
 
+With before/after comparison images:
+    python3 scripts/publish_review_snapshot.py --deck 260329-seminar-curriculum-proposal --rev 034 \
+      --before-images tmp/review/260329-seminar-curriculum-proposal/font-pipeline-rev-034/render-normalized \
+      --after-images tmp/review/260329-seminar-curriculum-proposal/font-pipeline-rev-034/render-fixed \
+      --lint-json tmp/review/260329-seminar-curriculum-proposal/font-pipeline-rev-034/review-artifact.json
+
 The script does not render or lint a deck. It rebuilds
 tmp/review-snapshot/<deck>/rev-<NNN>/ from files already present under
 tmp/review/<deck>/.
@@ -43,12 +49,14 @@ def main() -> int:
     source_dir = REVIEW_ROOT / args.deck
     if not source_dir.is_dir():
         raise SystemExit(f"Source deck directory not found: {source_dir}")
+    if (args.before_images is None) != (args.after_images is None):
+        raise SystemExit("--before-images and --after-images must be provided together")
 
     image_dir = select_image_dir(source_dir, rev)
     lint_json = args.lint_json or select_json(source_dir, rev, kind="lint")
     priorities_json = args.priorities_json or select_json(source_dir, rev, kind="priorities")
 
-    if image_dir is None:
+    if args.before_images is None and image_dir is None:
         raise SystemExit(f"No slide PNG directory found for rev-{rev} under {source_dir}")
     if lint_json is None:
         raise SystemExit(f"No lint JSON found for rev-{rev} under {source_dir}")
@@ -60,11 +68,24 @@ def main() -> int:
     output_dir = SNAPSHOT_ROOT / args.deck / f"rev-{rev}"
     if output_dir.exists():
         shutil.rmtree(output_dir)
-    (output_dir / "images").mkdir(parents=True)
 
-    copied = copy_slide_images(image_dir, output_dir / "images")
-    if copied == 0:
-        raise SystemExit(f"No slide PNG files found in selected image directory: {image_dir}")
+    if args.before_images is not None and args.after_images is not None:
+        before_count = copy_named_slide_images(args.before_images, output_dir / "images" / "before")
+        after_count = copy_named_slide_images(args.after_images, output_dir / "images" / "after")
+        if before_count == 0:
+            raise SystemExit(f"No slide PNG files found in before image directory: {args.before_images}")
+        if after_count == 0:
+            raise SystemExit(f"No slide PNG files found in after image directory: {args.after_images}")
+        copied_message = (
+            f"before={before_count} from {repo_display_path(args.before_images)}, "
+            f"after={after_count} from {repo_display_path(args.after_images)}"
+        )
+    else:
+        assert image_dir is not None
+        copied = copy_named_slide_images(image_dir, output_dir / "images")
+        if copied == 0:
+            raise SystemExit(f"No slide PNG files found in selected image directory: {image_dir}")
+        copied_message = f"{copied} from {repo_display_path(image_dir)}"
 
     lint_payload = rewrite_lint_json(lint_json, output_dir / "lint.json")
     if isinstance(lint_payload, dict):
@@ -73,7 +94,7 @@ def main() -> int:
         rewrite_json(priorities_json, output_dir / "priorities.json")
 
     print(f"snapshot: {repo_display_path(output_dir)}")
-    print(f"images: {copied} from {repo_display_path(image_dir)}")
+    print(f"images: {copied_message}")
     print(f"lint: {repo_display_path(lint_json)}")
     if priorities_json is not None:
         print(f"priorities: {repo_display_path(priorities_json)}")
@@ -99,6 +120,16 @@ def parse_args() -> argparse.Namespace:
         "--priorities-json",
         type=Path,
         help="Explicit priorities JSON path.",
+    )
+    parser.add_argument(
+        "--before-images",
+        type=Path,
+        help="Explicit before slide PNG directory for compare snapshots.",
+    )
+    parser.add_argument(
+        "--after-images",
+        type=Path,
+        help="Explicit after slide PNG directory for compare snapshots.",
     )
     return parser.parse_args()
 
@@ -174,7 +205,10 @@ def newest_mtime(paths: Iterable[Path]) -> float:
     return max(path.stat().st_mtime for path in paths)
 
 
-def copy_slide_images(source_dir: Path, target_dir: Path) -> int:
+def copy_named_slide_images(source_dir: Path, target_dir: Path) -> int:
+    if not source_dir.is_dir():
+        raise SystemExit(f"Slide PNG directory not found: {source_dir}")
+    target_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
     seen: set[int] = set()
     for path in sorted(iter_slide_pngs(source_dir), key=slide_sort_key):
