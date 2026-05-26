@@ -140,8 +140,8 @@ function extractSlideNumbers(value: unknown): number[] {
     }
     if (!current || typeof current !== "object") continue;
     const record = current as Record<string, unknown>;
-    addSlideNumber(numbers, record.slide_index, 1);
-    addSlideNumber(numbers, record.example_slide_index, 1);
+    addSlideNumber(numbers, record.slide_index, 0);
+    addSlideNumber(numbers, record.example_slide_index, 0);
     addSlideNumber(numbers, record.slide, 0);
     addSlideArray(numbers, record.affected_slides);
     stack.push(...Object.values(record));

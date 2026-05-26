@@ -98,10 +98,14 @@ function parseFinding(value: unknown): LintFinding | null {
   const check = stringValue(raw.check) ?? stringValue(detail.check_id);
   if (!check) return null;
 
-  const slideIndex = numberValue(raw.slide_index) ?? numberValue(detail.example_slide_index) ?? 0;
+  const rawSlideIndex = numberValue(raw.slide_index);
+  const exampleSlideIndex = numberValue(detail.example_slide_index);
+  const slideIndex = rawSlideIndex ?? exampleSlideIndex ?? 0;
   const slideNo =
     slideNumberFromPath(stringValue(detail.rendered_image_path) ?? stringValue(evidence.rendered_image_path)) ??
-    slideIndex + 1;
+    positiveSlideNumber(rawSlideIndex) ??
+    positiveSlideNumber(exampleSlideIndex) ??
+    1;
   const shapeId =
     primitiveId(raw.shape_id) ??
     primitiveId(detail.example_shape_id) ??
@@ -161,6 +165,10 @@ function stringValue(value: unknown): string | undefined {
 
 function numberValue(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function positiveSlideNumber(value: number | null): number | null {
+  return value !== null && Number.isInteger(value) && value > 0 ? value : null;
 }
 
 function primitiveId(value: unknown): number | string | null {
