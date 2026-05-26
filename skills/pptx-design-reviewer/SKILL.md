@@ -128,9 +128,17 @@ python3 scripts/pptx_lint.py path/to/DECK.pptx --profile strict
 python3 scripts/pptx_lint.py path/to/DECK.pptx --severity error
 python3 scripts/pptx_lint.py path/to/DECK.pptx --json > lint.json
 python3 scripts/pptx_lint.py path/to/DECK.pptx --structure-json > structure.json
+python3 scripts/pptx_two_layer_lint.py path/to/DECK.pptx --out-dir review/font-pipeline
+python3 scripts/pptx_two_layer_lint.py path/to/DECK.pptx \
+  --out-dir review/font-pipeline --verify-fix
 ```
 
 Exit code: `1` if any error, `0` otherwise. Checks (initial set):
+
+Use `pptx_two_layer_lint.py` when font normalization can affect text-width
+or viewer measurement. It runs raw design lint first, writes a normalized
+derived deck for measurement-sensitive checks, and preserves raw
+`font_family` evidence in the combined `review-artifact.json`.
 
 | Check | Severity | Description |
 | ------- | ---------- | ------------- |
@@ -342,7 +350,7 @@ Use the vscode-pptx-viewer pipeline for both Before and After (see the
 `_render_pptx` is the easiest entry point; for ad-hoc runs invoke the two
 node scripts directly:
 
-\`\`\`bash
+```bash
 # Before
 node skills/pptx-design-reviewer/scripts/render_with_vscode_pptx_viewer.js \\
   BEFORE.pptx review/before-viewer
@@ -354,7 +362,7 @@ node skills/pptx-design-reviewer/scripts/render_with_vscode_pptx_viewer.js \\
   AFTER.pptx review/after-viewer
 node skills/pptx-design-reviewer/scripts/capture_vscode_pptx_viewer.js \\
   review/after-viewer review/after
-\`\`\`
+```
 
 This emits \`review/before/slide-NN.png\` and \`review/after/slide-NN.png\`.
 Assemble a Before/After view (review SPA, custom HTML, or finder preview).

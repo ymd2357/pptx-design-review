@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import json
 from pathlib import Path
 
 HERE = Path(__file__).parent
@@ -20,6 +21,7 @@ sys.path.insert(0, str(HERE))
 
 import make_examples  # noqa: E402
 import pptx_lint  # noqa: E402
+import pptx_two_layer_lint  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 from pptx import Presentation  # noqa: E402
 from pptx.dml.color import RGBColor  # noqa: E402
@@ -323,6 +325,21 @@ def _make_embedded_typeface_suffix_bad(out: Path) -> None:
     run = title.text_frame.paragraphs[0].add_run()
     run.text = "Typeface suffix"
     run.font.name = " Avenir Next Arabic Semi-Bold"
+    run.font.size = Pt(28)
+    prs.save(str(out))
+
+
+def _make_normalizable_full_font_name_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    title = slide.shapes.add_textbox(Pt(40.5), Pt(20), Pt(639), Pt(70))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = title.text_frame.paragraphs[0].add_run()
+    run.text = "Mac full font name"
+    run.font.name = "Calibri (MS) Bold"
     run.font.size = Pt(28)
     prs.save(str(out))
 
@@ -983,6 +1000,7 @@ def main() -> int:
         rendered_low_contrast_images = tmp_dir / "rendered-low-contrast-images"
         allowed_latin_fonts_good = tmp_dir / "allowed-latin-fonts-good.pptx"
         embedded_typeface_suffix_bad = tmp_dir / "embedded-typeface-suffix-bad.pptx"
+        normalizable_full_font_name_bad = tmp_dir / "normalizable-full-font-name-bad.pptx"
         scaled_near_font_sizes_good = tmp_dir / "scaled-near-font-sizes-good.pptx"
         bad_table_cell_font = tmp_dir / "bad-table-cell-font.pptx"
         scaled_near_line_heights_good = tmp_dir / "scaled-near-line-heights-good.pptx"
@@ -1035,6 +1053,7 @@ def main() -> int:
         _make_rendered_low_contrast_case(rendered_low_contrast, rendered_low_contrast_images)
         _make_allowed_latin_fonts_good(allowed_latin_fonts_good)
         _make_embedded_typeface_suffix_bad(embedded_typeface_suffix_bad)
+        _make_normalizable_full_font_name_bad(normalizable_full_font_name_bad)
         _make_scaled_near_font_sizes_good(scaled_near_font_sizes_good)
         _make_bad_table_cell_font(bad_table_cell_font)
         _make_scaled_near_line_heights_good(scaled_near_line_heights_good)
@@ -1257,6 +1276,91 @@ def main() -> int:
                 "embedded-typeface-suffix-bad.pptx did not trigger font_family "
                 "for a non-token embedded typeface with the expected design-token candidate"
             )
+
+        two_layer_out = tmp_dir / "two-layer-out"
+        two_layer_artifact = pptx_two_layer_lint.build_artifacts(
+            normalizable_full_font_name_bad,
+            two_layer_out,
+            consolidate=False,
+        )
+        if not Path(two_layer_artifact["sources"]["normalized_pptx"]).is_file():
+            failures.append("two-layer lint did not generate normalized PPTX")
+        if not Path(two_layer_artifact["sources"]["raw_design_lint_json"]).is_file():
+            failures.append("two-layer lint did not write raw design lint JSON")
+        if not Path(two_layer_artifact["sources"]["normalized_measurement_lint_json"]).is_file():
+            failures.append("two-layer lint did not write normalized measurement lint JSON")
+        if not Path(two_layer_artifact["sources"]["combined_json"]).is_file():
+            failures.append("two-layer lint did not write combined review artifact")
+        if two_layer_artifact["normalization"].get("occurrences", 0) < 1:
+            failures.append(
+                "two-layer lint normalization report did not record any typeface replacement"
+            )
+        raw_layer = two_layer_artifact.get("layers", {}).get("raw_design", {})
+        normalized_layer = two_layer_artifact.get("layers", {}).get("normalized_measurement", {})
+        raw_fonts = [
+            f
+            for f in raw_layer.get("findings", [])
+            if f.get("check") == "font_family"
+        ]
+        normalized_fonts = [
+            f
+            for f in normalized_layer.get("findings", [])
+            if f.get("check") == "font_family"
+        ]
+        review_fonts = [
+            f
+            for f in two_layer_artifact.get("review_findings", [])
+            if f.get("check") == "font_family"
+        ]
+        if not any(
+            f.get("layer") == "raw_design"
+            and f.get("measurement_source") == "raw_pptx"
+            and f.get("detail", {}).get("font") == "Calibri (MS) Bold"
+            for f in raw_fonts
+        ):
+            failures.append("two-layer raw layer did not preserve Calibri (MS) Bold font_family finding")
+        if normalized_fonts:
+            failures.append(
+                "two-layer normalized layer should not keep font_family after Calibri normalization:\n  "
+                + "\n  ".join(f.get("message", "") for f in normalized_fonts)
+            )
+        if not any(
+            f.get("layer") == "raw_design"
+            and f.get("measurement_source") == "raw_pptx"
+            and f.get("detail", {}).get("font") == "Calibri (MS) Bold"
+            for f in review_fonts
+        ):
+            failures.append(
+                "two-layer review_findings did not preserve raw font_family after normalized lint removed it"
+            )
+        if not {
+            "raw_findings",
+            "normalized_findings",
+            "review_findings",
+            "layers",
+        }.issubset(two_layer_artifact):
+            failures.append("two-layer combined artifact is missing raw/normalized/review layers")
+        combined_from_disk = json.loads(
+            Path(two_layer_artifact["sources"]["combined_json"]).read_text(encoding="utf-8")
+        )
+        if combined_from_disk.get("review_findings") != two_layer_artifact.get("review_findings"):
+            failures.append("two-layer combined artifact on disk differs from returned review findings")
+        two_layer_fix_artifact = pptx_two_layer_lint.build_artifacts(
+            normalizable_full_font_name_bad,
+            tmp_dir / "two-layer-fix-out",
+            consolidate=False,
+            verify_fix=True,
+        )
+        fix_verification = two_layer_fix_artifact.get("fix_verification", {})
+        if not fix_verification.get("enabled"):
+            failures.append("two-layer fix verification was not marked enabled")
+        for key in (
+            "fixed_pptx",
+            "fix_actions_json",
+            "fixed_measurement_lint_json",
+        ):
+            if not Path(fix_verification.get(key) or "").is_file():
+                failures.append(f"two-layer fix verification did not write {key}")
 
         scaled_near_font_size_findings = [
             f
