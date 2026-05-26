@@ -692,6 +692,22 @@ def _make_badge_alignment_good(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_badge_alignment_canvas_overflow(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    box = slide.shapes.add_textbox(Pt(1280), Pt(310), Pt(240), Pt(100))
+    box.fill.solid()
+    box.fill.fore_color.rgb = RGBColor.from_string("FFDDDD")
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "右はみ出し"
+    run.font.name = "Noto Sans JP"
+    run.font.size = Pt(24)
+    prs.save(str(out))
+
+
 def _make_decorative_isolated_line_bad(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -1024,6 +1040,7 @@ def main() -> int:
         )
         badge_alignment_bad = tmp_dir / "badge-alignment-bad.pptx"
         badge_alignment_good = tmp_dir / "badge-alignment-good.pptx"
+        badge_alignment_canvas_overflow = tmp_dir / "badge-alignment-canvas-overflow.pptx"
         semantic_title_subtitle_bad = tmp_dir / "semantic-title-subtitle-bad.pptx"
         semantic_title_subtitle_good = tmp_dir / "semantic-title-subtitle-good.pptx"
         text_vertical_balance_good = tmp_dir / "text-vertical-balance-good.pptx"
@@ -1075,6 +1092,7 @@ def main() -> int:
         _make_decorative_line_with_companion_good(decorative_line_with_companion_good)
         _make_badge_alignment_bad(badge_alignment_bad)
         _make_badge_alignment_good(badge_alignment_good)
+        _make_badge_alignment_canvas_overflow(badge_alignment_canvas_overflow)
         _make_semantic_title_subtitle_bad(semantic_title_subtitle_bad)
         _make_semantic_title_subtitle_good(semantic_title_subtitle_good)
         _make_text_vertical_balance_good(text_vertical_balance_good)
@@ -1657,6 +1675,19 @@ def main() -> int:
                 "badge-alignment-good.pptx incorrectly triggered badge_alignment:\n  "
                 + "\n  ".join(f.message for f in badge_good)
             )
+
+        badge_overflow_all = pptx_lint.lint_pptx(badge_alignment_canvas_overflow)
+        badge_overflow_badge = [f for f in badge_overflow_all if f.check == "badge_alignment"]
+        if badge_overflow_badge:
+            failures.append(
+                "canvas-overflow text box must not trigger badge_alignment:\n  "
+                + "\n  ".join(f.message for f in badge_overflow_badge)
+            )
+        badge_overflow_canvas = [
+            f for f in badge_overflow_all if f.check == "box_canvas_overflow"
+        ]
+        if not badge_overflow_canvas:
+            failures.append("canvas-overflow text box should still trigger box_canvas_overflow")
 
         semantic_bad = [
             f

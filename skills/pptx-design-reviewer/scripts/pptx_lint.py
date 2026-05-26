@@ -2639,6 +2639,8 @@ def check_alignment(ctx, slide_idx, slide_id, shape, findings):
 def _is_badge_like_shape(shape, bbox) -> bool:
     if not getattr(shape, "has_text_frame", False):
         return False
+    if getattr(shape, "shape_type", None) != MSO_SHAPE_TYPE.AUTO_SHAPE:
+        return False
     text = _shape_text(shape)
     if not text or len(text) > BADGE_TEXT_LENGTH_MAX:
         return False
@@ -2651,6 +2653,8 @@ def _is_badge_like_shape(shape, bbox) -> bool:
         return False
     x, y, w, h = bbox
     if w <= 0 or h <= 0:
+        return False
+    if x < 0 or y < 0 or x + w > SLIDE_W_PT or y + h > SLIDE_H_PT:
         return False
     if w > BADGE_SHAPE_MAX_WIDTH_PT or h > BADGE_SHAPE_MAX_HEIGHT_PT:
         return False
