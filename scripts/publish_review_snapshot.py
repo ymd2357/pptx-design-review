@@ -4,6 +4,10 @@
 Happy path:
     python3 scripts/publish_review_snapshot.py --deck 260329-seminar-curriculum-proposal --rev 017
 
+With two-layer font pipeline output:
+    python3 scripts/publish_review_snapshot.py --deck mcp-cource --rev 007 \
+      --lint-json tmp/review/mcp-cource/font-pipeline-rev-007/review-artifact.json
+
 The script does not render or lint a deck. It rebuilds
 tmp/review-snapshot/<deck>/rev-<NNN>/ from files already present under
 tmp/review/<deck>/.
@@ -41,13 +45,17 @@ def main() -> int:
         raise SystemExit(f"Source deck directory not found: {source_dir}")
 
     image_dir = select_image_dir(source_dir, rev)
-    lint_json = select_json(source_dir, rev, kind="lint")
-    priorities_json = select_json(source_dir, rev, kind="priorities")
+    lint_json = args.lint_json or select_json(source_dir, rev, kind="lint")
+    priorities_json = args.priorities_json or select_json(source_dir, rev, kind="priorities")
 
     if image_dir is None:
         raise SystemExit(f"No slide PNG directory found for rev-{rev} under {source_dir}")
     if lint_json is None:
         raise SystemExit(f"No lint JSON found for rev-{rev} under {source_dir}")
+    if not lint_json.is_file():
+        raise SystemExit(f"Lint JSON not found: {lint_json}")
+    if priorities_json is not None and not priorities_json.is_file():
+        raise SystemExit(f"Priorities JSON not found: {priorities_json}")
 
     output_dir = SNAPSHOT_ROOT / args.deck / f"rev-{rev}"
     if output_dir.exists():
@@ -58,15 +66,17 @@ def main() -> int:
     if copied == 0:
         raise SystemExit(f"No slide PNG files found in selected image directory: {image_dir}")
 
-    rewrite_json(lint_json, output_dir / "lint.json")
+    lint_payload = rewrite_lint_json(lint_json, output_dir / "lint.json")
+    if isinstance(lint_payload, dict):
+        rewrite_json(lint_json, output_dir / "review-artifact.json")
     if priorities_json is not None:
         rewrite_json(priorities_json, output_dir / "priorities.json")
 
-    print(f"snapshot: {output_dir.relative_to(REPO_ROOT)}")
-    print(f"images: {copied} from {image_dir.relative_to(REPO_ROOT)}")
-    print(f"lint: {lint_json.relative_to(REPO_ROOT)}")
+    print(f"snapshot: {repo_display_path(output_dir)}")
+    print(f"images: {copied} from {repo_display_path(image_dir)}")
+    print(f"lint: {repo_display_path(lint_json)}")
     if priorities_json is not None:
-        print(f"priorities: {priorities_json.relative_to(REPO_ROOT)}")
+        print(f"priorities: {repo_display_path(priorities_json)}")
     return 0
 
 
@@ -76,6 +86,20 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--deck", required=True, help="Deck id under tmp/review/<deck>.")
     parser.add_argument("--rev", required=True, help="Revision number, for example 017 or rev-017.")
+    parser.add_argument(
+        "--lint-json",
+        type=Path,
+        help=(
+            "Explicit lint JSON path. If the file is a two-layer review-artifact, "
+            "its review_findings/findings array is written as lint.json and the "
+            "full artifact is copied to review-artifact.json."
+        ),
+    )
+    parser.add_argument(
+        "--priorities-json",
+        type=Path,
+        help="Explicit priorities JSON path.",
+    )
     return parser.parse_args()
 
 
@@ -177,6 +201,36 @@ def rewrite_json(source: Path, target: Path) -> None:
     with target.open("w", encoding="utf-8") as handle:
         json.dump(data, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
+
+
+def rewrite_lint_json(source: Path, target: Path) -> object:
+    with source.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    if isinstance(data, dict):
+        findings = data.get("review_findings")
+        if findings is None:
+            findings = data.get("findings")
+        if not isinstance(findings, list):
+            raise SystemExit(
+                f"Lint artifact object must contain review_findings[] or findings[]: {source}"
+            )
+        output = findings
+    elif isinstance(data, list):
+        output = data
+    else:
+        raise SystemExit(f"Lint JSON must be a findings array or artifact object: {source}")
+    with target.open("w", encoding="utf-8") as handle:
+        json.dump(output, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
+    return data
+
+
+def repo_display_path(path: Path) -> Path:
+    resolved = path.resolve()
+    try:
+        return resolved.relative_to(REPO_ROOT)
+    except ValueError:
+        return resolved
 
 
 if __name__ == "__main__":
