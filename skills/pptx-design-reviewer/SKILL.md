@@ -137,7 +137,7 @@ Exit code: `1` if any error, `0` otherwise. Checks (initial set):
 | `overflow` | error | Element extends beyond the normalized base slide canvas |
 | `safe_text_area` | warning | Text element outside normalized safe text area (x:81, y:40, w:1278, h:690 at 1440×810 base) |
 | `text_autofit_disabled` | error | Text-to-fit auto-size has a persisted font shrink |
-| `font_family` | warning | Font family not in `Noto Sans JP` / `Avenir Next Arabic` / `Nunito Sans` (weight suffix tolerated) |
+| `font_family` | warning | Embedded typeface not in design-system typography stack (`Noto Sans JP Medium/Bold`, `ヒラギノ角ゴ ProN`, `游ゴシック`, `Montserrat`, `Roboto`, `Calibri`) |
 | `font_size_scale` | warning | Font size not within 1pt of `{20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 80}` after normalization |
 | `line_height` | warning | Fixed paragraph line height not within 2pt of `{24, 30, 36, 42, 66, 90}` after normalization |
 | `text_color_allowlist` | warning | Explicit text color is outside the allowed text palette |

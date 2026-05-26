@@ -30,6 +30,8 @@ def main() -> int:
 
     if not palette.allowed_text_colors_hex:
         failures.append("LintPalette.allowed_text_colors_hex is empty")
+    if not palette.allowed_font_typefaces:
+        failures.append("LintPalette.allowed_font_typefaces is empty")
     if not palette.allowed_fill_colors_hex:
         failures.append("LintPalette.allowed_fill_colors_hex is empty")
     if not palette.text_color_token_by_hex:
@@ -46,6 +48,10 @@ def main() -> int:
     if set(palette.allowed_text_colors_hex) != set(pptx_lint.ALLOWED_TEXT_COLORS_HEX):
         failures.append(
             "pptx_lint.ALLOWED_TEXT_COLORS_HEX drifted from YAML loader"
+        )
+    if set(palette.allowed_font_typefaces) != set(pptx_lint.ALLOWED_FONT_TYPEFACES):
+        failures.append(
+            "pptx_lint.ALLOWED_FONT_TYPEFACES drifted from YAML loader"
         )
     if set(palette.allowed_fill_colors_hex) != set(pptx_lint.ALLOWED_FILL_COLORS_HEX):
         failures.append(
@@ -79,6 +85,20 @@ def main() -> int:
                 f"allowed_text_colors_hex should contain {expected}; got "
                 f"{sorted(palette.allowed_text_colors_hex)}"
             )
+    for expected in (
+        "Noto Sans JP Medium",
+        "Noto Sans JP Bold",
+        "ヒラギノ角ゴ ProN",
+        "游ゴシック",
+        "Montserrat",
+        "Roboto",
+        "Calibri",
+    ):
+        if expected not in palette.allowed_font_typefaces:
+            failures.append(
+                f"allowed_font_typefaces should contain {expected}; got "
+                f"{sorted(palette.allowed_font_typefaces)}"
+            )
 
     if failures:
         print("FAIL:")
@@ -86,9 +106,10 @@ def main() -> int:
             print(f"- {f}")
         return 1
     print(
-        "OK: rules.color.lint_palette loads and matches pptx_lint module "
+        "OK: design-system lint tokens load and match pptx_lint module "
         f"constants ({len(palette.allowed_text_colors_hex)} text + "
-        f"{len(palette.allowed_fill_colors_hex)} fill colors)"
+        f"{len(palette.allowed_fill_colors_hex)} fill colors, "
+        f"{len(palette.allowed_font_typefaces)} font typefaces)"
     )
     return 0
 

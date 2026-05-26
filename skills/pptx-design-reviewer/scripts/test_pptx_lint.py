@@ -128,6 +128,53 @@ def _guideline_lint_check_automation() -> dict[str, str]:
     return automation
 
 
+def _check_fast_text_width_estimator(failures: list) -> None:
+    sample = "AI とシステムを繋ぐための「共通規格」であ"
+    width = pptx_lint._estimate_text_width_pt(
+        sample,
+        36,
+        latin_font_name="Calibri Bold",
+        ea_font_name="Hiragino Sans W6",
+    )
+    if width <= 0:
+        failures.append("fast text width estimator returned a non-positive width")
+    latin = pptx_lint._estimate_text_width_pt(
+        "Automation",
+        24,
+        latin_font_name="Calibri Bold",
+    )
+    spaced = pptx_lint._estimate_text_width_pt(
+        "Automation",
+        24,
+        latin_font_name="Calibri Bold",
+        char_spacing_pt=1.0,
+    )
+    if abs((spaced - latin) - 9.0) > 0.01:
+        failures.append(
+            "fast text width estimator should add explicit char spacing; "
+            f"base={latin:.3f}, spaced={spaced:.3f}"
+        )
+    if (
+        pptx_lint._find_font_path("Hiragino Sans W6") is None
+        and pptx_lint._find_font_path("Noto Sans JP") is None
+    ):
+        failures.append("fast text width estimator could not resolve any East Asian fallback font")
+    expected_typefaces = {
+        "Noto Sans JP Medium",
+        "Noto Sans JP Bold",
+        "ヒラギノ角ゴ ProN",
+        "游ゴシック",
+        "Montserrat",
+        "Roboto",
+        "Calibri",
+    }
+    if expected_typefaces - set(pptx_lint.ALLOWED_FONT_TYPEFACES):
+        failures.append(
+            "allowed font typefaces should be expanded from design-system family+weights; "
+            f"got {sorted(pptx_lint.ALLOWED_FONT_TYPEFACES)}"
+        )
+
+
 def _make_scaled_good(out: Path) -> None:
     """Create a 720x405 deck that is compliant after 1440x810 normalization."""
     prs = Presentation()
@@ -139,14 +186,14 @@ def _make_scaled_good(out: Path) -> None:
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = title.text_frame.paragraphs[0].add_run()
     run.text = "Scaled compliant title"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(28)
 
     body = slide.shapes.add_textbox(Pt(40.5), Pt(100), Pt(639), Pt(200))
     body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = body.text_frame.paragraphs[0].add_run()
     run.text = "Scaled compliant body."
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
 
     prs.save(str(out))
@@ -163,7 +210,7 @@ def _make_centered_single_line_good(out: Path) -> None:
     label.text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
     run = label.text_frame.paragraphs[0].add_run()
     run.text = "Centered single-line label"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
     prs.save(str(out))
 
@@ -178,7 +225,7 @@ def _make_shape_to_fit_text_not_p1_autofit(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.SHAPE_TO_FIT_TEXT
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Shape grows to fit text"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -193,7 +240,7 @@ def _make_text_to_fit_without_scale_not_p1_autofit(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "No persisted shrink"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -225,7 +272,7 @@ def _make_rendered_low_contrast_case(out: Path, image_dir: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Rendered low contrast"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
     prs.save(str(out))
 
@@ -246,15 +293,37 @@ def _make_allowed_latin_fonts_good(out: Path) -> None:
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = title.text_frame.paragraphs[0].add_run()
     run.text = "SHIFT AI"
-    run.font.name = "Avenir Next Arabic"
+    run.font.name = "Montserrat"
     run.font.size = Pt(28)
 
     body = slide.shapes.add_textbox(Pt(40.5), Pt(100), Pt(639), Pt(80))
     body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = body.text_frame.paragraphs[0].add_run()
     run.text = "Fallback Latin"
-    run.font.name = "Nunito Sans"
+    run.font.name = "Roboto"
     run.font.size = Pt(12)
+
+    primary = slide.shapes.add_textbox(Pt(40.5), Pt(190), Pt(639), Pt(80))
+    primary.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = primary.text_frame.paragraphs[0].add_run()
+    run.text = "Primary Japanese"
+    run.font.name = "Noto Sans JP Medium"
+    run.font.size = Pt(12)
+    prs.save(str(out))
+
+
+def _make_embedded_typeface_suffix_bad(out: Path) -> None:
+    prs = Presentation()
+    prs.slide_width = Pt(720)
+    prs.slide_height = Pt(405)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+    title = slide.shapes.add_textbox(Pt(40.5), Pt(20), Pt(639), Pt(60))
+    title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = title.text_frame.paragraphs[0].add_run()
+    run.text = "Typeface suffix"
+    run.font.name = " Avenir Next Arabic Semi-Bold"
+    run.font.size = Pt(28)
     prs.save(str(out))
 
 
@@ -269,7 +338,7 @@ def _make_scaled_near_font_sizes_good(out: Path) -> None:
         box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
         run = box.text_frame.paragraphs[0].add_run()
         run.text = f"Near size {size}"
-        run.font.name = "Noto Sans JP"
+        run.font.name = "Noto Sans JP Medium"
         run.font.size = Pt(size)
     prs.save(str(out))
 
@@ -287,7 +356,7 @@ def _make_scaled_near_line_heights_good(out: Path) -> None:
         para.line_spacing = Pt(line_height)
         run = para.add_run()
         run.text = f"Near line height {line_height}"
-        run.font.name = "Noto Sans JP"
+        run.font.name = "Noto Sans JP Medium"
         run.font.size = Pt(12)
     prs.save(str(out))
 
@@ -316,7 +385,7 @@ def _make_bad_east_asian_font(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "日本語フォント"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
     r_pr = run._r.get_or_add_rPr()
     ea = r_pr.find(f"{A_NS}ea")
@@ -419,7 +488,7 @@ def _add_lint005_text_box(slide, *, x: int, y: int, width: int, text: str):
     para.line_spacing = Pt(30)
     run = para.add_run()
     run.text = text
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     return box
 
@@ -515,13 +584,13 @@ def _add_card_with_text(slide, *, x: int, y: int, width: int, height: int, child
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     title_run = title.text_frame.paragraphs[0].add_run()
     title_run.text = "Card title"
-    title_run.font.name = "Noto Sans JP"
+    title_run.font.name = "Noto Sans JP Medium"
     title_run.font.size = Pt(24)
     body = slide.shapes.add_textbox(Pt(x + 24), Pt(y + child_y + 54), Pt(width - 48), Pt(56))
     body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     body_run = body.text_frame.paragraphs[0].add_run()
     body_run.text = "Card body text"
-    body_run.font.name = "Noto Sans JP"
+    body_run.font.name = "Noto Sans JP Medium"
     body_run.font.size = Pt(20)
     return card
 
@@ -535,13 +604,13 @@ def _make_semantic_title_subtitle_bad(out: Path) -> None:
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     t_run = title.text_frame.paragraphs[0].add_run()
     t_run.text = "Title"
-    t_run.font.name = "Noto Sans JP"
+    t_run.font.name = "Noto Sans JP Medium"
     t_run.font.size = Pt(40)
     subtitle = slide.shapes.add_textbox(Pt(120), Pt(230), Pt(900), Pt(30))
     subtitle.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     s_run = subtitle.text_frame.paragraphs[0].add_run()
     s_run.text = "Subtitle"
-    s_run.font.name = "Noto Sans JP"
+    s_run.font.name = "Noto Sans JP Medium"
     s_run.font.size = Pt(20)
     prs.save(str(out))
 
@@ -555,13 +624,13 @@ def _make_semantic_title_subtitle_good(out: Path) -> None:
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     t_run = title.text_frame.paragraphs[0].add_run()
     t_run.text = "Title"
-    t_run.font.name = "Noto Sans JP"
+    t_run.font.name = "Noto Sans JP Medium"
     t_run.font.size = Pt(40)
     subtitle = slide.shapes.add_textbox(Pt(120), Pt(240), Pt(900), Pt(30))
     subtitle.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     s_run = subtitle.text_frame.paragraphs[0].add_run()
     s_run.text = "Subtitle"
-    s_run.font.name = "Noto Sans JP"
+    s_run.font.name = "Noto Sans JP Medium"
     s_run.font.size = Pt(20)
     prs.save(str(out))
 
@@ -580,7 +649,7 @@ def _make_badge_alignment_bad(out: Path) -> None:
     para.alignment = PP_ALIGN.LEFT
     run = para.add_run()
     run.text = "Beta"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(20)
     run.font.color.rgb = RGBColor.from_string("FFFFFF")
     prs.save(str(out))
@@ -600,7 +669,7 @@ def _make_badge_alignment_good(out: Path) -> None:
     para.alignment = PP_ALIGN.CENTER
     run = para.add_run()
     run.text = "Beta"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(20)
     run.font.color.rgb = RGBColor.from_string("FFFFFF")
     prs.save(str(out))
@@ -622,7 +691,7 @@ def _make_decorative_isolated_line_bad(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "本文 (isolated lines are 240+pt away)"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -640,7 +709,7 @@ def _make_decorative_line_with_companion_good(out: Path) -> None:
     label.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = label.text_frame.paragraphs[0].add_run()
     run.text = "セクション名"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -679,7 +748,7 @@ def _add_lint006_text_box(slide, *, y: int, height: int, anchor, margin_top: int
     para.line_spacing = Pt(30)
     run = para.add_run()
     run.text = "Text vertical balance sample"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     return box
 
@@ -698,7 +767,7 @@ def _make_invisible_text_box_vertical_balance_good(out: Path) -> None:
     para.line_spacing = Pt(30)
     run = para.add_run()
     run.text = "Invisible text box with extra selection height"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -772,7 +841,7 @@ def _add_semantic_text(slide, *, x: int, y: int, width: int, text: str, size: in
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = text
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(size)
     return box
 
@@ -892,13 +961,14 @@ def _make_color_only_bad(out: Path, *, labeled: bool = False) -> None:
             shape.text_frame.auto_size = MSO_AUTO_SIZE.NONE
             run = shape.text_frame.paragraphs[0].add_run()
             run.text = "NG" if idx == 0 else "OK"
-            run.font.name = "Noto Sans JP"
+            run.font.name = "Noto Sans JP Medium"
             run.font.size = Pt(20)
     prs.save(str(out))
 
 
 def main() -> int:
     failures: list = []
+    _check_fast_text_width_estimator(failures)
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_dir = Path(tmp)
@@ -912,6 +982,7 @@ def main() -> int:
         rendered_low_contrast = tmp_dir / "rendered-low-contrast.pptx"
         rendered_low_contrast_images = tmp_dir / "rendered-low-contrast-images"
         allowed_latin_fonts_good = tmp_dir / "allowed-latin-fonts-good.pptx"
+        embedded_typeface_suffix_bad = tmp_dir / "embedded-typeface-suffix-bad.pptx"
         scaled_near_font_sizes_good = tmp_dir / "scaled-near-font-sizes-good.pptx"
         bad_table_cell_font = tmp_dir / "bad-table-cell-font.pptx"
         scaled_near_line_heights_good = tmp_dir / "scaled-near-line-heights-good.pptx"
@@ -963,6 +1034,7 @@ def main() -> int:
         _make_bad_table_cell_fill(bad_table_cell_fill)
         _make_rendered_low_contrast_case(rendered_low_contrast, rendered_low_contrast_images)
         _make_allowed_latin_fonts_good(allowed_latin_fonts_good)
+        _make_embedded_typeface_suffix_bad(embedded_typeface_suffix_bad)
         _make_scaled_near_font_sizes_good(scaled_near_font_sizes_good)
         _make_bad_table_cell_font(bad_table_cell_font)
         _make_scaled_near_line_heights_good(scaled_near_line_heights_good)
@@ -1168,6 +1240,22 @@ def main() -> int:
             failures.append(
                 "allowed-latin-fonts-good.pptx triggered font_family for design guideline fonts:\n  "
                 + "\n  ".join(f.message for f in allowed_latin_font_findings)
+            )
+
+        embedded_typeface_suffix_findings = [
+            pptx_lint.finding_to_json_dict(f)
+            for f in pptx_lint.lint_pptx(embedded_typeface_suffix_bad)
+            if f.check == "font_family"
+        ]
+        if not any(
+            f["detail"].get("font") == "Avenir Next Arabic Semi-Bold"
+            and f["detail"].get("candidate_values", {}).get("candidate_font_typeface") == "Montserrat"
+            and "allowed_font_typefaces" in f["detail"].get("candidate_values", {})
+            for f in embedded_typeface_suffix_findings
+        ):
+            failures.append(
+                "embedded-typeface-suffix-bad.pptx did not trigger font_family "
+                "for a non-token embedded typeface with the expected design-token candidate"
             )
 
         scaled_near_font_size_findings = [

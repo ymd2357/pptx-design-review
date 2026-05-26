@@ -1853,7 +1853,12 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
         if shape is None:
             return None
         candidate = _finding_detail_value(finding, "candidate_values") or {}
-        font_name = candidate.get("candidate_font_family") if isinstance(candidate, dict) else None
+        font_name = (
+            candidate.get("candidate_font_typeface")
+            or candidate.get("candidate_font_family")
+            if isinstance(candidate, dict)
+            else None
+        )
         if not font_name:
             font_name = "Noto Sans JP"
         return FixAction(

@@ -91,7 +91,6 @@ SAFE_TEXT_AREA_PT = (
     SLIDE_H_PT - SAFE_MARGIN_TOP_PT - SAFE_MARGIN_BOTTOM_PT,  # 690
 )
 
-ALLOWED_FONT_FAMILIES = ("Noto Sans JP", "Avenir Next Arabic", "Nunito Sans")
 ALLOWED_FONT_SIZES_PT = {80, 64, 56, 48, 40, 36, 32, 28, 24, 22, 20}
 FONT_SIZE_TOL_PT = 1.0
 ALLOWED_LINE_HEIGHTS_PT = {90, 66, 42, 36, 30, 24}
@@ -210,6 +209,7 @@ PX_PER_PT = 96 / 72
 from design_system_loader import load_lint_palette as _load_lint_palette
 
 _LINT_PALETTE = _load_lint_palette()
+ALLOWED_FONT_TYPEFACES = tuple(sorted(_LINT_PALETTE.allowed_font_typefaces))
 ALLOWED_TEXT_COLORS_HEX = set(_LINT_PALETTE.allowed_text_colors_hex)
 ALLOWED_FILL_COLORS_HEX = set(_LINT_PALETTE.allowed_fill_colors_hex)
 TEXT_COLOR_TOKEN_BY_HEX = dict(_LINT_PALETTE.text_color_token_by_hex)
@@ -334,16 +334,14 @@ def has_animation(slide) -> bool:
     return bool(animation_markers(slide))
 
 
-def _font_name_allowed(name: str) -> bool:
-    """Match family even when the run carries a weight suffix.
+def _clean_font_name(name: str) -> str:
+    return re.sub(r"\s+", " ", name or "").strip()
 
-    Some source decks emit names like "Noto Sans JP Medium" or
-    "Noto Sans JP Bold". Treat those as the same family as "Noto Sans JP".
-    """
-    for family in ALLOWED_FONT_FAMILIES:
-        if name == family or name.startswith(family + " "):
-            return True
-    return False
+
+def _font_name_allowed(name: str) -> bool:
+    """Only exact design-system embedded typefaces are allowed."""
+    name = _clean_font_name(name)
+    return name in ALLOWED_FONT_TYPEFACES
 
 
 def _run_explicit_typefaces(run) -> list[tuple[str, str]]:
@@ -425,7 +423,9 @@ def _text_excerpt(shape, limit: int = 80) -> str:
 
 
 _FONT_PATH_CACHE: dict[str, Optional[str]] = {}
-_FONT_OBJECT_CACHE: dict[str, Any] = {}
+_FONT_OBJECT_CACHE: dict[tuple[str, Optional[int]], Any] = {}
+_FONT_BYTES_CACHE: dict[str, bytes] = {}
+_TEXT_WIDTH_CACHE: dict[tuple[str, float, Optional[str], Optional[str], float], float] = {}
 _FONT_SEARCH_DIRS = (
     "/Users/yamadakenichi/Library/Fonts",
     "/Library/Fonts",
@@ -437,6 +437,10 @@ _FONT_FILE_HINTS = {
     "calibri": ("calibri.ttf",),
     "calibri bold": ("calibrib.ttf",),
     "calibri (ms) bold": ("calibrib.ttf",),
+    "hiragino sans": ("ヒラギノ角ゴシック w6.ttc", "hiragino sans gb.ttc"),
+    "hiragino sans w6": ("ヒラギノ角ゴシック w6.ttc",),
+    "hiraginosans-w6": ("ヒラギノ角ゴシック w6.ttc",),
+    "hiragino kaku gothic pron w6": ("ヒラギノ角ゴシック w6.ttc",),
     "noto sans jp": ("notosansjp[wght].ttf", "notosansjp-regular.otf", "notosansjp-regular.ttf"),
     "noto sans jp bold": ("notosansjp[wght].ttf", "notosansjp-bold.otf"),
 }
@@ -468,9 +472,10 @@ def _find_font_path(font_name: str) -> Optional[str]:
                     _FONT_PATH_CACHE[key] = full
                     return full
         # 部分一致 fallback (font 名を space 抜きで比較)
-        compact = font_name.replace(" ", "").lower()
+        compact = font_name.replace(" ", "").replace("-", "").lower()
         for entry in os.listdir(d):
-            if compact in entry.replace(" ", "").lower():
+            entry_compact = entry.replace(" ", "").replace("-", "").lower()
+            if compact in entry_compact:
                 full = os.path.join(d, entry)
                 _FONT_PATH_CACHE[key] = full
                 return full
@@ -478,20 +483,58 @@ def _find_font_path(font_name: str) -> Optional[str]:
     return None
 
 
-def _load_font(font_path: str):
-    """fontTools の TTFont を cache 経由で取得。fontTools 未インストール時 None。"""
-    if font_path in _FONT_OBJECT_CACHE:
-        return _FONT_OBJECT_CACHE[font_path]
+def _font_weight_from_name(font_name: Optional[str]) -> Optional[int]:
+    if not font_name:
+        return None
+    name = font_name.lower()
+    if "bold" in name:
+        return 700
+    m = re.search(r"\bw([0-9])\b", name)
+    if m:
+        return int(m.group(1)) * 100
+    return None
+
+
+def _font_name_with_run_weight(font_name: str, run) -> str:
     try:
-        from fontTools.ttLib import TTFont  # type: ignore
+        bold = run.font.bold
+    except AttributeError:
+        bold = None
+    try:
+        r_pr = run._r.rPr
+        if r_pr is not None and r_pr.get("b") in {"1", "true", "True"}:
+            bold = True
+    except AttributeError:
+        pass
+    if bold and "bold" not in font_name.lower() and not re.search(r"\bw[5-9]\b", font_name.lower()):
+        return f"{font_name} Bold"
+    return font_name
+
+
+def _load_font(font_path: str, variation_weight: Optional[int] = None):
+    """fontTools の TTFont を cache 経由で取得。fontTools 未インストール時 None。"""
+    cache_key = (font_path, variation_weight)
+    if cache_key in _FONT_OBJECT_CACHE:
+        return _FONT_OBJECT_CACHE[cache_key]
+    try:
+        from fontTools.ttLib import TTCollection, TTFont  # type: ignore
+        from fontTools.varLib import instancer  # type: ignore
     except ImportError:
-        _FONT_OBJECT_CACHE[font_path] = None
+        _FONT_OBJECT_CACHE[cache_key] = None
         return None
     try:
-        font = TTFont(font_path)
+        try:
+            font = TTFont(font_path)
+        except Exception:
+            collection = TTCollection(font_path)
+            font = collection.fonts[0]
+        if variation_weight is not None and "fvar" in font:
+            axes = {axis.axisTag for axis in font["fvar"].axes}
+            if "wght" in axes:
+                font = instancer.instantiateVariableFont(font, {"wght": variation_weight}, inplace=False)
     except Exception:
         font = None
-    _FONT_OBJECT_CACHE[font_path] = font
+    _FONT_OBJECT_CACHE[cache_key] = font
     return font
 
 
@@ -510,34 +553,114 @@ def _glyph_advance_pt(font, ch: str, font_size_pt: float) -> Optional[float]:
         return None
 
 
-def _glyph_rsb_pt(font, ch: str, font_size_pt: float) -> Optional[float]:
-    """末尾文字の right sidebearing を返す (advance - xMax)。font の glyf table
-    から bounding box を取得して計算。"""
+def _glyph_rsb_by_name_pt(font, gname: str, font_size_pt: float) -> Optional[float]:
+    """末尾 glyph の right sidebearing を返す (advance - xMax)。
+
+    `glyf` だけでなく CFF / TTC / variable-font instance でも glyphSet の
+    outline bounds を使って xMax を取る。取得不能なら None。
+    """
     if font is None:
         return None
     try:
         upm = font["head"].unitsPerEm
+        adv = font["hmtx"][gname][0]
+        try:
+            from fontTools.pens.boundsPen import BoundsPen  # type: ignore
+
+            glyph_set = font.getGlyphSet()
+            pen = BoundsPen(glyph_set)
+            glyph_set[gname].draw(pen)
+            if pen.bounds is None:
+                return None
+            _xmin, _ymin, xmax, _ymax = pen.bounds
+        except Exception:
+            return None
+        rsb = adv - xmax
+        return rsb / upm * font_size_pt
+    except Exception:
+        return None
+
+
+def _glyph_rsb_pt(font, ch: str, font_size_pt: float) -> Optional[float]:
+    if font is None:
+        return None
+    try:
         cmap = font.getBestCmap()
         gname = cmap.get(ord(ch))
-        if gname is None:
-            return None
-        adv = font["hmtx"][gname][0]
-        if "glyf" in font:
-            glyf = font["glyf"][gname]
+    except Exception:
+        return None
+    if gname is None:
+        return None
+    return _glyph_rsb_by_name_pt(font, gname, font_size_pt)
+
+
+def _is_east_asian_char(ch: str) -> bool:
+    return (
+        "぀" <= ch <= "ヿ"
+        or "㐀" <= ch <= "鿿"
+        or "＀" <= ch <= "￯"
+        or "　" <= ch <= "〿"
+    )
+
+
+def _font_bytes(font_path: str) -> bytes:
+    if font_path not in _FONT_BYTES_CACHE:
+        with open(font_path, "rb") as fh:
+            _FONT_BYTES_CACHE[font_path] = fh.read()
+    return _FONT_BYTES_CACHE[font_path]
+
+
+def _shape_segment_harfbuzz_width_pt(
+    text: str,
+    font_path: str,
+    font_size_pt: float,
+    *,
+    variation_weight: Optional[int] = None,
+    subtract_final_rsb: bool = True,
+) -> Optional[float]:
+    """Shape one same-font segment with HarfBuzz and return visible advance.
+
+    The returned width is shaped advances, optionally minus the final glyph RSB. If
+    HarfBuzz or font metadata is unavailable, callers fall back to hmtx
+    per-character estimation.
+    """
+    if not text:
+        return 0.0
+    try:
+        import uharfbuzz as hb  # type: ignore
+    except ImportError:
+        return None
+    try:
+        font_data = _font_bytes(font_path)
+        face = hb.Face(font_data)
+        hb_font = hb.Font(face)
+        upm = face.upem
+        hb_font.scale = (upm, upm)
+        if variation_weight is not None:
             try:
-                glyf.recalcBounds(font["glyf"])
+                hb_font.set_variations({"wght": variation_weight})
             except Exception:
                 pass
-            xmax = getattr(glyf, "xMax", None)
-            if xmax is None:
-                return None
-            rsb = adv - xmax
-        elif "CFF " in font or "CFF2" in font:
-            # CFF/CFF2 outline は別途解析が必要。簡略のため None。
+        buf = hb.Buffer()
+        buf.add_str(text)
+        buf.guess_segment_properties()
+        hb.shape(hb_font, buf, {})
+        infos = buf.glyph_infos
+        positions = buf.glyph_positions
+        if not infos or not positions:
             return None
-        else:
-            return None
-        return rsb / upm * font_size_pt
+        advance_pt = sum(pos.x_advance for pos in positions) / upm * font_size_pt
+        font = _load_font(font_path, variation_weight)
+        try:
+            last_gname = font.getGlyphName(infos[-1].codepoint) if font is not None else None
+        except Exception:
+            last_gname = None
+        last_rsb = (
+            _glyph_rsb_by_name_pt(font, last_gname, font_size_pt)
+            if subtract_final_rsb and last_gname
+            else None
+        )
+        return advance_pt - (last_rsb or 0.0)
     except Exception:
         return None
 
@@ -554,44 +677,140 @@ def _estimate_text_width_pt(
     text: str, font_size_pt: float,
     latin_font_name: Optional[str] = None,
     ea_font_name: Optional[str] = None,
+    char_spacing_pt: float = 0.0,
 ) -> float:
-    """font metrics (fontTools) から実描画 text width を返す:
-    width = sum(advance) - last_char_rsb + 0.110 × font_size
-    - advance: 各文字の advance (font の hmtx より)
-    - last_char_rsb: 末尾文字の right sidebearing (= advance - xMax)
-    - 0.110 × font_size: 実測 (2026-05-24) で得た renderer 残差 (汎用性は要検証)
-    font が見つからない / CFF outline の rsb 取れない場合は近似値に fallback。
+    """Fast text width estimator used by normal lint.
+
+    It mirrors the viewer path closely enough for lint/fix decisions without
+    launching a browser:
+    - HarfBuzz shapes same-font text segments when available.
+    - Latin defaults to Calibri Bold; East Asian fallback follows Chromium on
+      macOS (`Hiragino Sans W6`) before project-installed Noto Sans JP.
+    - The final glyph RSB is subtracted from the complete line, including
+      CFF/TTC/variable-font outlines through fontTools glyphSet bounds.
+    - Explicit OOXML character spacing is added as a layout advance.
     """
     if not text:
         return 0.0
-    latin_font = _load_font(_find_font_path(latin_font_name or "Calibri Bold"))
-    ea_font = _load_font(_find_font_path(ea_font_name or "Noto Sans JP"))
+    cache_key = (
+        text,
+        round(font_size_pt, 4),
+        latin_font_name,
+        ea_font_name,
+        round(char_spacing_pt, 4),
+    )
+    cached = _TEXT_WIDTH_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    latin_name = latin_font_name or "Calibri Bold"
+    ea_name = ea_font_name or "Hiragino Sans W6"
+    latin_weight = _font_weight_from_name(latin_name)
+    ea_weight = _font_weight_from_name(ea_name)
+    latin_path = _find_font_path(latin_name)
+    ea_path = _find_font_path(ea_name) or _find_font_path("Noto Sans JP")
+    latin_font = _load_font(latin_path, latin_weight) if latin_path else None
+    ea_font = _load_font(ea_path, ea_weight) if ea_path else None
 
     def _font_for(ch: str):
-        is_cjk = (
-            "぀" <= ch <= "ヿ"
-            or "㐀" <= ch <= "鿿"
-            or "＀" <= ch <= "￯"
-            or "　" <= ch <= "〿"
-        )
-        return ea_font if is_cjk else latin_font, is_cjk
+        is_cjk = _is_east_asian_char(ch)
+        if is_cjk:
+            return ea_font, ea_path, ea_weight, True
+        return latin_font, latin_path, latin_weight, False
 
-    sum_advance = 0.0
-    for ch in text:
-        font, is_cjk = _font_for(ch)
-        adv = _glyph_advance_pt(font, ch, font_size_pt)
-        if adv is None:
-            adv = font_size_pt * (_FALLBACK_FULL_WIDTH if is_cjk else _FALLBACK_HALF_WIDTH)
-        sum_advance += adv
-    # 末尾文字 rsb を引く
-    last_ch = text[-1]
-    last_font, _ = _font_for(last_ch)
-    last_rsb = _glyph_rsb_pt(last_font, last_ch, font_size_pt)
-    if last_rsb is None:
-        last_rsb = 0.0
+    total = 0.0
+    i = 0
+    while i < len(text):
+        font, font_path, weight, is_cjk = _font_for(text[i])
+        j = i + 1
+        while j < len(text):
+            _next_font, next_path, next_weight, next_is_cjk = _font_for(text[j])
+            if (next_path, next_weight, next_is_cjk) != (font_path, weight, is_cjk):
+                break
+            j += 1
+        segment = text[i:j]
+        is_final_segment = j == len(text)
+        segment_width: Optional[float] = None
+        if font_path:
+            segment_width = _shape_segment_harfbuzz_width_pt(
+                segment,
+                font_path,
+                font_size_pt,
+                variation_weight=weight,
+                subtract_final_rsb=is_final_segment,
+            )
+        if segment_width is None:
+            sum_advance = 0.0
+            for ch in segment:
+                adv = _glyph_advance_pt(font, ch, font_size_pt)
+                if adv is None:
+                    adv = font_size_pt * (_FALLBACK_FULL_WIDTH if is_cjk else _FALLBACK_HALF_WIDTH)
+                sum_advance += adv
+            last_rsb = _glyph_rsb_pt(font, segment[-1], font_size_pt) if is_final_segment else 0.0
+            last_rsb = last_rsb or 0.0
+            segment_width = sum_advance - last_rsb
+        total += segment_width
+        i = j
     # renderer 残差を加算 (実測)
     renderer_residual = _RENDERER_RESIDUAL_RATIO * font_size_pt
-    return sum_advance - last_rsb + renderer_residual
+    spacing = max(0, len(text) - 1) * char_spacing_pt
+    result = total + spacing + renderer_residual
+    if len(_TEXT_WIDTH_CACHE) > 10000:
+        _TEXT_WIDTH_CACHE.clear()
+    _TEXT_WIDTH_CACHE[cache_key] = result
+    return result
+
+
+def _text_frame_dominant_typefaces(text_frame) -> tuple[Optional[str], Optional[str]]:
+    latin_weights: dict[str, int] = {}
+    ea_weights: dict[str, int] = {}
+    for para in text_frame.paragraphs:
+        for run in para.runs:
+            weight = len((run.text or "").strip()) or 1
+            for script, name in _run_explicit_typefaces(run):
+                name = _font_name_with_run_weight(name, run)
+                if script == "ea":
+                    ea_weights[name] = ea_weights.get(name, 0) + weight
+                elif script in {"latin", "font"}:
+                    latin_weights[name] = latin_weights.get(name, 0) + weight
+    latin = max(latin_weights.items(), key=lambda item: item[1])[0] if latin_weights else None
+    ea = max(ea_weights.items(), key=lambda item: item[1])[0] if ea_weights else None
+    return latin, ea
+
+
+def _text_frame_dominant_char_spacing_pt(ctx: LintContext, text_frame) -> float:
+    spacing_weights: dict[float, int] = {}
+    for para in text_frame.paragraphs:
+        for run in para.runs:
+            try:
+                r_pr = run._r.rPr
+            except AttributeError:
+                continue
+            if r_pr is None:
+                continue
+            raw = r_pr.get("spc")
+            if raw is None:
+                continue
+            try:
+                spacing_pt = round((int(raw) / 1000.0) * ctx.font_scale, 4)
+            except (TypeError, ValueError):
+                continue
+            weight = len((run.text or "").strip()) or 1
+            spacing_weights[spacing_pt] = spacing_weights.get(spacing_pt, 0) + weight
+    if not spacing_weights:
+        return 0.0
+    return max(spacing_weights.items(), key=lambda item: item[1])[0]
+
+
+def _estimate_text_width_for_frame(ctx: LintContext, text_frame, text: str, font_size_pt: float) -> float:
+    latin_font, ea_font = _text_frame_dominant_typefaces(text_frame)
+    char_spacing_pt = _text_frame_dominant_char_spacing_pt(ctx, text_frame)
+    return _estimate_text_width_pt(
+        text,
+        font_size_pt,
+        latin_font_name=latin_font,
+        ea_font_name=ea_font,
+        char_spacing_pt=char_spacing_pt,
+    )
 
 
 def _text_frame_has_inline_break(text_frame) -> bool:
@@ -1645,7 +1864,7 @@ def _estimate_text_render_lines(
         if not text:
             total += 1
             continue
-        para_w = _estimate_text_width_pt(text, font_size_pt)
+        para_w = _estimate_text_width_for_frame(ctx, shape.text_frame, text, font_size_pt)
         total += max(1, int(math.ceil(para_w / wrap_width_pt)))
     return max(total, 1)
 
@@ -1772,7 +1991,7 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
                     if inner_w <= 0:
                         para_lines = 9999
                     else:
-                        para_w = _estimate_text_width_pt(ptext, font_size_pt)
+                        para_w = _estimate_text_width_for_frame(ctx, shape.text_frame, ptext, font_size_pt)
                         para_lines = max(1, int(math.ceil(para_w / inner_w)))
                 total_required_h += para_lines * para_line_height
                 line_count_by_paragraph.append(para_lines)
@@ -1831,7 +2050,7 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
             word_wrap_enabled = word_wrap is None or word_wrap
             if canvas_remaining > 0 and text_raw:
                 if not word_wrap_enabled:
-                    total_w = _estimate_text_width_pt(text_raw, font_size_pt)
+                    total_w = _estimate_text_width_for_frame(ctx, shape.text_frame, text_raw, font_size_pt)
                     if total_w > canvas_remaining + TOL_PT:
                         text_canvas_fires = True
                         overflow_pt_canvas = total_w - canvas_remaining
@@ -1844,27 +2063,26 @@ def check_overflow(ctx, slide_idx, slide_id, shape, bbox, findings):
                         current_run = ""
                         for ch in word:
                             if (
-                                "぀" <= ch <= "ヿ"
-                                or "㐀" <= ch <= "鿿"
-                                or "＀" <= ch <= "￯"
-                                or "　" <= ch <= "〿"
+                                _is_east_asian_char(ch)
                             ):
                                 if current_run:
                                     max_unit_w = max(
                                         max_unit_w,
-                                        _estimate_text_width_pt(current_run, font_size_pt),
+                                        _estimate_text_width_for_frame(
+                                            ctx, shape.text_frame, current_run, font_size_pt
+                                        ),
                                     )
                                     current_run = ""
                                 max_unit_w = max(
                                     max_unit_w,
-                                    _estimate_text_width_pt(ch, font_size_pt),
+                                    _estimate_text_width_for_frame(ctx, shape.text_frame, ch, font_size_pt),
                                 )
                             else:
                                 current_run += ch
                         if current_run:
                             max_unit_w = max(
                                 max_unit_w,
-                                _estimate_text_width_pt(current_run, font_size_pt),
+                                _estimate_text_width_for_frame(ctx, shape.text_frame, current_run, font_size_pt),
                             )
                     if max_unit_w > canvas_remaining + TOL_PT:
                         text_canvas_fires = True
@@ -2283,6 +2501,7 @@ def check_font(ctx, slide_idx, slide_id, shape, findings):
         if not run.text:
             continue
         for script, name in _run_explicit_typefaces(run):
+            name = _clean_font_name(name)
             if name and not _font_name_allowed(name):
                 key = (script, name)
                 bad_fonts[key] = bad_fonts.get(key, 0) + 1
@@ -2301,7 +2520,7 @@ def check_font(ctx, slide_idx, slide_id, shape, findings):
         findings.append(
             make_finding(
                 "warning", "font_family", slide_idx, slide_id, shape,
-                f"{script} font '{name}' not in allowlist {list(ALLOWED_FONT_FAMILIES)} ({count} run(s))",
+                f"{script} font '{name}' not in allowlist {list(ALLOWED_FONT_TYPEFACES)} ({count} run(s))",
                 {
                     "script": script,
                     "font": name,
@@ -2559,7 +2778,7 @@ def check_wrap_break_changes_meaning(ctx, slide_idx, slide_id, shape, bbox, find
         if font_size_pt and font_size_pt > 0:
             joined = _text_frame_inline_joined_text(shape.text_frame)
             margin_l, margin_r = _text_frame_margin_pt(shape.text_frame)
-            text_width_pt = _estimate_text_width_pt(joined, font_size_pt)
+            text_width_pt = _estimate_text_width_for_frame(ctx, shape.text_frame, joined, font_size_pt)
             required_width_pt = text_width_pt + margin_l + margin_r + 1.0
             current_x, current_y, current_w, current_h = normalized
             safe_right_x = SLIDE_W_PT - SAFE_MARGIN_RIGHT_PT
@@ -4516,6 +4735,52 @@ def _widen_to_fit_candidate(evidence: dict) -> Optional[dict]:
     return None
 
 
+def _font_family_candidate(evidence: dict) -> str:
+    """Choose the nearest design-system embedded typeface for a finding.
+
+    This is a fix candidate, not the allow/deny check. The lint rule itself is
+    strict exact-typeface matching; candidate selection maps common non-token
+    typefaces to the closest declared design-system typeface.
+    """
+    raw_font = _clean_font_name(str(evidence.get("font") or ""))
+    raw_lower = raw_font.lower()
+    allowed_by_lower = {typeface.lower(): typeface for typeface in ALLOWED_FONT_TYPEFACES}
+    for lower, typeface in allowed_by_lower.items():
+        if raw_lower == lower:
+            return typeface
+    for lower, typeface in allowed_by_lower.items():
+        if raw_lower.startswith(lower + " "):
+            return typeface
+    if raw_lower == "noto sans jp" or raw_lower.startswith("noto sans jp "):
+        if "bold" in raw_lower and "Noto Sans JP Bold" in ALLOWED_FONT_TYPEFACES:
+            return "Noto Sans JP Bold"
+        if "Noto Sans JP Medium" in ALLOWED_FONT_TYPEFACES:
+            return "Noto Sans JP Medium"
+    if raw_lower == "montserrat" or raw_lower.startswith("montserrat "):
+        if "Montserrat" in ALLOWED_FONT_TYPEFACES:
+            return "Montserrat"
+    if raw_lower == "roboto" or raw_lower.startswith("roboto "):
+        if "Roboto" in ALLOWED_FONT_TYPEFACES:
+            return "Roboto"
+    if raw_lower == "calibri" or raw_lower.startswith("calibri "):
+        if "Calibri" in ALLOWED_FONT_TYPEFACES:
+            return "Calibri"
+    if raw_lower == "ヒラギノ角ゴ pron" or raw_lower.startswith("ヒラギノ角ゴ pron "):
+        if "ヒラギノ角ゴ ProN" in ALLOWED_FONT_TYPEFACES:
+            return "ヒラギノ角ゴ ProN"
+    if raw_lower == "游ゴシック" or raw_lower.startswith("游ゴシック "):
+        if "游ゴシック" in ALLOWED_FONT_TYPEFACES:
+            return "游ゴシック"
+    script = evidence.get("script")
+    if script == "latin" and "Montserrat" in ALLOWED_FONT_TYPEFACES:
+        return "Montserrat"
+    if "bold" in raw_lower and "Noto Sans JP Bold" in ALLOWED_FONT_TYPEFACES:
+        return "Noto Sans JP Bold"
+    if "Noto Sans JP Medium" in ALLOWED_FONT_TYPEFACES:
+        return "Noto Sans JP Medium"
+    return ALLOWED_FONT_TYPEFACES[0]
+
+
 def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
     if check == "text_autofit_disabled":
         return {"auto_size": "NONE"}
@@ -4529,9 +4794,11 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
             candidate["rounded_bbox_pt"] = [round(value) for value in evidence["bbox_pt"]]
         return candidate or None
     if check == "font_family":
+        candidate = _font_family_candidate(evidence)
         return {
-            "allowed_font_families": list(ALLOWED_FONT_FAMILIES),
-            "candidate_font_family": ALLOWED_FONT_FAMILIES[0],
+            "allowed_font_typefaces": list(ALLOWED_FONT_TYPEFACES),
+            "candidate_font_typeface": candidate,
+            "candidate_font_family": candidate,
         }
     if check == "font_size_scale":
         return {

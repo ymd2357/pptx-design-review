@@ -1,0 +1,5 @@
+Pillow==12.1.1
+PyYAML==6.0.3
+fonttools==4.63.0
+python-pptx==1.0.2
+uharfbuzz==0.54.1

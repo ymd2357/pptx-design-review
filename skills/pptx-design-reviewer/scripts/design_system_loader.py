@@ -26,6 +26,7 @@ DEFAULT_GUIDELINE_PATH = REPO_ROOT / "doc" / "slide-guideline-v1.yml"
 
 @dataclass(frozen=True)
 class LintPalette:
+    allowed_font_typefaces: frozenset[str]
     allowed_text_colors_hex: frozenset[str]
     allowed_fill_colors_hex: frozenset[str]
     text_color_token_by_hex: dict[str, str]
@@ -50,6 +51,33 @@ def _families_from_yaml(node: dict) -> tuple[tuple[str, tuple[str, ...]], ...]:
     return tuple(items)
 
 
+def _allowed_font_typefaces_from_yaml(data: dict) -> frozenset[str]:
+    fonts = (
+        ((data.get("rules") or {}).get("typography") or {}).get("fonts")
+        or {}
+    )
+    typefaces: set[str] = set()
+    for spec in fonts.values():
+        if not isinstance(spec, dict):
+            continue
+        family = spec.get("family")
+        if family:
+            family_name = str(family).strip()
+            weights = spec.get("weights")
+            if isinstance(weights, list) and weights:
+                for weight in weights:
+                    typefaces.add(f"{family_name} {str(weight).strip()}")
+            else:
+                typefaces.add(family_name)
+        stack = spec.get("stack")
+        if isinstance(stack, list):
+            for entry in stack:
+                name = str(entry).strip()
+                if name and name != "sans-serif":
+                    typefaces.add(name)
+    return frozenset(typefaces)
+
+
 def load_lint_palette(path: Path | str | None = None) -> LintPalette:
     yaml_path = Path(path) if path is not None else DEFAULT_GUIDELINE_PATH
     with yaml_path.open("r", encoding="utf-8") as fh:
@@ -65,6 +93,7 @@ def load_lint_palette(path: Path | str | None = None) -> LintPalette:
     fill_token = {_normalize_hex(k): str(v) for k, v in (node.get("fill_color_token_by_hex") or {}).items()}
 
     return LintPalette(
+        allowed_font_typefaces=_allowed_font_typefaces_from_yaml(data),
         allowed_text_colors_hex=frozenset(_normalize_hex(c) for c in (node.get("allowed_text_colors_hex") or [])),
         allowed_fill_colors_hex=frozenset(_normalize_hex(c) for c in (node.get("allowed_fill_colors_hex") or [])),
         text_color_token_by_hex=text_token,

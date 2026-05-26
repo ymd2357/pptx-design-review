@@ -336,8 +336,9 @@ tokens:
 
     typography:
       font_family_primary: "Noto Sans JP"
-      font_family_latin: "Avenir Next Arabic"
-      font_family_fallback: "Nunito Sans"
+      font_family_fallback: "Calibri"
+      font_family_japanese: "\"ヒラギノ角ゴ ProN\", \"Noto Sans JP\", \"游ゴシック\", sans-serif"
+      font_family_latin: "\"Montserrat\", \"Roboto\", sans-serif"
       align:
         horizontal_left: "Left"
         horizontal_center: "Center"
@@ -1239,10 +1240,19 @@ rules:
         weights:
           - "Medium"
           - "Bold"
+      japanese:
+        stack:
+          - "ヒラギノ角ゴ ProN"
+          - "Noto Sans JP"
+          - "游ゴシック"
+          - "sans-serif"
       latin:
-        family: "Avenir Next Arabic"
+        stack:
+          - "Montserrat"
+          - "Roboto"
+          - "sans-serif"
       fallback:
-        family: "Nunito Sans"
+        family: "Calibri"
 
     size_scale_pt:
       title: 80

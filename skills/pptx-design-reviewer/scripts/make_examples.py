@@ -125,11 +125,11 @@ def make_good(out: Path) -> None:
 
     title = slide.shapes.add_textbox(Pt(81), Pt(40), Pt(1278), Pt(120))
     title.text_frame.auto_size = MSO_AUTO_SIZE.NONE
-    _set_run(title.text_frame, "Compliant title", "Noto Sans JP", 56)
+    _set_run(title.text_frame, "Compliant title", "Noto Sans JP Bold", 56)
 
     body = slide.shapes.add_textbox(Pt(81), Pt(200), Pt(1278), Pt(400))
     body.text_frame.auto_size = MSO_AUTO_SIZE.NONE
-    _set_run(body.text_frame, "Compliant body content.", "Noto Sans JP", 24)
+    _set_run(body.text_frame, "Compliant body content.", "Noto Sans JP Medium", 24)
 
     prs.save(str(out))
 
@@ -151,7 +151,7 @@ def make_bad(out: Path) -> None:
     b.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     b.fill.solid()
     b.fill.fore_color.rgb = RGBColor(255, 204, 0)
-    b_run = _set_run(b.text_frame, "Outside safe area", "Noto Sans JP", 24)
+    b_run = _set_run(b.text_frame, "Outside safe area", "Noto Sans JP Medium", 24)
     b_run.font.color.rgb = RGBColor(255, 255, 255)
 
     c = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(10), Pt(120), Pt(48), Pt(48))
@@ -166,12 +166,12 @@ def make_bad(out: Path) -> None:
     d_p.line_spacing = Pt(27)
     d_run = d_p.add_run()
     d_run.text = "Bad line spacing and alignment"
-    d_run.font.name = "Noto Sans JP"
+    d_run.font.name = "Noto Sans JP Medium"
     d_run.font.size = Pt(24)
 
     e = slide.shapes.add_textbox(Emu(round(81.5 * 12700)), Pt(540), Pt(180), Pt(60))
     e.text_frame.auto_size = MSO_AUTO_SIZE.NONE
-    _set_run(e.text_frame, "Half-point geometry", "Noto Sans JP", 24)
+    _set_run(e.text_frame, "Half-point geometry", "Noto Sans JP Medium", 24)
 
     tiny = out.with_name("_lint_tiny.png")
     tiny.write_bytes(TINY_PNG)

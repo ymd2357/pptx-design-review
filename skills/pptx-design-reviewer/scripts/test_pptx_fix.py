@@ -55,7 +55,7 @@ def _build_text_canvas_overflow_fixture(out: Path) -> None:
         "This is intentionally long single-line text that runs far beyond "
         "the canvas right edge because word_wrap is disabled."
     )
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(28)
     prs.save(str(out))
 
@@ -77,7 +77,7 @@ def _build_text_box_overflow_fixture(out: Path) -> None:
         "This sentence is intentionally long enough that wrapping inside the "
         "box generates several rendered lines and overflows the 40pt height."
     )
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -94,7 +94,7 @@ def _build_box_canvas_overflow_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Bad shape A"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -118,7 +118,7 @@ def _build_safe_font_size_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Short label"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(14.75)
     prs.save(str(out))
 
@@ -132,7 +132,7 @@ def _build_manual_font_size_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Cover label"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(22.5)
     prs.save(str(out))
 
@@ -148,7 +148,7 @@ def _build_line_height_fixture(out: Path) -> None:
     para.line_spacing = Pt(16.4)
     run = para.add_run()
     run.text = "Line height fixture"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
     prs.save(str(out))
 
@@ -162,7 +162,7 @@ def _build_wrap_break_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Auto\nmation improves review speed"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -189,7 +189,7 @@ def _build_decorative_isolated_lines_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "本文 (lines are isolated)"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -208,7 +208,7 @@ def _build_badge_alignment_fixture(out: Path) -> None:
     para.alignment = PP_ALIGN.LEFT
     run = para.add_run()
     run.text = "Beta"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(20)
     run.font.color.rgb = RGBColor.from_string("FFFFFF")
     prs.save(str(out))
@@ -224,7 +224,7 @@ def _build_wrap_break_widen_fixture(out: Path) -> None:
     box.text_frame.word_wrap = True
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Auto\nmation improves review speed"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     prs.save(str(out))
 
@@ -241,7 +241,7 @@ def _build_alignment_fixture(out: Path) -> None:
     para.alignment = PP_ALIGN.CENTER
     run = para.add_run()
     run.text = "Alignment fixture"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(12)
     prs.save(str(out))
 
@@ -264,14 +264,14 @@ def _build_contrast_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Low contrast"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("999999")
     box = slide.shapes.add_textbox(Pt(120), Pt(210), Pt(300), Pt(60))
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Moderate contrast"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("858585")
     prs.save(str(out))
@@ -297,7 +297,7 @@ def _build_bg_mode_contrast_fixture(out: Path) -> int:
     para = tf.paragraphs[0]
     run = para.add_run()
     run.text = "White on light gray"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("FFFFFF")
     prs.save(str(out))
@@ -328,7 +328,7 @@ def _build_behind_solid_fill_contrast_fixture(out: Path) -> tuple[int, int]:
     textbox.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = textbox.text_frame.paragraphs[0].add_run()
     run.text = "White on red"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("FFFFFF")
 
@@ -345,7 +345,7 @@ def _build_text_color_allowlist_fixture(out: Path) -> None:
     box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = box.text_frame.paragraphs[0].add_run()
     run.text = "Brand color review"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     run.font.color.rgb = RGBColor.from_string("FF0000")
     prs.save(str(out))
@@ -360,13 +360,13 @@ def _build_text_overlap_fixture(out: Path) -> tuple[int, int]:
     first.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = first.text_frame.paragraphs[0].add_run()
     run.text = "Text overlap A"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     second = slide.shapes.add_textbox(Pt(140), Pt(120), Pt(260), Pt(60))
     second.text_frame.auto_size = MSO_AUTO_SIZE.NONE
     run = second.text_frame.paragraphs[0].add_run()
     run.text = "Text overlap B"
-    run.font.name = "Noto Sans JP"
+    run.font.name = "Noto Sans JP Medium"
     run.font.size = Pt(24)
     ids = (first.shape_id, second.shape_id)
     prs.save(str(out))
