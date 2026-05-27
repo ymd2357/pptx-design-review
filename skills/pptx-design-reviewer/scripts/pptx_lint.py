@@ -4600,6 +4600,23 @@ def _card_grid_auto_fixable(check: str, evidence: dict) -> bool:
     for key in ("top", "width", "height"):
         if key not in medians:
             return False
+    for item in inconsistent:
+        if not isinstance(item, dict):
+            return False
+        container = item.get("container")
+        children = item.get("children")
+        if not isinstance(container, dict) or not isinstance(children, list):
+            return False
+        bbox = container.get("bbox_pt")
+        if not isinstance(bbox, list) or len(bbox) != 4:
+            return False
+        x, y, width, height = (float(value) for value in bbox)
+        if x <= 0 or y <= 0:
+            return False
+        if width >= SLIDE_W_PT * 0.5 or height >= SLIDE_H_PT * 0.5:
+            return False
+        if len(children) < 3:
+            return False
     return True
 
 
@@ -4622,7 +4639,6 @@ _AUTO_FIX_REASONS = {
     "text_autofit_disabled": "mechanical text_frame.auto_size NONE change",
     "font_size_scale": "nearest allowed font size can be applied when pptx_fix fit checks pass",
     "line_height": "nearest allowed fixed line height can be applied when pptx_fix fit checks pass",
-    "alignment_left_top": "mechanical paragraph LEFT and text-frame TOP alignment change",
     "badge_alignment": "mechanical paragraph CENTER and text-frame MIDDLE alignment change for badge container",
 }
 

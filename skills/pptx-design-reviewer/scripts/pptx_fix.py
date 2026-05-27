@@ -202,6 +202,17 @@ def _apply_mode_for_check(check: str | None) -> str | None:
     return entry.get("apply_mode")
 
 
+def _apply_modes_for_rule(rule: str) -> set[str]:
+    modes: set[str] = set()
+    for check, mapped_rule in CHECK_TO_RULE.items():
+        if mapped_rule != rule:
+            continue
+        mode = _apply_mode_for_check(check)
+        if mode is not None:
+            modes.add(mode)
+    return modes
+
+
 @dataclass
 class FixAction:
     rule: str
@@ -1716,6 +1727,9 @@ def _apply_matching_finding_fixability(
             return _apply_finding_fixability(
                 action, finding, judgement_gate=judgement_gate
             )
+    if judgement_gate and "judgement_fix" in _apply_modes_for_rule(action.rule):
+        action.status = "manual_required"
+        action.reasons = sorted(set(action.reasons + ["no_matching_judgement_fix_finding"]))
     return action
 
 

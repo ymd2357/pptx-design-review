@@ -3858,7 +3858,7 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.badge_alignment"
-        detection: "Detect shapes with a solid fill, short single-line text (length<=20), and a near-square / pill bounding box (aspect ratio between 0.5 and 2.5, max width 240pt, max height 120pt) whose paragraph alignment is not CENTER or whose text-frame vertical anchor is not MIDDLE. Emit an auto_fix_candidate with candidate_values={alignment:CENTER, vertical_anchor:MIDDLE}; alignment_left_top is suppressed on these shapes."
+        detection: "Detect AUTO_SHAPE objects fully inside the slide canvas with a solid fill, short single-line text (length<=20), and a near-square / pill bounding box (aspect ratio between 0.5 and 2.5, max width 240pt, max height 120pt) whose paragraph alignment is not CENTER or whose text-frame vertical anchor is not MIDDLE. Emit an auto_fix_candidate with candidate_values={alignment:CENTER, vertical_anchor:MIDDLE}; alignment_left_top is suppressed on these shapes."
         thresholds:
           shape_max_width_pt: 240.0
           shape_max_height_pt: 120.0
@@ -3948,7 +3948,7 @@ rules:
         apply_mode: auto_fix
         fix_rule: line_height
       alignment_left_top:
-        apply_mode: auto_fix
+        apply_mode: judgement_fix
         fix_rule: alignment
       badge_alignment:
         apply_mode: auto_fix

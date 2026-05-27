@@ -1579,6 +1579,50 @@ def main() -> int:
         ]
         if not card_grid_bad_findings:
             failures.append("card-grid-consistency-bad.pptx did not trigger card_grid_consistency")
+        else:
+            card_grid_bad_json = pptx_lint.finding_to_json_dict(card_grid_bad_findings[0])
+            fixability = card_grid_bad_json.get("detail", {}).get("fixability")
+            if fixability != "manual_required":
+                failures.append(
+                    "two-child card-grid-consistency-bad.pptx should remain manual_required; "
+                    f"got {fixability!r}"
+                )
+
+        page_wide_card_grid = {
+            "group_medians": {"top": 0, "width": 1440, "height": 100},
+            "inconsistent_containers": [
+                {
+                    "container": {"bbox_pt": [0.0, 0.0, 1440.0, 99.18]},
+                    "children": [{"shape_id": 1}, {"shape_id": 2}, {"shape_id": 3}],
+                }
+            ],
+        }
+        if pptx_lint._card_grid_auto_fixable("card_grid_consistency", page_wide_card_grid):
+            failures.append("page-wide card_grid finding must not be auto_fix_candidate")
+
+        two_child_card_grid = {
+            "group_medians": {"top": 180, "width": 300, "height": 80},
+            "inconsistent_containers": [
+                {
+                    "container": {"bbox_pt": [90.0, 180.0, 300.0, 80.0]},
+                    "children": [{"shape_id": 1}, {"shape_id": 2}],
+                }
+            ],
+        }
+        if pptx_lint._card_grid_auto_fixable("card_grid_consistency", two_child_card_grid):
+            failures.append("two-child card_grid finding must stay manual_required")
+
+        compact_card_grid = {
+            "group_medians": {"top": 180, "width": 300, "height": 180},
+            "inconsistent_containers": [
+                {
+                    "container": {"bbox_pt": [90.0, 180.0, 300.0, 180.0]},
+                    "children": [{"shape_id": 1}, {"shape_id": 2}, {"shape_id": 3}],
+                }
+            ],
+        }
+        if not pptx_lint._card_grid_auto_fixable("card_grid_consistency", compact_card_grid):
+            failures.append("compact three-child card_grid finding should remain auto_fix_candidate")
 
         decorative_bad_findings = [
             f

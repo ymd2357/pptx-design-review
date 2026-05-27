@@ -105,8 +105,25 @@ def main() -> int:
             f"auto_fix policy under strict gate should apply; got {auto_gated.status}"
         )
 
-    # 5. apply_mode lookup: declared policy returns the right mode.
+    # 5. judgement_fix detector actions with no matching lint finding must not
+    #    apply just because a broad shape detector found a possible edit.
+    unmatched_alignment = pptx_fix._apply_matching_finding_fixability(
+        _action("alignment"), [f4]
+    )
+    if unmatched_alignment.status != "manual_required":
+        failures.append(
+            "unmatched judgement_fix detector action should be skipped under "
+            f"strict gate; got {unmatched_alignment.status}"
+        )
+    if "no_matching_judgement_fix_finding" not in unmatched_alignment.reasons:
+        failures.append(
+            "unmatched judgement_fix detector action missing no-match reason: "
+            f"{unmatched_alignment.reasons}"
+        )
+
+    # 6. apply_mode lookup: declared policy returns the right mode.
     assert pptx_fix._apply_mode_for_check("text_color_allowlist") == "judgement_fix"
+    assert pptx_fix._apply_mode_for_check("alignment_left_top") == "judgement_fix"
     assert pptx_fix._apply_mode_for_check("text_autofit_disabled") == "auto_fix"
     assert pptx_fix._apply_mode_for_check("alt_text_required") == "no_fix"
     assert pptx_fix._apply_mode_for_check("nonexistent_check") is None
