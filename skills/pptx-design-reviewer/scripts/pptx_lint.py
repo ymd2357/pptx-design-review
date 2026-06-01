@@ -2276,7 +2276,22 @@ def check_safe_margins(ctx, slide_idx, slide_id, shape, bbox, findings, slide_ty
     )
 
 
-def check_geometry_rounding(ctx, slide_idx, slide_id, shape, bbox, findings):
+def _shape_is_group_child(shape) -> bool:
+    """Detect whether ``shape`` is a child of a `<p:grpSp>` (group shape).
+    Used by FONT-005 to exclude group children from geometry_rounding
+    auto_fix_candidate promotion.
+    """
+    try:
+        parent = shape._element.getparent()
+    except AttributeError:
+        return False
+    if parent is None:
+        return False
+    tag = parent.tag.split("}", 1)[-1] if "}" in parent.tag else parent.tag
+    return tag == "grpSp"
+
+
+def check_geometry_rounding(ctx, slide_idx, slide_id, shape, bbox, findings, card_grid_child_ids: Optional[set] = None):
     normalized = normalize_bbox(ctx, bbox)
     names = ("x", "y", "w", "h")
     drifted = {
@@ -2289,6 +2304,9 @@ def check_geometry_rounding(ctx, slide_idx, slide_id, shape, bbox, findings):
     msg = "geometry is not rounded to integer pt: " + ", ".join(
         f"{name}={value:g}pt" for name, value in drifted.items()
     )
+    is_group_child = _shape_is_group_child(shape)
+    shape_id = getattr(shape, "shape_id", None)
+    is_card_grid_child = bool(card_grid_child_ids) and shape_id in card_grid_child_ids
     findings.append(
         make_finding(
             "warning", "geometry_rounding", slide_idx, slide_id, shape, msg,
@@ -2296,6 +2314,8 @@ def check_geometry_rounding(ctx, slide_idx, slide_id, shape, bbox, findings):
                 "bbox_pt": [round(v, 3) for v in normalized],
                 "actual_bbox_pt": [round(v, 3) for v in bbox],
                 "drifted": drifted,
+                "is_group_child": is_group_child,
+                "is_card_grid_child": is_card_grid_child,
             },
         )
     )
@@ -4315,6 +4335,17 @@ def lint_pptx(
         check_decorative_isolated_lines(idx, slide_id, records, findings)
         check_inner_padding_imbalance(idx, slide_id, records, findings)
         check_card_grid_consistency(idx, slide_id, records, findings)
+        # FONT-005: collect shape_ids of container children (= shapes whose
+        # bbox lives inside another shape) so check_geometry_rounding can
+        # suppress auto_fix_candidate promotion on those shapes. Per
+        # slide-guideline-v1.yml fix_policy
+        # geometry_rounding.auto_fix_promote_scope.exclude_card_grid_children.
+        card_grid_child_shape_ids: set = set()
+        for _children in _container_children(records).values():
+            for _child in _children:
+                _cs = getattr(getattr(_child, "shape", None), "shape_id", None)
+                if _cs is not None:
+                    card_grid_child_shape_ids.add(_cs)
         check_missing_required_element(ctx, idx, slide_id, records, findings)
         check_heading_hierarchy(ctx, idx, slide_id, records, findings)
         check_reading_order(ctx, idx, slide_id, records, findings)
@@ -4327,7 +4358,7 @@ def lint_pptx(
             overflowed = any(f.check in ("box_canvas_overflow", "overflow_shapes", "overflow_images") for f in findings[before_overflow_count:])
             check_safe_text_area(ctx, idx, slide_id, record, findings, slide_type)
             check_safe_margins(ctx, idx, slide_id, shape, bbox, findings, slide_type)
-            check_geometry_rounding(ctx, idx, slide_id, shape, bbox, findings)
+            check_geometry_rounding(ctx, idx, slide_id, shape, bbox, findings, card_grid_child_ids=card_grid_child_shape_ids)
             check_image_upscale(ctx, idx, slide_id, shape, bbox, findings)
             check_key_area_cropped(ctx, idx, slide_id, shape, bbox, findings)
             check_alt_text(idx, slide_id, shape, findings)
@@ -4584,6 +4615,14 @@ MANUAL_REQUIRED_REASONS = {
 def _geometry_auto_fixable(evidence: dict) -> bool:
     if evidence.get("affected_slides"):
         return False
+    # FONT-005 (rev-007 evidence): group / card_grid 内部 child は auto promote
+    # 対象外。縦移動が card 外に出る被害を確認 (slide 44)。YAML
+    # `fix_policy.geometry_rounding.auto_fix_promote_scope.exclude_group_children=true /
+    # exclude_card_grid_children=true`.
+    if evidence.get("is_group_child"):
+        return False
+    if evidence.get("is_card_grid_child"):
+        return False
     drifted = evidence.get("drifted")
     if not isinstance(drifted, dict) or not drifted:
         return False
@@ -4666,7 +4705,13 @@ def _judgement_auto_fixable(check: str, evidence: dict) -> bool:
     if check in {"low_contrast", "contrast_ratio"}:
         return _contrast_auto_fixable(check, evidence)
     if check == "card_grid_consistency":
-        return _card_grid_auto_fixable(check, evidence)
+        # FONT-005 (rev-007 evidence): card_grid auto_fix_candidate promote を
+        # 全面停止。compact 3-child 限定でも architecture / step / multi-col list
+        # を card_grid と誤認して text を card 外へ移動させる被害が出た
+        # (slide 29/31/35/37/39/41/43/46)。YAML
+        # `fix_policy.card_grid_consistency.auto_fix_promote_scope.disabled=true`.
+        # `_card_grid_auto_fixable` predicate 自体は test 用に動作維持。
+        return False
     return False
 
 

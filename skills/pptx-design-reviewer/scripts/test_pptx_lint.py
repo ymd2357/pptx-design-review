@@ -1621,8 +1621,16 @@ def main() -> int:
                 }
             ],
         }
+        # FONT-005 (rev-007 evidence): predicate 自体は compact-3-child を真と判定
+        # するが、`_judgement_auto_fixable` 経由の昇格は disabled。
         if not pptx_lint._card_grid_auto_fixable("card_grid_consistency", compact_card_grid):
-            failures.append("compact three-child card_grid finding should remain auto_fix_candidate")
+            failures.append(
+                "compact three-child card_grid predicate (direct) must still identify the shape"
+            )
+        if pptx_lint._judgement_auto_fixable("card_grid_consistency", compact_card_grid):
+            failures.append(
+                "FONT-005: card_grid_consistency must no longer auto-fix-promote via _judgement_auto_fixable"
+            )
 
         decorative_bad_findings = [
             f

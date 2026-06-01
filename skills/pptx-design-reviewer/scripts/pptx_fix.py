@@ -1349,18 +1349,45 @@ def _find_bg_repair_target(text_shape, slide, from_hex_bg: str, background_sourc
     text_height = float(getattr(text_shape, "height", 0) or 0)
     cx = text_left + text_width / 2.0
     cy = text_top + text_height / 2.0
-    best = None
-    for candidate in slide.shapes:
-        if candidate is text_shape:
+    # Pre-compute every shape's bbox so we can quickly check whether a
+    # candidate encloses additional shapes (= card-like, FONT-005).
+    other_bboxes: list[tuple] = []
+    for s in slide.shapes:
+        if s is text_shape:
             continue
+        try:
+            s_left = float(getattr(s, "left", 0) or 0)
+            s_top = float(getattr(s, "top", 0) or 0)
+            s_w = float(getattr(s, "width", 0) or 0)
+            s_h = float(getattr(s, "height", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        other_bboxes.append((s, s_left, s_top, s_w, s_h))
+    best = None
+    for candidate, c_left, c_top, c_w, c_h in other_bboxes:
         cand_hex = _shape_solid_fill_hex(candidate)
         if not cand_hex or cand_hex.upper() != from_hex_bg.upper():
             continue
-        c_left = float(getattr(candidate, "left", 0) or 0)
-        c_top = float(getattr(candidate, "top", 0) or 0)
-        c_w = float(getattr(candidate, "width", 0) or 0)
-        c_h = float(getattr(candidate, "height", 0) or 0)
         if not (c_left <= cx <= c_left + c_w and c_top <= cy <= c_top + c_h):
+            continue
+        # FONT-005 (rev-007 evidence): card-like shape (= 内部に 2 つ以上の
+        # 子要素が完全内包される shape) を bg-mode の fill 差し替え target にす
+        # ると card 全体が塗りつぶされる被害が出る (slide 9/10/19)。単一 textbox
+        # が rect の上に載っただけの構成は card ではないので 2 個未満は許容。
+        contained = 0
+        for other, o_l, o_t, o_w, o_h in other_bboxes:
+            if other is candidate:
+                continue
+            if (
+                o_l >= c_left
+                and o_t >= c_top
+                and o_l + o_w <= c_left + c_w
+                and o_t + o_h <= c_top + c_h
+            ):
+                contained += 1
+                if contained >= 2:
+                    break
+        if contained >= 2:
             continue
         area = c_w * c_h
         if best is None or area < best[0]:
