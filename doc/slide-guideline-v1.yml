@@ -3291,7 +3291,7 @@ rules:
             - "threshold"
             - "delta"
             - "unit"
-          candidate_values: "Normalize repeated card container size, row position, padding, and first-child placement as a group."
+          candidate_values: "Normalize repeated card container size, row position, padding, first-child placement, or fit card-owned overflowing text boxes to their owner card when the text visibly fits."
           manual_required_reason: "Repeated-card repair requires template grouping intent review."
         text_vertical_balance:
           evidence_source: "pptx_xml"
@@ -3869,7 +3869,7 @@ rules:
         severity: "warning"
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.card_grid_consistency"
-        detection: "Detect repeated card containers in the same row whose container size, top position, padding, first-child relative placement, or same-role child text placement differs from the row median beyond tolerance."
+        detection: "Detect repeated card containers in the same row whose container size, top position, padding, first-child relative placement, same-role child text placement, card-owned title alignment, or card-owned child visual overflow differs from the intended card grid structure beyond tolerance."
         thresholds:
           group_min: 2
           child_count_min: 2
@@ -3878,6 +3878,22 @@ rules:
           size_tolerance_pt: 6
           padding_tolerance_pt: 8
           first_child_relative_tolerance_pt: 14
+          child_visual_overflow_tolerance_pt: 2
+          child_visual_overflow_epsilon_pt: 0.25
+          text_anchor_edge_tolerance_pt: 4
+          text_inset_max_pt: 32
+          text_fit_margin_pt: 24
+          title_relative_top_min: 0.30
+          title_relative_top_max: 0.55
+          title_center_tolerance_pt: 18
+          inline_group_center_tolerance_pt: 2
+          component_max_width_ratio: 0.75
+          component_max_height_ratio: 0.85
+          component_min_height_pt: 120
+          center_child_width_ratio_max: 0.55
+          center_child_height_ratio_max: 0.45
+          slide_scope_centered_text_y_min_ratio: 0.70
+          slide_scope_centered_text_width_min_ratio: 0.50
       text_vertical_balance:
         severity: "warning"
         automation: "automated"
@@ -3947,6 +3963,7 @@ rules:
       line_height:
         apply_mode: auto_fix
         fix_rule: line_height
+        note: "REV-007 で line_height 単独の被害は未確認だが、card_grid / geometry の text 移動と組み合わさるとリズム崩壊に寄与する。auto_fix は維持しつつ、card 内 child への適用は judgement_gate=True 環境では card_grid 側の制約に従う。"
       alignment_left_top:
         apply_mode: judgement_fix
         fix_rule: alignment
@@ -3956,13 +3973,22 @@ rules:
       geometry_rounding:
         apply_mode: judgement_fix
         fix_rule: geometry
-        note: "drift が 0.1pt 未満なら lint 側で auto_fix_candidate に昇格 (実装条件)。"
+        note: "drift が 0.1pt 未満なら lint 側で auto_fix_candidate に昇格 (実装条件)。ただし card / group 内部 child は昇格対象外 (= 必ず judgement 経由)。REV-007 で card 内 text shape が card 外まで縦移動する被害を確認 (slide 29/31/35/44)。"
+        auto_fix_promote_scope:
+          max_drift_pt: 0.1
+          exclude_group_children: true
+          exclude_card_grid_children: true
       low_contrast:
         apply_mode: judgement_fix
         fix_rule: contrast
+        note: "background_source=behind_solid_fill では enclosing shape の fill を差し替えるため、card-like (= 内部に子テキスト/icon を含む) shape を target にしないこと。REV-007 で card 全体が白塗りされる被害を確認 (slide 9/10/19)。target は『text shape を覆う最小面積の solid fill rect で、それ自身が他 shape を含まないこと』に限定。"
+        bg_mode_target_constraint:
+          forbid_card_like_shape: true
+          forbid_shape_with_child: true
       contrast_ratio:
         apply_mode: judgement_fix
         fix_rule: contrast
+        note: "low_contrast と同じ bg_mode_target_constraint を適用。"
       font_family:
         apply_mode: judgement_fix
         fix_rule: font_family
@@ -3972,6 +3998,9 @@ rules:
       background_color_palette:
         apply_mode: judgement_fix
         fix_rule: fill_color
+        note: "card-like shape (= 内部に子テキスト/icon を含む) の fill は SPA judgement 必須で auto promote 不可。REV-007 で card 背景消去の被害を確認 (slide 9/10/19)。"
+        auto_fix_promote_scope:
+          forbid_card_like_shape: true
       box_canvas_overflow:
         apply_mode: auto_fix
         fix_rule: box_canvas_clip
@@ -4030,6 +4059,9 @@ rules:
       card_grid_consistency:
         apply_mode: judgement_fix
         fix_rule: card_grid
+        note: "compact 3-child card への限定昇格は REV-007 で破綻 (slide 29/31/35/37/39/41/43/46 で architecture / step / multi-col list を card_grid と誤認 → text が card 外移動)。lint 側の auto_fix_candidate 昇格を全廃する。card_grid の auto apply は SPA judgement (= auto_fixable promote) 経由のみとする。"
+        auto_fix_promote_scope:
+          disabled: true
       text_vertical_balance:
         apply_mode: judgement_fix
         fix_rule: text_vertical_balance
