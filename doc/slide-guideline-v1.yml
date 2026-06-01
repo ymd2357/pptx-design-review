@@ -3403,6 +3403,14 @@ rules:
         impact_axis: "readability"
         issue_title: "テキスト自体がスライド右端を超えている"
         action: "word_wrap 有効化 / 枠の幅をスライドに合わせる / フォントサイズ縮小 のいずれかを SPA で選んで適用する。"
+      text_outside_container:
+        status: "implemented_lint"
+        priority: "P0"
+        detection: "automated"
+        fix_policy: "manual_review"
+        impact_axis: "readability"
+        issue_title: "テキストが card / box 内に収まらず container 外にはみ出している"
+        action: "container (= 包んでいる solid-fill shape) の bbox 外に text bbox が 1pt 以上出ている。container 拡張・text box 縮小・行数圧縮など視覚判断で修正する。FONT-006 案B (bbox-only / 2-loop + solid fill フィルタ + 最小面積 enclosing)。"
       animation_present:
         status: "implemented_lint"
         priority: "P1"
@@ -3691,6 +3699,11 @@ rules:
         automation: "automated"
         priority_catalog: "rules.lint.priority_catalog.text_canvas_overflow"
         detection: "text を canvas 端 (wrap_w = min(box.width, canvas.right - box.left)) で強制改行した場合でも、wrap できない unit (word_wrap=False のとき text 全幅、または 1 単語/1 文字が wrap_w 超え) が canvas 右端を超える場合に発火。DS-OVERFLOW-001 段階3 (2026-05-23)。"
+      text_outside_container:
+        severity: "warning"
+        automation: "automated"
+        priority_catalog: "rules.lint.priority_catalog.text_outside_container"
+        detection: "FONT-006 案B (bbox-only / no-containment-graph)。text shape の bbox 中心を内側に持ち、area が child より大きく、solid fill を持つ shape のうち最小面積のものを container として、child の bbox がその container の bbox を 1pt 以上出る場合に発火。containment graph (`extract_structure_relations` / `_container_children`) には依存しない別系統評価。"
       overflow_shapes:
         severity: "error"
         automation: "automated"
@@ -4089,6 +4102,10 @@ rules:
         apply_mode: no_fix
         fix_rule: null
         manual_reason: "比率変更は配布形態の再判断が必要。"
+      text_outside_container:
+        apply_mode: no_fix
+        fix_rule: null
+        manual_reason: "container 拡張 / text box 縮小 / 行数圧縮 など視覚判断が必要 (FONT-006 案B)。"
 
     rounding_policy:
       allow_grid_pt: 0.5

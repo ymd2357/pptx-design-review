@@ -3827,6 +3827,120 @@ def _slide_type_detail(ctx: LintContext, records: list[ShapeRecord]) -> dict:
     return detail
 
 
+def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    """FONT-006 案 B: bbox-only / no-containment-graph ベース detector.
+
+    `extract_structure_relations` や `_container_children` を経由せず、slide 内
+    の shape を 2 重ループで直接照合する。text を持つ child について、
+    solid-fill を持ち、child の bbox 中心を内側に持ち、area が child より大き
+    い shape を「container 候補」とし、その中で最小面積のものを enclosing
+    container として採用する。child の bbox が container の bbox を 1pt 以上
+    出ていれば warning を発火する。
+
+    案 A (containment-graph ベース) と異なり solid-fill の有無で container を
+    限定するので、fill 無の container は見落とすが、containment 判定の癖に
+    依存しない別系統の評価として補完的に動作する。fixability は
+    `manual_required` 固定 (apply_mode: no_fix)。
+    """
+    text_records = [r for r in records if r.kind == "text"]
+    if not text_records:
+        return
+    # Precompute solid-fill candidates with their bbox + area.
+    candidates: list[tuple[ShapeRecord, str, float]] = []
+    for rec in records:
+        if rec.kind in {"text"}:
+            # text shapes themselves can technically have a solid fill, but
+            # treating them as enclosing containers is noisy; lint other
+            # text-vs-text overlaps separately.
+            continue
+        try:
+            fill_hex = _solid_shape_fill_rgb_hex(rec.shape)
+        except (AttributeError, TypeError, ValueError):
+            fill_hex = None
+        if fill_hex is None:
+            continue
+        area = _bbox_area(rec.bbox_pt)
+        if area <= 0:
+            continue
+        candidates.append((rec, fill_hex, area))
+    if not candidates:
+        return
+
+    for child in text_records:
+        child_area = _bbox_area(child.bbox_pt)
+        if child_area <= 0:
+            continue
+        child_center = _bbox_center(child.bbox_pt)
+        enclosing: Optional[tuple[ShapeRecord, str, float]] = None
+        for cand in candidates:
+            cand_rec, _cand_fill, cand_area = cand
+            if cand_rec is child or id(cand_rec) == id(child):
+                continue
+            if cand_area <= child_area:
+                continue
+            if not _point_in_bbox(child_center, cand_rec.bbox_pt):
+                continue
+            if enclosing is None or cand_area < enclosing[2]:
+                enclosing = cand
+        if enclosing is None:
+            continue
+        container, container_fill_hex, _container_area = enclosing
+        overflow_sides = _bbox_overflow_sides(container.bbox_pt, child.bbox_pt)
+        # _bbox_overflow_sides already filters by TOL_PT (0.5pt); enforce
+        # the documented 1pt threshold explicitly so that minor rounding
+        # noise around the edge does not fire here.
+        overflow_sides = {
+            side: value for side, value in overflow_sides.items() if value >= 1.0
+        }
+        if not overflow_sides:
+            continue
+        direction = max(overflow_sides.items(), key=lambda item: item[1])
+        child_bbox_rounded = [round(v, 2) for v in child.bbox_pt]
+        container_bbox_rounded = [round(v, 2) for v in container.bbox_pt]
+        evidence = {
+            "direction": direction[0],
+            "overflow_pt": round(direction[1], 2),
+            "overflow_sides_pt": {side: round(v, 2) for side, v in overflow_sides.items()},
+            "container_shape_id": getattr(container.shape, "shape_id", None),
+            "container_shape_name": getattr(container.shape, "name", None),
+            "container_bbox_pt": container_bbox_rounded,
+            "child_bbox_pt": child_bbox_rounded,
+            "container_fill_hex": container_fill_hex,
+            "detection_strategy": "bbox_only_solid_fill_enclosing",
+        }
+        manual_reason = MANUAL_REQUIRED_REASONS.get(
+            "text_outside_container",
+            "text shape extends past its visual container bbox",
+        )
+        detail = {
+            "container": _shape_record_detail(container),
+            "child": _shape_record_detail(child),
+            "evidence": evidence,
+            "fixability": "manual_required",
+            "fixability_reason": manual_reason,
+            "manual_required_reason": manual_reason,
+            "measurement_confidence": "medium",
+            "evidence_source": "pptx_xml",
+            "evidence_confidence": "medium",
+        }
+        message = (
+            f"text overflows enclosing container {_shape_label(container)} "
+            f"by {direction[1]:.1f}pt {direction[0]} "
+            f"(child={_shape_label(child)})"
+        )
+        findings.append(
+            make_finding(
+                "warning",
+                "text_outside_container",
+                slide_idx,
+                slide_id,
+                child.shape,
+                message,
+                detail,
+            )
+        )
+
+
 def check_missing_required_element(ctx, slide_idx, slide_id, records: list[ShapeRecord], findings):
     text_records = _text_records(records)
     if not text_records:
@@ -4346,6 +4460,7 @@ def lint_pptx(
                 _cs = getattr(getattr(_child, "shape", None), "shape_id", None)
                 if _cs is not None:
                     card_grid_child_shape_ids.add(_cs)
+        check_text_outside_container(idx, slide_id, records, findings)
         check_missing_required_element(ctx, idx, slide_id, records, findings)
         check_heading_hierarchy(ctx, idx, slide_id, records, findings)
         check_reading_order(ctx, idx, slide_id, records, findings)
@@ -4609,6 +4724,7 @@ MANUAL_REQUIRED_REASONS = {
     "inner_padding_imbalance": "container padding repair requires composition review",
     "card_grid_consistency": "repeated card repair requires template grouping intent review",
     "text_vertical_balance": "vertical balance repair requires visual review",
+    "text_outside_container": "text shape extends past its enclosing solid-fill container bbox; resize box or reduce text to fit (manual)",
 }
 
 

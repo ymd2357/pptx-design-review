@@ -76,6 +76,7 @@ KNOWN_EMITTED_CHECKS = EXPECTED_BAD_CHECKS | {
     "wrap_break_changes_meaning",
     "decorative_isolated_lines",
     "badge_alignment",
+    "text_outside_container",
 } | LINT005_CHECKS
 
 LINT004_POLICY = {
@@ -585,6 +586,45 @@ def _make_object_relationships_bad(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_text_outside_container_bad(out: Path) -> None:
+    """FONT-006 案B: card / box 内の text shape が container bbox を超えている fixture."""
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    # solid-fill card container
+    card = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(200), Pt(200), Pt(300), Pt(150))
+    card.fill.solid()
+    card.fill.fore_color.rgb = RGBColor.from_string("E0E8F0")
+    # text bbox center inside card (300+150=center 350,275), but extends past
+    # right edge by ~120pt (text right=620 vs card right=500).
+    box = slide.shapes.add_textbox(Pt(280), Pt(240), Pt(340), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Overflows the card to the right"
+    run.font.name = "Noto Sans JP Medium"
+    run.font.size = Pt(20)
+    prs.save(str(out))
+
+
+def _make_text_outside_container_good(out: Path) -> None:
+    """text が container 内部に収まる対照 fixture (発火しない)."""
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    card = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(200), Pt(200), Pt(300), Pt(150))
+    card.fill.solid()
+    card.fill.fore_color.rgb = RGBColor.from_string("E0E8F0")
+    box = slide.shapes.add_textbox(Pt(220), Pt(240), Pt(260), Pt(60))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Inside the card"
+    run.font.name = "Noto Sans JP Medium"
+    run.font.size = Pt(20)
+    prs.save(str(out))
+
+
 def _make_unmarked_small_gap_good(out: Path) -> None:
     prs = Presentation()
     prs.slide_width = Pt(1440)
@@ -1032,6 +1072,8 @@ def main() -> int:
         structural_containment_overflow = tmp_dir / "structural-containment-overflow.pptx"
         object_relationships_bad = tmp_dir / "object-relationships-bad.pptx"
         unmarked_small_gap_good = tmp_dir / "unmarked-small-gap-good.pptx"
+        text_outside_container_bad = tmp_dir / "text-outside-container-bad.pptx"
+        text_outside_container_good = tmp_dir / "text-outside-container-good.pptx"
         card_grid_consistency_good = tmp_dir / "card-grid-consistency-good.pptx"
         card_grid_consistency_bad = tmp_dir / "card-grid-consistency-bad.pptx"
         decorative_isolated_line_bad = tmp_dir / "decorative-isolated-line-bad.pptx"
@@ -1086,6 +1128,8 @@ def main() -> int:
         _make_structural_containment_overflow(structural_containment_overflow)
         _make_object_relationships_bad(object_relationships_bad)
         _make_unmarked_small_gap_good(unmarked_small_gap_good)
+        _make_text_outside_container_bad(text_outside_container_bad)
+        _make_text_outside_container_good(text_outside_container_good)
         _make_card_grid_consistency_good(card_grid_consistency_good)
         _make_card_grid_consistency_bad(card_grid_consistency_bad)
         _make_decorative_isolated_line_bad(decorative_isolated_line_bad)
@@ -1908,6 +1952,49 @@ def main() -> int:
             failures.append(
                 "color-only-labeled.pptx triggered color_only_meaning:\n  "
                 + "\n  ".join(f.message for f in labeled_color_findings)
+            )
+
+        toc_bad_findings = [
+            f
+            for f in pptx_lint.lint_pptx(text_outside_container_bad)
+            if f.check == "text_outside_container"
+        ]
+        if not toc_bad_findings:
+            failures.append(
+                "text-outside-container-bad.pptx did not trigger text_outside_container"
+            )
+        else:
+            ev = toc_bad_findings[0].detail.get("evidence") or {}
+            for key in (
+                "direction",
+                "overflow_pt",
+                "container_shape_id",
+                "container_bbox_pt",
+                "child_bbox_pt",
+                "container_fill_hex",
+            ):
+                if key not in ev:
+                    failures.append(
+                        f"text_outside_container evidence missing key {key!r}; got {sorted(ev)}"
+                    )
+            if ev.get("direction") != "right":
+                failures.append(
+                    f"text_outside_container expected direction=right; got {ev.get('direction')!r}"
+                )
+            if toc_bad_findings[0].detail.get("fixability") != "manual_required":
+                failures.append(
+                    "text_outside_container should be manual_required; got "
+                    f"{toc_bad_findings[0].detail.get('fixability')!r}"
+                )
+        toc_good_findings = [
+            f
+            for f in pptx_lint.lint_pptx(text_outside_container_good)
+            if f.check == "text_outside_container"
+        ]
+        if toc_good_findings:
+            failures.append(
+                "text-outside-container-good.pptx incorrectly triggered text_outside_container:\n  "
+                + "\n  ".join(f.message for f in toc_good_findings)
             )
 
     if failures:
