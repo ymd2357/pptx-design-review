@@ -3827,7 +3827,7 @@ def _slide_type_detail(ctx: LintContext, records: list[ShapeRecord]) -> dict:
     return detail
 
 
-def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord], findings):
+def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord], findings, ctx: Optional[LintContext] = None):
     """FONT-006 案 B: bbox-only / no-containment-graph ベース detector.
 
     `extract_structure_relations` や `_container_children` を経由せず、slide 内
@@ -3970,15 +3970,146 @@ def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord]
     # 「textbox 幅が異常に広い caption」(= slide 37 #16/#25, slide 46 #36) を
     # 拾うため、area-based slot 帰属で text を 1 slot に紐づけ、text bbox 幅が
     # slot 幅を超える場合に発火する。
-    _emit_repeated_slot_overflow(slide_idx, slide_id, records, findings)
+    _emit_repeated_slot_overflow(slide_idx, slide_id, records, findings, ctx=ctx)
 
 
 REPEATED_SLOT_OVERFLOW_RATIO = 1.2
 REPEATED_SLOT_Y_TOL_PT = 8.0
 REPEATED_SLOT_CAPTION_BELOW_PT = 120.0
 
+# FONT-007/4: card 内 child role 推定の閾値群
+CARD_ROLE_ICON_MAX_SIDE_PT = 100.0
+CARD_ROLE_NUMBER_MAX_LEN = 3
+CARD_ROLE_BADGE_MAX_LEN = 12
+CARD_ROLE_CONFIDENCE_MIN = 0.7
 
-def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord], findings):
+
+_NUMBER_RE = re.compile(r"^[0-9０-９IVXivx]{1,3}[.．、)）]?$")
+
+
+def _card_classify_role(
+    record: ShapeRecord,
+    container: ShapeRecord,
+    siblings_font_sizes: dict[int, Optional[float]],
+    ctx: Optional[LintContext] = None,
+) -> tuple[str, float]:
+    """単一 child shape の role を推定する。
+
+    返り値: (role, confidence)。
+    role は title / body / icon / number / badge / unknown のいずれか。
+    confidence >= CARD_ROLE_CONFIDENCE_MIN (= 0.7) のみ採用、低い場合は
+    "unknown" を返す。
+    """
+    bbox = record.bbox_pt
+    width, height = bbox[2], bbox[3]
+    kind = record.kind
+    shape = record.shape
+
+    text = ""
+    if getattr(shape, "has_text_frame", False):
+        try:
+            text = _shape_text(shape) or ""
+        except (AttributeError, TypeError, ValueError):
+            text = ""
+    text_stripped = text.strip()
+    text_len = len(text_stripped)
+
+    # ---- icon: image / 小さい shape で text なし ---------------------------
+    if kind == "image":
+        if width <= CARD_ROLE_ICON_MAX_SIDE_PT and height <= CARD_ROLE_ICON_MAX_SIDE_PT:
+            return ("icon", 0.9)
+        return ("icon", 0.75)
+    if kind == "shape" and text_len == 0:
+        if width <= CARD_ROLE_ICON_MAX_SIDE_PT and height <= CARD_ROLE_ICON_MAX_SIDE_PT:
+            return ("icon", 0.8)
+        # text のない大きい shape は装飾扱い (= unknown / low confidence)
+        return ("unknown", 0.4)
+
+    if kind != "text":
+        return ("unknown", 0.3)
+
+    # ---- number: 数字短文字 ------------------------------------------------
+    if text_stripped and _NUMBER_RE.match(text_stripped):
+        # icon サイズの数字 (= "01" のような小 box) は number 確信度高
+        if width <= CARD_ROLE_ICON_MAX_SIDE_PT * 1.5:
+            return ("number", 0.85)
+        return ("number", 0.7)
+
+    # ---- title vs body : 同 container 内 font-size 最大が title -----------
+    own_size = siblings_font_sizes.get(id(record))
+    sizes = [s for s in siblings_font_sizes.values() if s is not None]
+    max_size = max(sizes) if sizes else None
+    min_size = min(sizes) if sizes else None
+
+    # ---- badge: solid fill + 短い text ------------------------------------
+    fill_hex = None
+    try:
+        fill_hex = _solid_shape_fill_rgb_hex(shape)
+    except (AttributeError, TypeError, ValueError):
+        fill_hex = None
+    if fill_hex is not None and text_len <= CARD_ROLE_BADGE_MAX_LEN:
+        # badge: container 内で最も上 or 最も下に配置
+        cx_, cy_, cw_, ch_ = container.bbox_pt
+        rec_top = bbox[1]
+        rec_bottom = bbox[1] + bbox[3]
+        near_top = (rec_top - cy_) < ch_ * 0.25
+        near_bottom = (cy_ + ch_ - rec_bottom) < ch_ * 0.25
+        if near_top or near_bottom:
+            return ("badge", 0.75)
+
+    # title: own_size が container 内で最大、かつ他より明確に大きい
+    if own_size is not None and max_size is not None and own_size >= max_size - 0.1:
+        if min_size is None or max_size > min_size + 1.0 or len([s for s in sizes if s == max_size]) == 1:
+            return ("title", 0.85)
+        # font_size が全 child で同じ → first (top-most) を title 扱い、信頼度低
+        return ("title", 0.55)
+
+    # body: text かつ title 以外
+    if own_size is not None:
+        return ("body", 0.8)
+
+    # font_size 取れない (= no run found) text: low confidence body
+    return ("body", 0.5) if text_len > 0 else ("unknown", 0.3)
+
+
+def _card_children_with_roles(
+    container: ShapeRecord,
+    children: list[ShapeRecord],
+    ctx: Optional[LintContext] = None,
+) -> list[dict]:
+    """card container の child 群に role を付与する。
+
+    confidence >= CARD_ROLE_CONFIDENCE_MIN のみ採用し、それ未満は
+    role="unknown" に降格する。
+    """
+    siblings_font_sizes: dict[int, Optional[float]] = {}
+    for ch in children:
+        size: Optional[float] = None
+        if ctx is not None and ch.kind == "text":
+            try:
+                size = _font_size_for_record(ctx, ch)
+            except (AttributeError, TypeError, ValueError):
+                size = None
+        siblings_font_sizes[id(ch)] = size
+
+    out: list[dict] = []
+    for ch in children:
+        role, conf = _card_classify_role(ch, container, siblings_font_sizes, ctx=ctx)
+        if conf < CARD_ROLE_CONFIDENCE_MIN:
+            role_final = "unknown"
+        else:
+            role_final = role
+        out.append({
+            "shape": ch,
+            "role": role_final,
+            "role_confidence": round(conf, 2),
+            "raw_role": role,
+            "font_size_pt": siblings_font_sizes.get(id(ch)),
+        })
+    return out
+
+
+def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord], findings, ctx: Optional[LintContext] = None):
     cards = [
         rec for rec in records
         if _is_container_candidate(rec)
@@ -3993,6 +4124,26 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
     text_records = [r for r in records if r.kind == "text"]
     if not text_records:
         return
+
+    # FONT-007/4: card 内 child の role を推定。container -> {child_id: role-info}
+    children_by_container = _container_children(records)
+    card_role_map: dict[int, dict[int, dict]] = {}
+    for card in cards:
+        kids = children_by_container.get(id(card), [])
+        if not kids:
+            continue
+        role_entries = _card_children_with_roles(card, kids, ctx=ctx)
+        card_role_map[id(card)] = {id(entry["shape"]): entry for entry in role_entries}
+
+    # child shape -> (container, role_entry) の逆引き
+    child_role_index: dict[int, tuple[ShapeRecord, dict]] = {}
+    for cid, entries in card_role_map.items():
+        # find container record by id
+        container_rec = next((c for c in cards if id(c) == cid), None)
+        if container_rec is None:
+            continue
+        for shape_key, entry in entries.items():
+            child_role_index[shape_key] = (container_rec, entry)
 
     def _bbox_x_overlap_pt(a, b) -> float:
         ax, _, aw, _ = a
@@ -4059,6 +4210,75 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             row_container_ids, slot_width, row_size_v = best_meta
             best_overlap = _bbox_x_overlap_pt(best_slot.bbox_pt, child.bbox_pt)
             effective_slot_width = best_slot.bbox_pt[2]
+
+            # FONT-007/4: child role 推定。直接 best_slot の child として
+            # 帰属していれば card_role_map から、そうでなければ重なる
+            # container を探して role を推定する。
+            child_role = "unknown"
+            child_role_confidence = 0.0
+            same_role_widths: list[float] = []
+            best_slot_role_entry = None
+            child_shape_key = id(child)
+            entries_for_best_slot = card_role_map.get(id(best_slot), {})
+            if child_shape_key in entries_for_best_slot:
+                entry = entries_for_best_slot[child_shape_key]
+                child_role = entry["role"]
+                child_role_confidence = entry["role_confidence"]
+                best_slot_role_entry = entry
+            else:
+                # child が best_slot の直接 children に含まれない (= text bbox が
+                # 複数 slot にまたがる等)。同じ row の cards 内で同 role/
+                # text-likely 候補を比較。font size から ad-hoc 推定。
+                if ctx is not None and getattr(child.shape, "has_text_frame", False):
+                    own_size = None
+                    try:
+                        own_size = _font_size_for_record(ctx, child)
+                    except (AttributeError, TypeError, ValueError):
+                        own_size = None
+                    if own_size is not None:
+                        # best_slot の children 内 max font size と比較
+                        slot_kids = entries_for_best_slot.values()
+                        slot_max = max(
+                            (e["font_size_pt"] for e in slot_kids if e.get("font_size_pt") is not None),
+                            default=None,
+                        )
+                        if slot_max is None:
+                            child_role = "body"
+                            child_role_confidence = 0.5
+                        elif own_size >= slot_max - 0.1:
+                            child_role = "title"
+                            child_role_confidence = 0.7
+                        else:
+                            child_role = "body"
+                            child_role_confidence = 0.75
+
+            # 同 role の sibling 幅から median を再計算
+            if child_role in {"title", "body"}:
+                for cid_key, entries in card_role_map.items():
+                    if cid_key not in row_container_ids and cid_key != id(best_slot):
+                        # 同じ row に属する slot のみ参照する。row_container_ids
+                        # は shape_id (= int) なので比較対象を合わせる。
+                        cont_record = next((c for c in cards if id(c) == cid_key), None)
+                        if cont_record is None:
+                            continue
+                        cont_shape_id = getattr(cont_record.shape, "shape_id", None)
+                        if cont_shape_id not in row_container_ids:
+                            continue
+                    for entry in entries.values():
+                        if entry["role"] != child_role:
+                            continue
+                        shp = entry["shape"]
+                        if shp is child:
+                            continue
+                        same_role_widths.append(shp.bbox_pt[2])
+                if same_role_widths:
+                    same_role_widths.sort()
+                    role_median = same_role_widths[len(same_role_widths) // 2]
+                    # role-based slot width が現在の effective より大きい場合
+                    # に限り採用 (= 過剰 fix を避けるため許容を緩める方向のみ)
+                    if role_median > effective_slot_width:
+                        effective_slot_width = role_median
+
             if cw_ <= effective_slot_width * REPEATED_SLOT_OVERFLOW_RATIO:
                 continue
             # 既に同 child が text_outside_container で発火しているか?
@@ -4087,6 +4307,12 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 "row_size": row_size_v,
                 "detection_strategy": "repeated_slot_width_exceeds",
                 "relation_type": "repeated_slot_overflow",
+                "child_role": child_role,
+                "child_role_confidence": round(child_role_confidence, 2),
+                "role_median_slot_width_pt": (
+                    round(same_role_widths[len(same_role_widths) // 2], 2)
+                    if same_role_widths else None
+                ),
             }
             manual_reason = MANUAL_REQUIRED_REASONS.get(
                 "text_outside_container",
@@ -4648,7 +4874,7 @@ def lint_pptx(
                 _cs = getattr(getattr(_child, "shape", None), "shape_id", None)
                 if _cs is not None:
                     card_grid_child_shape_ids.add(_cs)
-        check_text_outside_container(idx, slide_id, records, findings)
+        check_text_outside_container(idx, slide_id, records, findings, ctx=ctx)
         check_missing_required_element(ctx, idx, slide_id, records, findings)
         check_heading_hierarchy(ctx, idx, slide_id, records, findings)
         check_reading_order(ctx, idx, slide_id, records, findings)
