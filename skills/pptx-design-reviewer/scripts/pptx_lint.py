@@ -3871,20 +3871,38 @@ def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord]
         if child_area <= 0:
             continue
         child_center = _bbox_center(child.bbox_pt)
-        enclosing: Optional[tuple[ShapeRecord, str, float]] = None
+        cx_, cy_, cw_, ch_ = child.bbox_pt
+        child_left = cx_
+        child_top = cy_
+        child_bottom = cy_ + ch_
+        # FONT-006: container 帰属を「text.left edge を含む container」優先で
+        # 選ぶ。同 priority 内では area 最小 (最も近い enclosing) を採用。
+        # left edge anchor で見つからない場合は bbox center inside にフォール
+        # バック (= 旧 case B 挙動)。これにより複数 card にまたがる wide
+        # textbox が center 側の card ではなく left edge 側の card に紐づく。
+        best = None  # (priority, -area, cand)
         for cand in candidates:
             cand_rec, _cand_fill, cand_area = cand
             if cand_rec is child or id(cand_rec) == id(child):
                 continue
             if cand_area <= child_area:
                 continue
-            if not _point_in_bbox(child_center, cand_rec.bbox_pt):
+            cx, cy, cw, ch = cand_rec.bbox_pt
+            # vertical containment: child の縦範囲が container と overlap する
+            if child_bottom < cy or child_top > cy + ch:
                 continue
-            if enclosing is None or cand_area < enclosing[2]:
-                enclosing = cand
-        if enclosing is None:
+            left_inside = cx <= child_left <= cx + cw
+            center_inside = _point_in_bbox(child_center, cand_rec.bbox_pt)
+            if not (left_inside or center_inside):
+                continue
+            priority = 1 if left_inside else 0
+            score = (priority, -cand_area)
+            if best is None or score > best[0]:
+                best = (score, cand)
+        if best is None:
             continue
-        container, container_fill_hex, _container_area = enclosing
+        _, enclosing_tuple = best
+        container, container_fill_hex, _container_area = enclosing_tuple
         overflow_sides = _bbox_overflow_sides(container.bbox_pt, child.bbox_pt)
         # _bbox_overflow_sides already filters by TOL_PT (0.5pt); enforce
         # the documented 1pt threshold explicitly so that minor rounding
@@ -3922,6 +3940,13 @@ def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord]
             "measurement_confidence": "medium",
             "evidence_source": "pptx_xml",
             "evidence_confidence": "medium",
+            "candidate_values": {
+                "strategy": "fit_to_slot",
+                "slot_width_pt": round(container.bbox_pt[2], 2),
+                "slot_left_pt": round(container.bbox_pt[0], 2),
+                "container_shape_id": getattr(container.shape, "shape_id", None),
+                "word_wrap": True,
+            },
         }
         message = (
             f"text overflows enclosing container {_shape_label(container)} "
@@ -3939,6 +3964,169 @@ def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord]
                 detail,
             )
         )
+
+    # FONT-006 案 G: 繰り返し構造 (row of cards) を slot として認識し、その slot
+    # 幅を継承していない wide text を検出する。bbox center inside では拾えない
+    # 「textbox 幅が異常に広い caption」(= slide 37 #16/#25, slide 46 #36) を
+    # 拾うため、area-based slot 帰属で text を 1 slot に紐づけ、text bbox 幅が
+    # slot 幅を超える場合に発火する。
+    _emit_repeated_slot_overflow(slide_idx, slide_id, records, findings)
+
+
+REPEATED_SLOT_OVERFLOW_RATIO = 1.2
+REPEATED_SLOT_Y_TOL_PT = 8.0
+REPEATED_SLOT_CAPTION_BELOW_PT = 120.0
+
+
+def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord], findings):
+    cards = [
+        rec for rec in records
+        if _is_container_candidate(rec)
+        and rec.bbox_pt[2] <= SLIDE_W_PT * 0.5
+        and rec.bbox_pt[3] >= 40.0  # min container height (sane card minimum)
+    ]
+    if len(cards) < 2:
+        return
+    rows = _card_row_groups(cards)
+    if not rows:
+        return
+    text_records = [r for r in records if r.kind == "text"]
+    if not text_records:
+        return
+
+    def _bbox_x_overlap_pt(a, b) -> float:
+        ax, _, aw, _ = a
+        bx, _, bw, _ = b
+        return max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
+
+    # 各 row について primary slots (= median 比 0.7 以上) を計算し、すべての
+    # row の primary slots を 1 つのプールに統合してから、child ごとに最も
+    # x-overlap の大きい slot を選ぶ (= row を跨いで best slot を判定する)。
+    # これにより icon row と box row が両方存在する slide で box row が選ばれる。
+    primary_pool: list[tuple] = []  # (slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width)
+    for row in rows:
+        if len(row) < 2:
+            continue
+        slot_widths_all = sorted(c.bbox_pt[2] for c in row)
+        median_w = slot_widths_all[len(slot_widths_all) // 2]
+        primary_min_width = median_w * 0.7
+        primary_slots = [c for c in row if c.bbox_pt[2] >= primary_min_width]
+        if len(primary_slots) < 2:
+            continue
+        primary_widths = sorted(c.bbox_pt[2] for c in primary_slots)
+        row_slot_width = primary_widths[len(primary_widths) // 2]
+        row_top = min(c.bbox_pt[1] for c in primary_slots)
+        row_bottom = max(c.bbox_pt[1] + c.bbox_pt[3] for c in primary_slots)
+        y_band_top = row_top - REPEATED_SLOT_Y_TOL_PT
+        y_band_bottom = row_bottom + REPEATED_SLOT_CAPTION_BELOW_PT
+        row_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
+        for slot in primary_slots:
+            primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots)))
+    if not primary_pool:
+        return
+    for child in text_records:
+            cx_, cy_, cw_, ch_ = child.bbox_pt
+            child_top = cy_
+            child_bottom = cy_ + ch_
+            child_left = cx_
+            # 全 row の primary slot を走査。y_band 内に child が入る slot から
+            # 「text の left edge を含む slot」を優先選択。複数該当なら slot.left
+            # が text.left に近いものを選ぶ (= 左揃え anchor)。該当ゼロなら
+            # x-overlap 最大の slot にフォールバック。
+            best_slot = None
+            best_meta = None
+            best_score = None  # (priority desc, distance asc)
+            for slot, yt, yb, rids, rsw, rsize in primary_pool:
+                if child_bottom < yt or child_top > yb:
+                    continue
+                ov = _bbox_x_overlap_pt(slot.bbox_pt, child.bbox_pt)
+                if ov <= 0.0:
+                    continue
+                sx, _, sw, _ = slot.bbox_pt
+                slot_left = sx
+                slot_right = sx + sw
+                contains_left = slot_left - 5 <= child_left <= slot_right
+                # priority: contains_left=1 > 0、distance = |slot_left - child_left|
+                priority = 1 if contains_left else 0
+                distance = abs(slot_left - child_left)
+                score = (priority, -distance, ov)
+                if best_score is None or score > best_score:
+                    best_score = score
+                    best_slot = slot
+                    best_meta = (rids, rsw, rsize)
+            if best_slot is None:
+                continue
+            row_container_ids, slot_width, row_size_v = best_meta
+            best_overlap = _bbox_x_overlap_pt(best_slot.bbox_pt, child.bbox_pt)
+            effective_slot_width = best_slot.bbox_pt[2]
+            if cw_ <= effective_slot_width * REPEATED_SLOT_OVERFLOW_RATIO:
+                continue
+            # 既に同 child が text_outside_container で発火しているか?
+            child_sid = getattr(child.shape, "shape_id", None)
+            already_fired = any(
+                f.check == "text_outside_container"
+                and f.slide_index == slide_idx
+                and f.detail.get("child", {}).get("shape_id") == child_sid
+                for f in findings
+            )
+            if already_fired:
+                continue
+            slot_bbox_rounded = [round(v, 2) for v in best_slot.bbox_pt]
+            child_bbox_rounded = [round(v, 2) for v in child.bbox_pt]
+            evidence = {
+                "direction": "right" if cx_ + cw_ > best_slot.bbox_pt[0] + best_slot.bbox_pt[2] else "left",
+                "overflow_pt": round(cw_ - effective_slot_width, 2),
+                "container_shape_id": getattr(best_slot.shape, "shape_id", None),
+                "container_shape_name": getattr(best_slot.shape, "name", None),
+                "container_bbox_pt": slot_bbox_rounded,
+                "child_bbox_pt": child_bbox_rounded,
+                "slot_width_pt": round(effective_slot_width, 2),
+                "row_median_slot_width_pt": round(slot_width, 2),
+                "child_width_pt": round(cw_, 2),
+                "row_container_shape_ids": row_container_ids,
+                "row_size": row_size_v,
+                "detection_strategy": "repeated_slot_width_exceeds",
+                "relation_type": "repeated_slot_overflow",
+            }
+            manual_reason = MANUAL_REQUIRED_REASONS.get(
+                "text_outside_container",
+                "text shape extends past its visual container bbox",
+            )
+            detail = {
+                "container": _shape_record_detail(best_slot),
+                "child": _shape_record_detail(child),
+                "evidence": evidence,
+                "fixability": "manual_required",
+                "fixability_reason": manual_reason,
+                "manual_required_reason": manual_reason,
+                "measurement_confidence": "medium",
+                "evidence_source": "pptx_xml",
+                "evidence_confidence": "medium",
+                "candidate_values": {
+                    "strategy": "fit_to_slot",
+                    "slot_width_pt": round(effective_slot_width, 2),
+                    "slot_left_pt": round(best_slot.bbox_pt[0], 2),
+                    "container_shape_id": getattr(best_slot.shape, "shape_id", None),
+                    "word_wrap": True,
+                },
+            }
+            message = (
+                f"text bbox width ({cw_:.0f}pt) exceeds repeated-slot width "
+                f"({effective_slot_width:.0f}pt × {REPEATED_SLOT_OVERFLOW_RATIO}) in row of "
+                f"{row_size_v} containers (child={_shape_label(child)}, "
+                f"slot={_shape_label(best_slot)})"
+            )
+            findings.append(
+                make_finding(
+                    "warning",
+                    "text_outside_container",
+                    slide_idx,
+                    slide_id,
+                    child.shape,
+                    message,
+                    detail,
+                )
+            )
 
 
 def check_missing_required_element(ctx, slide_idx, slide_id, records: list[ShapeRecord], findings):
@@ -5035,6 +5223,31 @@ def _candidate_values_for_json(check: str, evidence: dict) -> Optional[dict]:
                 cand["target_height_pt"] = max(20.0, round(h - float(sides["bottom"]), 2))
             return cand
         return None
+    if check == "text_outside_container":
+        # FONT-006 案 B / G 共通: container_bbox_pt + slot_width_pt から
+        # fit_to_slot candidate を組み立てる。案 G (repeated_slot) では slot_width_pt
+        # を明示、案 B (bbox_only) では container.width をそのまま slot_width 扱い。
+        inner = evidence.get("evidence") if isinstance(evidence.get("evidence"), dict) else evidence
+        slot_bbox = (
+            inner.get("container_bbox_pt")
+            or evidence.get("container_bbox_pt")
+            or []
+        )
+        if not (isinstance(slot_bbox, list) and len(slot_bbox) >= 4):
+            return None
+        slot_left = slot_bbox[0]
+        slot_w = (
+            inner.get("slot_width_pt")
+            or evidence.get("slot_width_pt")
+            or slot_bbox[2]
+        )
+        return {
+            "strategy": "fit_to_slot",
+            "slot_width_pt": round(float(slot_w), 2),
+            "slot_left_pt": round(float(slot_left), 2),
+            "container_shape_id": inner.get("container_shape_id") or evidence.get("container_shape_id"),
+            "word_wrap": True,
+        }
     if check == "text_canvas_overflow":
         tr = evidence.get("text_render") or {}
         bbox = evidence.get("bbox_pt") or []

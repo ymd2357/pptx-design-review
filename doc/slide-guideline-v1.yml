@@ -4103,9 +4103,9 @@ rules:
         fix_rule: null
         manual_reason: "比率変更は配布形態の再判断が必要。"
       text_outside_container:
-        apply_mode: no_fix
-        fix_rule: null
-        manual_reason: "container 拡張 / text box 縮小 / 行数圧縮 など視覚判断が必要 (FONT-006 案B)。"
+        apply_mode: judgement_fix
+        fix_rule: text_outside_container_fit_to_slot
+        note: "FONT-006 案 G: text shape の bbox 幅を slot 幅に縮小し left を slot に揃え word_wrap=True を有効化する。SPA judgement (auto_fixable) 経由のみ apply。視覚的に caption が card 1 個に収まる方向に動かす。複数 card にまたがる共通 caption だった場合は意味が変わるため必ず人間判断を要求。"
 
     rounding_policy:
       allow_grid_pt: 0.5

@@ -100,6 +100,7 @@ ALL_RULES = (
     "box_canvas_clip",
     "text_box_resize",
     "text_canvas_reflow",
+    "text_outside_container_fit_to_slot",
 )
 
 
@@ -715,6 +716,50 @@ def _geometry_action(rule: str, finding: Any, shape, geometry: dict, reasons: li
     )
 
 
+def _shape_group_inverse_transform(shape) -> tuple[float, float, float, float]:
+    """Return (left_delta, top_delta, inv_sx, inv_sy) such that
+    `local = absolute * inv_s + delta`. 1 段の <p:grpSp> 用 (mcp-cource 観察上
+    多段 nested は出ない)。group 外の shape は (0, 0, 1, 1) を返す。
+    """
+    DML = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    try:
+        parent = shape._element.getparent()
+    except AttributeError:
+        return 0.0, 0.0, 1.0, 1.0
+    if parent is None:
+        return 0.0, 0.0, 1.0, 1.0
+    tag = parent.tag.split("}", 1)[-1] if "}" in parent.tag else parent.tag
+    if tag != "grpSp":
+        return 0.0, 0.0, 1.0, 1.0
+    gxfrm = parent.find(f".//{DML}xfrm")
+    if gxfrm is None:
+        return 0.0, 0.0, 1.0, 1.0
+    off = gxfrm.find(f"{DML}off")
+    ext = gxfrm.find(f"{DML}ext")
+    choff = gxfrm.find(f"{DML}chOff")
+    chext = gxfrm.find(f"{DML}chExt")
+    if off is None or choff is None:
+        return 0.0, 0.0, 1.0, 1.0
+    ox = float(off.get("x", 0)) / 12700.0
+    oy = float(off.get("y", 0)) / 12700.0
+    cox = float(choff.get("x", 0)) / 12700.0
+    coy = float(choff.get("y", 0)) / 12700.0
+    csx = csy = 1.0
+    if ext is not None and chext is not None:
+        cex = float(chext.get("cx", 1)) or 1.0
+        cey = float(chext.get("cy", 1)) or 1.0
+        ex = float(ext.get("cx", 1)) or 1.0
+        ey = float(ext.get("cy", 1)) or 1.0
+        csx = ex / cex
+        csy = ey / cey
+    # absolute = ox + (local - cox) * csx → local = (absolute - ox) / csx + cox
+    inv_sx = 1.0 / csx
+    inv_sy = 1.0 / csy
+    left_delta = -ox * inv_sx + cox
+    top_delta = -oy * inv_sy + coy
+    return left_delta, top_delta, inv_sx, inv_sy
+
+
 def _apply_geometry(shape, geometry: dict) -> None:
     for attr in ("left", "top", "width", "height"):
         if attr in geometry:
@@ -828,6 +873,7 @@ FINDING_DRIVEN_RULES = {
     "box_canvas_clip",
     "text_box_resize",
     "text_canvas_reflow",
+    "text_outside_container_fit_to_slot",
 }
 
 
@@ -2310,6 +2356,68 @@ def _detect_finding_action(prs, finding: Any) -> Optional[FixAction | list[FixAc
             },
         )
 
+    if rule == "text_outside_container_fit_to_slot":
+        # FONT-006 案 G: 繰り返し構造 (= row of cards) の slot 幅を継承して
+        # いない wide textbox を、紐づく slot の幅・left に合わせて縮小し
+        # word_wrap=True にする。fix policy = judgement_fix なので gate 経由
+        # でのみ apply される。
+        if shape is None:
+            return None
+        cv = detail.get("candidate_values") or {}
+        slot_width = cv.get("slot_width_pt") if isinstance(cv, dict) else None
+        slot_left = cv.get("slot_left_pt") if isinstance(cv, dict) else None
+        if slot_width is None or slot_left is None:
+            # fallback: evidence の入れ子構造から (detail.evidence.evidence)
+            ev = detail.get("evidence") or {}
+            inner = ev.get("evidence") if isinstance(ev.get("evidence"), dict) else ev
+            slot_bbox = inner.get("container_bbox_pt") if isinstance(inner, dict) else None
+            if isinstance(slot_bbox, (list, tuple)) and len(slot_bbox) >= 4 and slot_left is None:
+                slot_left = float(slot_bbox[0])
+            if slot_width is None and isinstance(inner, dict):
+                slot_width = inner.get("slot_width_pt")
+        if slot_width is None or slot_left is None:
+            return None
+        try:
+            slot_width = float(slot_width)
+            slot_left = float(slot_left)
+        except (TypeError, ValueError):
+            return None
+        if slot_width <= 0:
+            return None
+        before_geometry = _shape_geometry_pt(shape)
+        sx, sy = _slide_scale_xy(prs)
+        # absolute slide-space → shape の local coord に変換 (group transform 考慮)。
+        # top / height は変更しない (= 縦移動を起こさない)。
+        gx_delta, _gy_delta, gx_inv_sx, _gy_inv_sy = _shape_group_inverse_transform(shape)
+        new_left_local = (slot_left * sx) * gx_inv_sx + gx_delta
+        new_width_local = (slot_width * sx) * gx_inv_sx
+        new_top_local = float(getattr(shape, "top", 0) or 0) / 12700.0  # 不変
+        new_height_local = float(getattr(shape, "height", 0) or 0) / 12700.0  # 不変
+        if abs(new_width_local - new_top_local * 0 - (float(getattr(shape, "width", 0) or 0) / 12700.0)) < 0.05 and abs(new_left_local - (float(getattr(shape, "left", 0) or 0) / 12700.0)) < 0.05:
+            return None
+        return FixAction(
+            rule=rule,
+            slide_index=int(_finding_field(finding, "slide_index") or 1),
+            slide_id=_finding_field(finding, "slide_id"),
+            shape_id=getattr(shape, "shape_id", None),
+            shape_name=getattr(shape, "name", None),
+            before={
+                "geometry": before_geometry,
+                "word_wrap": bool(getattr(getattr(shape, "text_frame", None), "word_wrap", False) or False),
+            },
+            after={
+                "geometry": {
+                    "left": round(new_left_local, 4),
+                    "top": round(new_top_local, 4),
+                    "width": round(new_width_local, 4),
+                    "height": round(new_height_local, 4),
+                },
+                "word_wrap": True,
+                "slot_width_pt": slot_width,
+                "slot_left_pt": slot_left,
+            },
+        )
+
     if rule == "decorative_remove":
         # FIX-013: lint が出した remove_shape candidate を SPA judgement で
         # auto_fixable に promote した finding が来ると、対象 shape を
@@ -2708,6 +2816,14 @@ def _apply_finding_action(prs, action: FixAction) -> None:
         for para in shape.text_frame.paragraphs:
             if para.text.strip():
                 para.alignment = PP_ALIGN.CENTER
+    elif action.rule == "text_outside_container_fit_to_slot":
+        # FONT-006 案 G: geometry は上の `if "geometry" in action.after` 分岐で
+        # apply 済 (= shape.left / shape.width が slot 幅・left に変更済)。
+        # ここでは text_frame.word_wrap を True に強制する。
+        try:
+            shape.text_frame.word_wrap = True
+        except (AttributeError, ValueError):
+            pass
     elif action.rule == "decorative_remove":
         # FIX-013: physically remove the shape element from its slide spTree.
         # python-pptx does not expose a high-level delete API, so we drop the
