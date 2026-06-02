@@ -1997,6 +1997,69 @@ def main() -> int:
                 + "\n  ".join(f.message for f in toc_good_findings)
             )
 
+        # ---- FONT-008/3: synthetic repeating-layout detection -------------
+        def _mk_rec(x: float, y: float, w: float, h: float, kind: str = "rect") -> pptx_lint.ShapeRecord:
+            bbox = (x, y, w, h)
+            return pptx_lint.ShapeRecord(
+                shape=None,
+                actual_bbox_pt=bbox,
+                bbox_pt=bbox,
+                kind=kind,
+                source_order_index=0,
+            )
+
+        # Fixture A: 4 columns × 5 stack (image / circle / text / text / rect).
+        col_xs_a = [60.0, 200.0, 340.0, 480.0]
+        stack_centers_a = [80.0, 160.0, 230.0, 290.0, 360.0]
+        recs_a: list[pptx_lint.ShapeRecord] = []
+        kinds = ["image", "circle", "text", "text", "rect"]
+        for cx in col_xs_a:
+            for cy, kind in zip(stack_centers_a, kinds):
+                # cx,cy are *centers*; convert to top-left for bbox_pt(x,y,w,h)
+                w, h = 60.0, 40.0
+                recs_a.append(_mk_rec(cx - w / 2, cy - h / 2, w, h, kind))
+
+        layouts_a = pptx_lint._detect_repeating_layout(recs_a)
+        if len(layouts_a) != 1:
+            failures.append(
+                f"FONT-008/3 fixture A: expected 1 VirtualLayout, got {len(layouts_a)}"
+            )
+        elif (
+            len(layouts_a[0].columns) != 4
+            or layouts_a[0].stack_depth != 5
+            or len(layouts_a[0].members) != 20
+        ):
+            failures.append(
+                "FONT-008/3 fixture A: expected 4 columns × 5 stack (20 members); "
+                f"got columns={len(layouts_a[0].columns)} stack_depth={layouts_a[0].stack_depth} "
+                f"members={len(layouts_a[0].members)}"
+            )
+
+        # Fixture B: 2 columns × 3 stack co-existing with fixture A (different x band).
+        col_xs_b = [800.0, 940.0]
+        stack_centers_b = [500.0, 580.0, 660.0]
+        recs_b = list(recs_a)
+        for cx in col_xs_b:
+            for cy in stack_centers_b:
+                w, h = 50.0, 30.0
+                recs_b.append(_mk_rec(cx - w / 2, cy - h / 2, w, h))
+
+        layouts_b = pptx_lint._detect_repeating_layout(recs_b)
+        depths = sorted(l.stack_depth for l in layouts_b)
+        col_counts = sorted(len(l.columns) for l in layouts_b)
+        if depths != [3, 5] or col_counts != [2, 4]:
+            failures.append(
+                "FONT-008/3 fixture B: expected layouts (4cols×5stack)+(2cols×3stack); "
+                f"got depths={depths} col_counts={col_counts}"
+            )
+
+        # Fixture C: empty / too-shallow should return [].
+        if pptx_lint._detect_repeating_layout([]) != []:
+            failures.append("FONT-008/3 fixture C: empty input must return []")
+        sparse = [_mk_rec(0, 0, 10, 10), _mk_rec(100, 0, 10, 10)]  # 2 cols × 1 stack
+        if pptx_lint._detect_repeating_layout(sparse) != []:
+            failures.append("FONT-008/3 fixture C: shallow stacks must return []")
+
     if failures:
         print("FAIL:")
         for line in failures:

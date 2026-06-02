@@ -134,6 +134,11 @@ CARD_GRID_TOP_TOL_PT = 4.0
 CARD_GRID_SIZE_TOL_PT = 6.0
 CARD_GRID_PADDING_TOL_PT = 8.0
 CARD_GRID_CHILD_RELATIVE_TOL_PT = 14.0
+# FONT-008 /3: column-first repeating layout detection (text shape を含む)
+REPEATING_LAYOUT_COL_CENTER_TOL_PT = 36.0
+REPEATING_LAYOUT_STACK_Y_CENTER_TOL_PT = 30.0
+REPEATING_LAYOUT_MIN_COLUMNS = 2
+REPEATING_LAYOUT_MIN_STACK_DEPTH = 2
 DECORATIVE_LINE_PROXIMITY_PT_MAX = 24.0
 DECORATIVE_THIN_BAR_THICKNESS_PT_MAX = 4.0
 DECORATIVE_THIN_BAR_LENGTH_PT_MIN = 20.0
@@ -304,6 +309,21 @@ class StructureRelation:
     overlap_area_pt2: float
     overlap_bbox_pt: tuple
     metadata: dict = field(default_factory=dict)
+
+
+@dataclass
+class VirtualLayout:
+    """FONT-008/3: column-first detected repeating layout across all shapes.
+
+    Members of `columns` are lists of ShapeRecord sorted by y_center (top→bottom).
+    All columns share `stack_depth` length. `members` maps (col_idx, stack_idx) →
+    ShapeRecord for easy access. Each column is interpreted as a virtual
+    super-card whose bbox is the union of its members.
+    """
+
+    columns: list[list[ShapeRecord]]
+    stack_depth: int
+    members: dict[tuple[int, int], ShapeRecord]
 
 
 # ---- Helpers ---------------------------------------------------------------
@@ -3519,6 +3539,183 @@ def _card_row_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
     ]
 
 
+def _shape_kind_signature(rec: ShapeRecord) -> tuple[str, str]:
+    """FONT-008 案 3: 各 shape を (kind, size_rank) の signature に。
+    kind は kind="shape" の場合 auto_shape_type で細分化 (oval / rect 等)、
+    size_rank は bbox area の slide 内 quantile に粗く分類。
+    """
+    kind = rec.kind
+    if kind == "shape":
+        try:
+            ast = rec.shape.auto_shape_type
+            if ast is not None:
+                kind = str(ast).split(".")[-1].lower()
+        except Exception:
+            pass
+    area = rec.bbox_pt[2] * rec.bbox_pt[3]
+    if area < 5000:
+        size_rank = "small"
+    elif area < 30000:
+        size_rank = "medium"
+    else:
+        size_rank = "large"
+    return (kind, size_rank)
+
+
+def _edit_distance(seq_a, seq_b) -> int:
+    """Levenshtein 距離 (insert / delete / substitute コスト 1)。"""
+    m, n = len(seq_a), len(seq_b)
+    if m == 0:
+        return n
+    if n == 0:
+        return m
+    dp = list(range(n + 1))
+    for i in range(1, m + 1):
+        prev = dp[0]
+        dp[0] = i
+        for j in range(1, n + 1):
+            cur = dp[j]
+            if seq_a[i - 1] == seq_b[j - 1]:
+                dp[j] = prev
+            else:
+                dp[j] = 1 + min(prev, dp[j - 1], dp[j])
+            prev = cur
+    return dp[n]
+
+
+def _detect_repeating_layout(records: list[ShapeRecord]) -> list[VirtualLayout]:
+    """FONT-008/3: column-first repeating layout detection.
+
+    Approach (column-first, as opposed to a y_center row-first cluster):
+      1. Cluster every record (text 含む) by x_center → candidate columns.
+      2. Within each column, order members by y_center → vertical stack.
+      3. Cross-correlate columns: same stack_depth + member-wise y_center
+         distance ≤ REPEATING_LAYOUT_STACK_Y_CENTER_TOL_PT ⇒ same virtual
+         layout. The first column anchors a group; later columns join when
+         they match the anchor's y_center signature.
+      4. Emit a VirtualLayout per matching group; each column behaves as a
+         super-card (= union bbox of its stack).
+
+    Records lacking width/height are skipped. Empty inputs → []. The function
+    is read-only and never mutates the input list.
+    """
+    candidates = [r for r in records if r.bbox_pt and r.bbox_pt[2] > 0 and r.bbox_pt[3] > 0]
+    if len(candidates) < REPEATING_LAYOUT_MIN_COLUMNS * REPEATING_LAYOUT_MIN_STACK_DEPTH:
+        return []
+
+    # --- 1. Cluster by x_center ------------------------------------------------
+    columns: list[list[ShapeRecord]] = []
+    for rec in sorted(candidates, key=lambda r: (_bbox_center(r.bbox_pt)[0], r.bbox_pt[1])):
+        cx, _ = _bbox_center(rec.bbox_pt)
+        target: list[ShapeRecord] | None = None
+        for col in columns:
+            col_center = _median([_bbox_center(m.bbox_pt)[0] for m in col])
+            if abs(cx - col_center) <= REPEATING_LAYOUT_COL_CENTER_TOL_PT:
+                target = col
+                break
+        if target is None:
+            columns.append([rec])
+        else:
+            target.append(rec)
+
+    # --- 2. Sort each column by y_center, drop too-shallow stacks --------------
+    # FONT-008: 隣接 y_gap が極端に大きい (= column 内 median gap × 3 超 もしくは
+    # 絶対 200pt 超) ところで stack を切り、長い方の連続塊を採用する。
+    # これにより slide 下部 footnote (y_center=688) のような外れ shape が
+    # column stack に混入するのを防ぐ。
+    def _trim_by_gap(col: list[ShapeRecord]) -> list[ShapeRecord]:
+        if len(col) < 3:
+            return col
+        sorted_col = sorted(col, key=lambda r: _bbox_center(r.bbox_pt)[1])
+        ys = [_bbox_center(r.bbox_pt)[1] for r in sorted_col]
+        gaps = [ys[i+1] - ys[i] for i in range(len(ys)-1)]
+        # median gap (= column 内の典型的 stack 間隔)
+        sorted_gaps = sorted(gaps)
+        median_gap = sorted_gaps[len(sorted_gaps) // 2]
+        abs_max = 150.0
+        rel_max = median_gap * 3 if median_gap > 0 else abs_max
+        threshold = max(abs_max, rel_max)
+        # 連続セグメントに分割
+        segments: list[list[ShapeRecord]] = [[sorted_col[0]]]
+        for i, gap in enumerate(gaps):
+            if gap > threshold:
+                segments.append([])
+            segments[-1].append(sorted_col[i+1])
+        # 長さ最大セグメントを採用 (tie の場合最初)
+        return max(segments, key=len)
+
+    columns = [
+        _trim_by_gap(col)
+        for col in columns
+    ]
+    columns = [
+        sorted(col, key=lambda r: _bbox_center(r.bbox_pt)[1])
+        for col in columns
+        if len(col) >= REPEATING_LAYOUT_MIN_STACK_DEPTH
+    ]
+    if len(columns) < REPEATING_LAYOUT_MIN_COLUMNS:
+        return []
+
+    # --- 3. Group columns by matching y_center signature -----------------------
+    # Two columns match if their stack_depth is equal and every pair of
+    # members shares y_center within REPEATING_LAYOUT_STACK_Y_CENTER_TOL_PT.
+    def _y_signature(col: list[ShapeRecord]) -> list[float]:
+        return [_bbox_center(r.bbox_pt)[1] for r in col]
+
+    def _matches(a: list[ShapeRecord], b: list[ShapeRecord]) -> bool:
+        # FONT-008 案 2: stack_depth + 各 member の y_center 完全一致
+        if len(a) != len(b):
+            return False
+        sa, sb = _y_signature(a), _y_signature(b)
+        return all(abs(ya - yb) <= REPEATING_LAYOUT_STACK_Y_CENTER_TOL_PT for ya, yb in zip(sa, sb))
+
+    def _matches_signature(a: list[ShapeRecord], b: list[ShapeRecord], max_edit: int = 2) -> bool:
+        # FONT-008 案 3: shape kind signature (kind + size_rank) の編集距離が
+        # max_edit 以下なら一致 (= 1 要素欠損 or 余分 OK)。stack_depth の差が
+        # max_edit を超える場合は即 false。y_center 一致は要件としない (signature
+        # で意味的一致を保証)。
+        if abs(len(a) - len(b)) > max_edit:
+            return False
+        sa = [_shape_kind_signature(r) for r in a]
+        sb = [_shape_kind_signature(r) for r in b]
+        return _edit_distance(sa, sb) <= max_edit
+
+    # Sort columns by x to keep emission stable left→right.
+    columns_sorted = sorted(columns, key=lambda col: _median([_bbox_center(r.bbox_pt)[0] for r in col]))
+
+    used: set[int] = set()
+    layouts: list[VirtualLayout] = []
+    for i, anchor in enumerate(columns_sorted):
+        if i in used:
+            continue
+        group_indices = [i]
+        for j in range(i + 1, len(columns_sorted)):
+            if j in used:
+                continue
+            # 案 2 (y_center 完全一致) または 案 3 (kind signature 編集距離 ≤ 1)
+            # のどちらかで一致すれば同一 layout に併合。
+            if _matches(anchor, columns_sorted[j]) or _matches_signature(anchor, columns_sorted[j]):
+                group_indices.append(j)
+        if len(group_indices) < REPEATING_LAYOUT_MIN_COLUMNS:
+            continue
+        for idx in group_indices:
+            used.add(idx)
+        group_columns = [columns_sorted[idx] for idx in group_indices]
+        stack_depth = len(anchor)
+        members: dict[tuple[int, int], ShapeRecord] = {}
+        for col_idx, col in enumerate(group_columns):
+            for stack_idx, rec in enumerate(col):
+                members[(col_idx, stack_idx)] = rec
+        layouts.append(
+            VirtualLayout(
+                columns=group_columns,
+                stack_depth=stack_depth,
+                members=members,
+            )
+        )
+    return layouts
+
+
 def _first_child_relative_bbox(container: ShapeRecord, children: list[ShapeRecord]) -> Optional[list[float]]:
     if not children:
         return None
@@ -4022,6 +4219,31 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
         row_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
         for slot in primary_slots:
             primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots)))
+
+    # FONT-008: 全 shape (text 含む) で繰り返し layout を検出し、各 super-card
+    # の中で最大幅の stack member を slot として primary_pool に追加。
+    # これにより slide 45 のような 4 column × 多層 stack 構造でも、列ごとの
+    # caption rect / 最大幅要素が slot として認識される。
+    layouts = _detect_repeating_layout(records)
+    for layout in layouts:
+        if layout.stack_depth < 3:
+            continue  # noise (2-stack の偶然 grouping) を除外
+        super_slots = []
+        for col in layout.columns:
+            widest = max(col, key=lambda r: r.bbox_pt[2])
+            super_slots.append(widest)
+        if len(super_slots) < 2:
+            continue
+        sw_sorted = sorted(s.bbox_pt[2] for s in super_slots)
+        super_slot_width = sw_sorted[len(sw_sorted) // 2]
+        s_top = min(s.bbox_pt[1] for s in super_slots)
+        s_bottom = max(s.bbox_pt[1] + s.bbox_pt[3] for s in super_slots)
+        s_y_band_top = s_top - REPEATED_SLOT_Y_TOL_PT
+        s_y_band_bottom = s_bottom + REPEATED_SLOT_CAPTION_BELOW_PT
+        s_container_ids = [getattr(s.shape, "shape_id", None) for s in super_slots]
+        for slot in super_slots:
+            primary_pool.append((slot, s_y_band_top, s_y_band_bottom, s_container_ids, super_slot_width, len(super_slots)))
+
     if not primary_pool:
         return
     for child in text_records:
