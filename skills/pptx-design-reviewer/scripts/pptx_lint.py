@@ -3519,6 +3519,71 @@ def _card_row_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
     ]
 
 
+def _card_staircase_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
+    """FONT-007/4: 階段状 (staircase / diagonal shift) に並ぶ container 列を検出する。
+
+    - 各 container の (x_center, y_center) を取り、x_center → y_center の辞書順で sort。
+    - 連続する n 個 (n >= 2) の container で、
+        * Δx_center > 0 が連続して同符号 (= 単調増加方向に進む)
+        * Δy_center > 0 が連続して同符号
+        * |Δx| が等差性を満たす (前後で |next_dx - prev_dx| <= tol)
+        * |Δy| も同様
+      を満たす連続列を 1 staircase とする。
+    - tol は container width の中央値 × 0.2。
+    - row pattern (`_card_row_groups`) と重複しないように、Δy が tol 未満 (≒ 同じ row)
+      は staircase 扱いしない。
+    """
+    if len(cards) < 3:
+        return []
+    # Sort by x_center primarily, then y_center. staircase は x も y も増加する想定。
+    sorted_cards = sorted(cards, key=lambda c: (_bbox_center(c.bbox_pt)[0], _bbox_center(c.bbox_pt)[1]))
+    median_w = _median([c.bbox_pt[2] for c in sorted_cards])
+    median_h = _median([c.bbox_pt[3] for c in sorted_cards])
+    tol_x = max(median_w * 0.2, 4.0)
+    tol_y = max(median_h * 0.2, 4.0)
+    # Compute consecutive deltas
+    centers = [_bbox_center(c.bbox_pt) for c in sorted_cards]
+    deltas = [
+        (centers[i + 1][0] - centers[i][0], centers[i + 1][1] - centers[i][1])
+        for i in range(len(centers) - 1)
+    ]
+    groups: list[list[ShapeRecord]] = []
+    i = 0
+    n = len(sorted_cards)
+    while i < n - 1:
+        # Start a candidate run at i, try to extend as long as the staircase property holds.
+        dx0, dy0 = deltas[i]
+        if dx0 <= 0 or dy0 <= 0:
+            i += 1
+            continue
+        # Reject very small dy (≒ same row).
+        if dy0 < tol_y * 0.5:
+            i += 1
+            continue
+        run = [sorted_cards[i], sorted_cards[i + 1]]
+        last_dx, last_dy = dx0, dy0
+        j = i + 1
+        while j < n - 1:
+            dx, dy = deltas[j]
+            if dx <= 0 or dy <= 0:
+                break
+            if dy < tol_y * 0.5:
+                break
+            if abs(dx - last_dx) > tol_x:
+                break
+            if abs(dy - last_dy) > tol_y:
+                break
+            run.append(sorted_cards[j + 1])
+            last_dx, last_dy = dx, dy
+            j += 1
+        if len(run) >= 3:
+            groups.append(run)
+            i = j + 1
+        else:
+            i += 1
+    return groups
+
+
 def _first_child_relative_bbox(container: ShapeRecord, children: list[ShapeRecord]) -> Optional[list[float]]:
     if not children:
         return None
@@ -3988,7 +4053,8 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
     if len(cards) < 2:
         return
     rows = _card_row_groups(cards)
-    if not rows:
+    staircases = _card_staircase_groups(cards)
+    if not rows and not staircases:
         return
     text_records = [r for r in records if r.kind == "text"]
     if not text_records:
@@ -4003,7 +4069,10 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
     # row の primary slots を 1 つのプールに統合してから、child ごとに最も
     # x-overlap の大きい slot を選ぶ (= row を跨いで best slot を判定する)。
     # これにより icon row と box row が両方存在する slide で box row が選ばれる。
-    primary_pool: list[tuple] = []  # (slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width)
+    # Each pool entry: dict with keys
+    #   slot, y_band_top, y_band_bottom, container_ids, slot_width, group_size,
+    #   pattern_axis, staircase_step_dx_pt, staircase_step_dy_pt
+    primary_pool: list[dict] = []
     for row in rows:
         if len(row) < 2:
             continue
@@ -4021,7 +4090,46 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
         y_band_bottom = row_bottom + REPEATED_SLOT_CAPTION_BELOW_PT
         row_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
         for slot in primary_slots:
-            primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots)))
+            primary_pool.append({
+                "slot": slot,
+                "y_band_top": y_band_top,
+                "y_band_bottom": y_band_bottom,
+                "container_ids": row_container_ids,
+                "slot_width": row_slot_width,
+                "group_size": len(primary_slots),
+                "pattern_axis": "row",
+                "staircase_step_dx_pt": None,
+                "staircase_step_dy_pt": None,
+            })
+    # staircase 経路を row と独立に並走させる。各 slot の y_band は slot 自身の
+    # bbox 上端 - tol 〜 bbox 下端 + caption_below とする (= row 全体の y_band で
+    # はなく individual slot band)。これは斜め配置で row 全体に拡張すると
+    # band が slide 全面を覆って誤帰属するため。
+    for stair in staircases:
+        if len(stair) < 3:
+            continue
+        # 等差 step を再計算
+        centers = [_bbox_center(c.bbox_pt) for c in stair]
+        dxs = [centers[i + 1][0] - centers[i][0] for i in range(len(centers) - 1)]
+        dys = [centers[i + 1][1] - centers[i][1] for i in range(len(centers) - 1)]
+        step_dx = round(_median(dxs), 2)
+        step_dy = round(_median(dys), 2)
+        widths = sorted(c.bbox_pt[2] for c in stair)
+        stair_slot_width = widths[len(widths) // 2]
+        stair_container_ids = [getattr(c.shape, "shape_id", None) for c in stair]
+        for slot in stair:
+            sx, sy, sw, sh = slot.bbox_pt
+            primary_pool.append({
+                "slot": slot,
+                "y_band_top": sy - REPEATED_SLOT_Y_TOL_PT,
+                "y_band_bottom": sy + sh + REPEATED_SLOT_CAPTION_BELOW_PT,
+                "container_ids": stair_container_ids,
+                "slot_width": stair_slot_width,
+                "group_size": len(stair),
+                "pattern_axis": "staircase",
+                "staircase_step_dx_pt": step_dx,
+                "staircase_step_dy_pt": step_dy,
+            })
     if not primary_pool:
         return
     for child in text_records:
@@ -4036,7 +4144,10 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             best_slot = None
             best_meta = None
             best_score = None  # (priority desc, distance asc)
-            for slot, yt, yb, rids, rsw, rsize in primary_pool:
+            for entry in primary_pool:
+                slot = entry["slot"]
+                yt = entry["y_band_top"]
+                yb = entry["y_band_bottom"]
                 if child_bottom < yt or child_top > yb:
                     continue
                 ov = _bbox_x_overlap_pt(slot.bbox_pt, child.bbox_pt)
@@ -4053,10 +4164,15 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 if best_score is None or score > best_score:
                     best_score = score
                     best_slot = slot
-                    best_meta = (rids, rsw, rsize)
+                    best_meta = entry
             if best_slot is None:
                 continue
-            row_container_ids, slot_width, row_size_v = best_meta
+            row_container_ids = best_meta["container_ids"]
+            slot_width = best_meta["slot_width"]
+            row_size_v = best_meta["group_size"]
+            pattern_axis = best_meta["pattern_axis"]
+            stair_dx = best_meta["staircase_step_dx_pt"]
+            stair_dy = best_meta["staircase_step_dy_pt"]
             best_overlap = _bbox_x_overlap_pt(best_slot.bbox_pt, child.bbox_pt)
             effective_slot_width = best_slot.bbox_pt[2]
             if cw_ <= effective_slot_width * REPEATED_SLOT_OVERFLOW_RATIO:
@@ -4087,6 +4203,9 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 "row_size": row_size_v,
                 "detection_strategy": "repeated_slot_width_exceeds",
                 "relation_type": "repeated_slot_overflow",
+                "pattern_axis": pattern_axis,
+                "staircase_step_dx_pt": stair_dx,
+                "staircase_step_dy_pt": stair_dy,
             }
             manual_reason = MANUAL_REQUIRED_REASONS.get(
                 "text_outside_container",
@@ -4112,8 +4231,8 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             }
             message = (
                 f"text bbox width ({cw_:.0f}pt) exceeds repeated-slot width "
-                f"({effective_slot_width:.0f}pt × {REPEATED_SLOT_OVERFLOW_RATIO}) in row of "
-                f"{row_size_v} containers (child={_shape_label(child)}, "
+                f"({effective_slot_width:.0f}pt × {REPEATED_SLOT_OVERFLOW_RATIO}) in "
+                f"{pattern_axis} of {row_size_v} containers (child={_shape_label(child)}, "
                 f"slot={_shape_label(best_slot)})"
             )
             findings.append(

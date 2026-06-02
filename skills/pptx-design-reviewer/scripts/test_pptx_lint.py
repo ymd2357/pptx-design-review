@@ -607,6 +607,36 @@ def _make_text_outside_container_bad(out: Path) -> None:
     prs.save(str(out))
 
 
+def _make_staircase_fixture(out_path: Path) -> None:
+    """FONT-007/4: 3 cards が斜め (staircase) に配置され、最左 card に幅超過
+    text caption が紐付く合成 fixture。staircase 検出 + repeated_slot_overflow
+    発火を回帰確認する。"""
+    prs = Presentation()
+    prs.slide_width = Pt(1440)
+    prs.slide_height = Pt(810)
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    # 3 cards: (x=120,y=120), (x=320,y=260), (x=520,y=400). Δx=200, Δy=140 等差。
+    card_w, card_h = 280, 120
+    positions = [(120, 120), (320, 260), (520, 400)]
+    for cx, cy in positions:
+        card = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Pt(cx), Pt(cy), Pt(card_w), Pt(card_h))
+        card.fill.solid()
+        card.fill.fore_color.rgb = RGBColor.from_string("E0E8F0")
+    # 最左 card 直下に「caption」を置く: x-overlap で staircase 最左 slot に
+    # 紐付くが、bbox center が card の中にないので bbox-only enclosing path は
+    # 発火しない。幅は slot (280pt) を大きく超える 420pt。
+    # 最左 card の直下、card 間 vertical gap (240..260) 内に caption を置く。
+    # bbox-only enclosing path の vertical-overlap 判定にひっかからず、staircase
+    # の y_band (= slot 下端 + 120pt caption band) のみが拾う配置。
+    box = slide.shapes.add_textbox(Pt(120), Pt(244), Pt(420), Pt(14))
+    box.text_frame.auto_size = MSO_AUTO_SIZE.NONE
+    run = box.text_frame.paragraphs[0].add_run()
+    run.text = "Caption that overflows staircase slot"
+    run.font.name = "Noto Sans JP Medium"
+    run.font.size = Pt(18)
+    prs.save(str(out_path))
+
+
 def _make_text_outside_container_good(out: Path) -> None:
     """text が container 内部に収まる対照 fixture (発火しない)."""
     prs = Presentation()
@@ -1074,6 +1104,7 @@ def main() -> int:
         unmarked_small_gap_good = tmp_dir / "unmarked-small-gap-good.pptx"
         text_outside_container_bad = tmp_dir / "text-outside-container-bad.pptx"
         text_outside_container_good = tmp_dir / "text-outside-container-good.pptx"
+        staircase_bad = tmp_dir / "staircase-bad.pptx"
         card_grid_consistency_good = tmp_dir / "card-grid-consistency-good.pptx"
         card_grid_consistency_bad = tmp_dir / "card-grid-consistency-bad.pptx"
         decorative_isolated_line_bad = tmp_dir / "decorative-isolated-line-bad.pptx"
@@ -1130,6 +1161,7 @@ def main() -> int:
         _make_unmarked_small_gap_good(unmarked_small_gap_good)
         _make_text_outside_container_bad(text_outside_container_bad)
         _make_text_outside_container_good(text_outside_container_good)
+        _make_staircase_fixture(staircase_bad)
         _make_card_grid_consistency_good(card_grid_consistency_good)
         _make_card_grid_consistency_bad(card_grid_consistency_bad)
         _make_decorative_isolated_line_bad(decorative_isolated_line_bad)
@@ -1996,6 +2028,41 @@ def main() -> int:
                 "text-outside-container-good.pptx incorrectly triggered text_outside_container:\n  "
                 + "\n  ".join(f.message for f in toc_good_findings)
             )
+
+        # FONT-007/4: staircase pattern 検出 + repeated_slot_overflow 発火
+        staircase_findings = [
+            f
+            for f in pptx_lint.lint_pptx(staircase_bad)
+            if f.check == "text_outside_container"
+            and (f.detail.get("evidence") or {}).get("pattern_axis") == "staircase"
+        ]
+        if not staircase_findings:
+            failures.append(
+                "staircase-bad.pptx did not trigger text_outside_container with pattern_axis=staircase"
+            )
+        else:
+            ev = staircase_findings[0].detail.get("evidence") or {}
+            for key in (
+                "pattern_axis",
+                "staircase_step_dx_pt",
+                "staircase_step_dy_pt",
+                "row_container_shape_ids",
+                "slot_width_pt",
+            ):
+                if key not in ev:
+                    failures.append(
+                        f"staircase finding evidence missing key {key!r}; got {sorted(ev)}"
+                    )
+            if ev.get("pattern_axis") != "staircase":
+                failures.append(
+                    f"staircase finding expected pattern_axis=staircase; got {ev.get('pattern_axis')!r}"
+                )
+            dx = ev.get("staircase_step_dx_pt")
+            dy = ev.get("staircase_step_dy_pt")
+            if dx is None or dx <= 0:
+                failures.append(f"staircase_step_dx_pt should be > 0; got {dx!r}")
+            if dy is None or dy <= 0:
+                failures.append(f"staircase_step_dy_pt should be > 0; got {dy!r}")
 
     if failures:
         print("FAIL:")
