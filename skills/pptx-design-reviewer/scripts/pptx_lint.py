@@ -130,6 +130,7 @@ INNER_PADDING_TARGET_TOL_PT = 4.0
 CARD_GRID_GROUP_MIN = 2
 CARD_GRID_CHILD_COUNT_MIN = 2
 CARD_GRID_ROW_CENTER_TOL_PT = 36.0
+CARD_GRID_COL_CENTER_TOL_PT = 36.0
 CARD_GRID_TOP_TOL_PT = 4.0
 CARD_GRID_SIZE_TOL_PT = 6.0
 CARD_GRID_PADDING_TOL_PT = 8.0
@@ -3519,6 +3520,33 @@ def _card_row_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
     ]
 
 
+def _card_col_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
+    """Group cards by similar x_center to detect vertical columns of containers.
+
+    Mirror of `_card_row_groups` but axis-swapped. A column requires
+    `CARD_GRID_GROUP_MIN` members within `CARD_GRID_COL_CENTER_TOL_PT` of the
+    column's running median x_center. Members are returned sorted by y (top).
+    """
+    cols: list[list[ShapeRecord]] = []
+    for card in sorted(cards, key=lambda item: (_bbox_center(item.bbox_pt)[0], item.bbox_pt[1])):
+        cx, _ = _bbox_center(card.bbox_pt)
+        target: list[ShapeRecord] | None = None
+        for col in cols:
+            col_center = _median([_bbox_center(existing.bbox_pt)[0] for existing in col])
+            if abs(cx - col_center) <= CARD_GRID_COL_CENTER_TOL_PT:
+                target = col
+                break
+        if target is None:
+            cols.append([card])
+        else:
+            target.append(card)
+    return [
+        sorted(col, key=lambda item: item.bbox_pt[1])
+        for col in cols
+        if len(col) >= CARD_GRID_GROUP_MIN
+    ]
+
+
 def _first_child_relative_bbox(container: ShapeRecord, children: list[ShapeRecord]) -> Optional[list[float]]:
     if not children:
         return None
@@ -3976,6 +4004,8 @@ def check_text_outside_container(slide_idx, slide_id, records: list[ShapeRecord]
 REPEATED_SLOT_OVERFLOW_RATIO = 1.2
 REPEATED_SLOT_Y_TOL_PT = 8.0
 REPEATED_SLOT_CAPTION_BELOW_PT = 120.0
+REPEATED_SLOT_X_TOL_PT = 8.0
+REPEATED_SLOT_CAPTION_RIGHT_PT = 120.0
 
 
 def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord], findings):
@@ -3988,7 +4018,8 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
     if len(cards) < 2:
         return
     rows = _card_row_groups(cards)
-    if not rows:
+    cols = _card_col_groups(cards)
+    if not rows and not cols:
         return
     text_records = [r for r in records if r.kind == "text"]
     if not text_records:
@@ -3999,11 +4030,23 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
         bx, _, bw, _ = b
         return max(0.0, min(ax + aw, bx + bw) - max(ax, bx))
 
+    def _bbox_y_overlap_pt(a, b) -> float:
+        _, ay, _, ah = a
+        _, by, _, bh = b
+        return max(0.0, min(ay + ah, by + bh) - max(ay, by))
+
+    def _bbox_area_overlap_pt(a, b) -> float:
+        return _bbox_x_overlap_pt(a, b) * _bbox_y_overlap_pt(a, b)
+
     # 各 row について primary slots (= median 比 0.7 以上) を計算し、すべての
     # row の primary slots を 1 つのプールに統合してから、child ごとに最も
     # x-overlap の大きい slot を選ぶ (= row を跨いで best slot を判定する)。
     # これにより icon row と box row が両方存在する slide で box row が選ばれる。
-    primary_pool: list[tuple] = []  # (slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width)
+    # pool entry: (slot, band_a, band_b, group_container_ids, group_slot_metric,
+    #              group_size, pattern_axis)
+    # row: band_a/b = y_band_top/y_band_bottom, group_slot_metric = width
+    # column: band_a/b = x_band_left/x_band_right, group_slot_metric = height
+    primary_pool: list[tuple] = []
     for row in rows:
         if len(row) < 2:
             continue
@@ -4021,7 +4064,25 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
         y_band_bottom = row_bottom + REPEATED_SLOT_CAPTION_BELOW_PT
         row_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
         for slot in primary_slots:
-            primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots)))
+            primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots), "row"))
+    for col in cols:
+        if len(col) < 2:
+            continue
+        slot_heights_all = sorted(c.bbox_pt[3] for c in col)
+        median_h = slot_heights_all[len(slot_heights_all) // 2]
+        primary_min_height = median_h * 0.7
+        primary_slots = [c for c in col if c.bbox_pt[3] >= primary_min_height]
+        if len(primary_slots) < 2:
+            continue
+        primary_heights = sorted(c.bbox_pt[3] for c in primary_slots)
+        col_slot_height = primary_heights[len(primary_heights) // 2]
+        col_left = min(c.bbox_pt[0] for c in primary_slots)
+        col_right = max(c.bbox_pt[0] + c.bbox_pt[2] for c in primary_slots)
+        x_band_left = col_left - REPEATED_SLOT_X_TOL_PT
+        x_band_right = col_right + REPEATED_SLOT_CAPTION_RIGHT_PT
+        col_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
+        for slot in primary_slots:
+            primary_pool.append((slot, x_band_left, x_band_right, col_container_ids, col_slot_height, len(primary_slots), "column"))
     if not primary_pool:
         return
     for child in text_records:
@@ -4029,38 +4090,67 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             child_top = cy_
             child_bottom = cy_ + ch_
             child_left = cx_
-            # 全 row の primary slot を走査。y_band 内に child が入る slot から
-            # 「text の left edge を含む slot」を優先選択。複数該当なら slot.left
-            # が text.left に近いものを選ぶ (= 左揃え anchor)。該当ゼロなら
-            # x-overlap 最大の slot にフォールバック。
-            best_slot = None
-            best_meta = None
-            best_score = None  # (priority desc, distance asc)
-            for slot, yt, yb, rids, rsw, rsize in primary_pool:
-                if child_bottom < yt or child_top > yb:
-                    continue
-                ov = _bbox_x_overlap_pt(slot.bbox_pt, child.bbox_pt)
-                if ov <= 0.0:
-                    continue
-                sx, _, sw, _ = slot.bbox_pt
-                slot_left = sx
-                slot_right = sx + sw
-                contains_left = slot_left - 5 <= child_left <= slot_right
-                # priority: contains_left=1 > 0、distance = |slot_left - child_left|
-                priority = 1 if contains_left else 0
-                distance = abs(slot_left - child_left)
+            child_right = cx_ + cw_
+            # Row pattern と column pattern を別々に best 評価し、両方 hit した
+            # 場合のみ area-overlap で勝者を選ぶ。同 axis 内では従来通り
+            # contains-anchor + distance を優先 (= row 経路の判定ロジック不変)。
+            best_per_axis: dict[str, tuple] = {}  # axis -> (score, slot, meta, area_ov)
+            for slot, band_a, band_b, gids, gmetric, gsize, axis in primary_pool:
+                if axis == "row":
+                    if child_bottom < band_a or child_top > band_b:
+                        continue
+                    ov = _bbox_x_overlap_pt(slot.bbox_pt, child.bbox_pt)
+                    if ov <= 0.0:
+                        continue
+                    sx, _, sw, _ = slot.bbox_pt
+                    slot_left = sx
+                    slot_right = sx + sw
+                    contains_anchor = slot_left - 5 <= child_left <= slot_right
+                    distance = abs(slot_left - child_left)
+                else:  # column
+                    if child_right < band_a or child_left > band_b:
+                        continue
+                    ov = _bbox_y_overlap_pt(slot.bbox_pt, child.bbox_pt)
+                    if ov <= 0.0:
+                        continue
+                    _, sy, _, sh = slot.bbox_pt
+                    slot_top = sy
+                    slot_bottom = sy + sh
+                    contains_anchor = slot_top - 5 <= child_top <= slot_bottom
+                    distance = abs(slot_top - child_top)
+                priority = 1 if contains_anchor else 0
                 score = (priority, -distance, ov)
-                if best_score is None or score > best_score:
-                    best_score = score
-                    best_slot = slot
-                    best_meta = (rids, rsw, rsize)
-            if best_slot is None:
+                area_ov = _bbox_area_overlap_pt(slot.bbox_pt, child.bbox_pt)
+                cur = best_per_axis.get(axis)
+                if cur is None or score > cur[0]:
+                    best_per_axis[axis] = (score, slot, (gids, gmetric, gsize, axis), area_ov)
+            if not best_per_axis:
                 continue
-            row_container_ids, slot_width, row_size_v = best_meta
-            best_overlap = _bbox_x_overlap_pt(best_slot.bbox_pt, child.bbox_pt)
+            # axis 選択: regression 0 を満たすため、row が hit すれば row を優先
+            # する (= 既存 row 経路の発火件数を維持)。column は row が hit しな
+            # かった text shape にのみ新規に追加発火させる。area-overlap tiebreak
+            # は仕様に記載されているが、本実装では row hit を最優先とすること
+            # で「既存 row pattern の発火件数が不変」要件を満たす。row が hit
+            # しても overflow 閾値を満たさない場合は column を fallback として試す。
+            candidates_in_order: list[tuple] = []
+            if "row" in best_per_axis:
+                candidates_in_order.append(best_per_axis["row"])
+            if "column" in best_per_axis:
+                candidates_in_order.append(best_per_axis["column"])
+            fired_meta = None
+            for entry in candidates_in_order:
+                _score_c, slot_c, meta_c, _area_c = entry
+                _gids_c, _gm_c, _gs_c, axis_c = meta_c
+                eff_w = slot_c.bbox_pt[2]
+                if cw_ > eff_w * REPEATED_SLOT_OVERFLOW_RATIO:
+                    fired_meta = entry
+                    break
+            if fired_meta is None:
+                continue
+            _score, best_slot, best_meta, _area = fired_meta
+            row_container_ids, slot_metric, row_size_v, pattern_axis = best_meta
             effective_slot_width = best_slot.bbox_pt[2]
-            if cw_ <= effective_slot_width * REPEATED_SLOT_OVERFLOW_RATIO:
-                continue
+            slot_width = slot_metric
             # 既に同 child が text_outside_container で発火しているか?
             child_sid = getattr(child.shape, "shape_id", None)
             already_fired = any(
@@ -4087,6 +4177,7 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 "row_size": row_size_v,
                 "detection_strategy": "repeated_slot_width_exceeds",
                 "relation_type": "repeated_slot_overflow",
+                "pattern_axis": pattern_axis,
             }
             manual_reason = MANUAL_REQUIRED_REASONS.get(
                 "text_outside_container",
@@ -4112,7 +4203,7 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             }
             message = (
                 f"text bbox width ({cw_:.0f}pt) exceeds repeated-slot width "
-                f"({effective_slot_width:.0f}pt × {REPEATED_SLOT_OVERFLOW_RATIO}) in row of "
+                f"({effective_slot_width:.0f}pt × {REPEATED_SLOT_OVERFLOW_RATIO}) in {pattern_axis} of "
                 f"{row_size_v} containers (child={_shape_label(child)}, "
                 f"slot={_shape_label(best_slot)})"
             )
