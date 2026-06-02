@@ -130,6 +130,8 @@ INNER_PADDING_TARGET_TOL_PT = 4.0
 CARD_GRID_GROUP_MIN = 2
 CARD_GRID_CHILD_COUNT_MIN = 2
 CARD_GRID_ROW_CENTER_TOL_PT = 36.0
+CARD_GRID_COL_CENTER_TOL_PT = 36.0
+CARD_GRID_FILL_RATIO_MIN = 0.9
 CARD_GRID_TOP_TOL_PT = 4.0
 CARD_GRID_SIZE_TOL_PT = 6.0
 CARD_GRID_PADDING_TOL_PT = 8.0
@@ -3519,6 +3521,94 @@ def _card_row_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
     ]
 
 
+def _card_col_groups(cards: list[ShapeRecord]) -> list[list[ShapeRecord]]:
+    """Group cards into columns by x_center proximity.
+
+    Mirrors `_card_row_groups` but uses x_center instead of y_center.
+    The grouping tolerance reuses `CARD_GRID_COL_CENTER_TOL_PT` (= same value
+    as the row tolerance; merge with agent #1's helper is acceptable since the
+    logic is identical).
+    """
+    cols: list[list[ShapeRecord]] = []
+    for card in sorted(cards, key=lambda item: (_bbox_center(item.bbox_pt)[0], item.bbox_pt[1])):
+        cx, _ = _bbox_center(card.bbox_pt)
+        target: list[ShapeRecord] | None = None
+        for col in cols:
+            col_center = _median([_bbox_center(existing.bbox_pt)[0] for existing in col])
+            if abs(cx - col_center) <= CARD_GRID_COL_CENTER_TOL_PT:
+                target = col
+                break
+        if target is None:
+            cols.append([card])
+        else:
+            target.append(card)
+    return [
+        sorted(col, key=lambda item: item.bbox_pt[1])
+        for col in cols
+        if len(col) >= CARD_GRID_GROUP_MIN
+    ]
+
+
+def _card_grid_cells(
+    cards: list[ShapeRecord],
+) -> tuple[list[list[Optional[ShapeRecord]]], int, int]:
+    """Detect an m × n grid of containers and return cells as `grid[row][col]`.
+
+    Returns `([], 0, 0)` when no grid is detected. Grid criteria:
+      - rows >= 2 AND cols >= 2 (from row / column grouping)
+      - at least `CARD_GRID_FILL_RATIO_MIN` (= 90%) of the m × n cells are
+        occupied (missing entries are allowed and represented as `None`).
+    """
+    rows = _card_row_groups(cards)
+    cols = _card_col_groups(cards)
+    if len(rows) < 2 or len(cols) < 2:
+        return [], 0, 0
+    # Sort rows top-to-bottom by row median y_center.
+    rows = sorted(
+        rows,
+        key=lambda row: _median([_bbox_center(c.bbox_pt)[1] for c in row]),
+    )
+    cols = sorted(
+        cols,
+        key=lambda col: _median([_bbox_center(c.bbox_pt)[0] for c in col]),
+    )
+    row_centers = [
+        _median([_bbox_center(c.bbox_pt)[1] for c in row]) for row in rows
+    ]
+    col_centers = [
+        _median([_bbox_center(c.bbox_pt)[0] for c in col]) for col in cols
+    ]
+    m = len(rows)
+    n = len(cols)
+    grid: list[list[Optional[ShapeRecord]]] = [[None] * n for _ in range(m)]
+    placed_ids: set[int] = set()
+    for card in cards:
+        cx, cy = _bbox_center(card.bbox_pt)
+        # Find nearest row.
+        ri = min(range(m), key=lambda i: abs(cy - row_centers[i]))
+        if abs(cy - row_centers[ri]) > CARD_GRID_ROW_CENTER_TOL_PT:
+            continue
+        ci = min(range(n), key=lambda j: abs(cx - col_centers[j]))
+        if abs(cx - col_centers[ci]) > CARD_GRID_COL_CENTER_TOL_PT:
+            continue
+        if grid[ri][ci] is not None:
+            # Prefer the larger-area container when collisions happen.
+            existing = grid[ri][ci]
+            existing_area = existing.bbox_pt[2] * existing.bbox_pt[3]
+            new_area = card.bbox_pt[2] * card.bbox_pt[3]
+            if new_area > existing_area:
+                placed_ids.discard(id(existing))
+                grid[ri][ci] = card
+                placed_ids.add(id(card))
+            continue
+        grid[ri][ci] = card
+        placed_ids.add(id(card))
+    filled = sum(1 for row in grid for cell in row if cell is not None)
+    if filled < CARD_GRID_FILL_RATIO_MIN * m * n:
+        return [], 0, 0
+    return grid, m, n
+
+
 def _first_child_relative_bbox(container: ShapeRecord, children: list[ShapeRecord]) -> Optional[list[float]]:
     if not children:
         return None
@@ -4003,7 +4093,10 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
     # row の primary slots を 1 つのプールに統合してから、child ごとに最も
     # x-overlap の大きい slot を選ぶ (= row を跨いで best slot を判定する)。
     # これにより icon row と box row が両方存在する slide で box row が選ばれる。
-    primary_pool: list[tuple] = []  # (slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width)
+    # Each entry: dict with keys
+    #   slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width,
+    #   row_size, pattern_axis ("row" | "grid_mxn"), grid_size (Optional[(m,n)])
+    primary_pool: list[dict] = []
     for row in rows:
         if len(row) < 2:
             continue
@@ -4021,7 +4114,65 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
         y_band_bottom = row_bottom + REPEATED_SLOT_CAPTION_BELOW_PT
         row_container_ids = [getattr(c.shape, "shape_id", None) for c in primary_slots]
         for slot in primary_slots:
-            primary_pool.append((slot, y_band_top, y_band_bottom, row_container_ids, row_slot_width, len(primary_slots)))
+            primary_pool.append({
+                "slot": slot,
+                "y_band_top": y_band_top,
+                "y_band_bottom": y_band_bottom,
+                "row_container_ids": row_container_ids,
+                "row_slot_width": row_slot_width,
+                "row_size": len(primary_slots),
+                "pattern_axis": "row",
+                "grid_size": None,
+            })
+
+    # FONT-007/2: m × n grid pattern. cell ごとに自分自身の bbox を slot とし、
+    # y_band は cell の上下に余裕を持たせる (caption が下にぶら下がる前提)。
+    # row 経路と独立に pool へ追加し、child 帰属競合時は score (contains_left,
+    # distance) で勝った方が採用される (= grid cell の方が x bound が狭いので
+    # 通常 grid が勝つ)。
+    grid_cells, m_rows, n_cols = _card_grid_cells(cards)
+    if grid_cells:
+        all_cells = [cell for row in grid_cells for cell in row if cell is not None]
+        if all_cells:
+            cell_widths = sorted(c.bbox_pt[2] for c in all_cells)
+            grid_median_w = cell_widths[len(cell_widths) // 2]
+            grid_container_ids = [
+                getattr(c.shape, "shape_id", None) for c in all_cells
+            ]
+            cell_height_med = _median([c.bbox_pt[3] for c in all_cells])
+            for ri, row in enumerate(grid_cells):
+                for ci, cell in enumerate(row):
+                    if cell is None:
+                        continue
+                    cx_left, cy_top, cw, ch = cell.bbox_pt
+                    # y_band: cell の上端から、次行までの想定 gap (= cell 高さ
+                    # 相当) を caption 領域として下方向に拡張する。最終行は
+                    # caption が外に出るので REPEATED_SLOT_CAPTION_BELOW_PT
+                    # と同じ余裕を許容。
+                    y_band_top = cy_top - REPEATED_SLOT_Y_TOL_PT
+                    if ri + 1 < m_rows:
+                        next_row_tops = [
+                            r2[ci].bbox_pt[1]
+                            for r2 in grid_cells[ri + 1:]
+                            if ci < len(r2) and r2[ci] is not None
+                        ]
+                        if next_row_tops:
+                            y_band_bottom = next_row_tops[0] - REPEATED_SLOT_Y_TOL_PT
+                        else:
+                            y_band_bottom = cy_top + ch + REPEATED_SLOT_CAPTION_BELOW_PT
+                    else:
+                        y_band_bottom = cy_top + ch + REPEATED_SLOT_CAPTION_BELOW_PT
+                    primary_pool.append({
+                        "slot": cell,
+                        "y_band_top": y_band_top,
+                        "y_band_bottom": y_band_bottom,
+                        "row_container_ids": grid_container_ids,
+                        "row_slot_width": grid_median_w,
+                        "row_size": len(all_cells),
+                        "pattern_axis": "grid_mxn",
+                        "grid_size": (m_rows, n_cols),
+                    })
+
     if not primary_pool:
         return
     for child in text_records:
@@ -4034,9 +4185,12 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
             # が text.left に近いものを選ぶ (= 左揃え anchor)。該当ゼロなら
             # x-overlap 最大の slot にフォールバック。
             best_slot = None
-            best_meta = None
+            best_entry = None
             best_score = None  # (priority desc, distance asc)
-            for slot, yt, yb, rids, rsw, rsize in primary_pool:
+            for entry in primary_pool:
+                slot = entry["slot"]
+                yt = entry["y_band_top"]
+                yb = entry["y_band_bottom"]
                 if child_bottom < yt or child_top > yb:
                     continue
                 ov = _bbox_x_overlap_pt(slot.bbox_pt, child.bbox_pt)
@@ -4046,17 +4200,26 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 slot_left = sx
                 slot_right = sx + sw
                 contains_left = slot_left - 5 <= child_left <= slot_right
-                # priority: contains_left=1 > 0、distance = |slot_left - child_left|
                 priority = 1 if contains_left else 0
                 distance = abs(slot_left - child_left)
-                score = (priority, -distance, ov)
+                # row / grid 両経路は並走させ、同じ child に対して両方が
+                # 該当するときは grid を優先 (= より細かい slot 帰属で
+                # 正確な container/slot_width を返す)。row 経路全体の発火
+                # children は不変 (= 同じ child が pattern_axis="grid_mxn"
+                # に再分類されるだけ、relation_type は維持)。
+                axis_pref = 1 if entry["pattern_axis"] == "grid_mxn" else 0
+                score = (priority, -distance, axis_pref, ov)
                 if best_score is None or score > best_score:
                     best_score = score
                     best_slot = slot
-                    best_meta = (rids, rsw, rsize)
+                    best_entry = entry
             if best_slot is None:
                 continue
-            row_container_ids, slot_width, row_size_v = best_meta
+            row_container_ids = best_entry["row_container_ids"]
+            slot_width = best_entry["row_slot_width"]
+            row_size_v = best_entry["row_size"]
+            pattern_axis_v = best_entry["pattern_axis"]
+            grid_size_v = best_entry["grid_size"]
             best_overlap = _bbox_x_overlap_pt(best_slot.bbox_pt, child.bbox_pt)
             effective_slot_width = best_slot.bbox_pt[2]
             if cw_ <= effective_slot_width * REPEATED_SLOT_OVERFLOW_RATIO:
@@ -4087,6 +4250,8 @@ def _emit_repeated_slot_overflow(slide_idx, slide_id, records: list[ShapeRecord]
                 "row_size": row_size_v,
                 "detection_strategy": "repeated_slot_width_exceeds",
                 "relation_type": "repeated_slot_overflow",
+                "pattern_axis": pattern_axis_v,
+                "grid_size": list(grid_size_v) if grid_size_v else None,
             }
             manual_reason = MANUAL_REQUIRED_REASONS.get(
                 "text_outside_container",
