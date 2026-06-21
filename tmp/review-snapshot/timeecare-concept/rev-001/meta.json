@@ -1,0 +1,32 @@
+{
+  "deck": "timeecare-concept",
+  "rev": "001",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    2,
+    3,
+    4
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 43946,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 6647,
+      "changed": true
+    },
+    {
+      "slide_no": 4,
+      "ae_pixels": 35427,
+      "changed": true
+    }
+  ]
+}
