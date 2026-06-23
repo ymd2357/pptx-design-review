@@ -465,6 +465,29 @@ textarea {
   stroke: #16834a;
 }
 
+/* 非フォーカスの finding: 薄いアウトラインのみ (赤一色で埋まらないように) */
+.finding-box.dim {
+  fill: transparent;
+  stroke: rgb(100 116 139 / 55%);
+  stroke-width: 2;
+}
+
+.finding-box.dim.judged {
+  stroke: rgb(22 131 74 / 55%);
+}
+
+/* フォーカス中の finding: 青で強調 */
+.finding-box.active {
+  fill: rgb(37 99 235 / 18%);
+  stroke: #2563eb;
+  stroke-width: 5;
+}
+
+.finding-box.active:focus,
+.finding-box.active:hover {
+  fill: rgb(37 99 235 / 28%);
+}
+
 .slide-empty {
   margin: 0;
   color: #526173;

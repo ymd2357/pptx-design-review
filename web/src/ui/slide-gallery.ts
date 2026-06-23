@@ -14,10 +14,12 @@ export type SlideGalleryHandle = {
   element: HTMLElement;
   refresh(): void;
   goToSlide(slideNo: number): void;
+  focus(finding: LintFinding): void;
 };
 
 export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHandle {
   let currentIndex = initialSlideIndex(options.imageUrls, options.initialSlideNo);
+  let focusKey: string | null = null;
   let pointerStartX: number | null = null;
 
   const root = document.createElement("section");
@@ -74,6 +76,12 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
         render();
       }
     },
+    focus(finding: LintFinding): void {
+      focusKey = finding.key;
+      const index = options.imageUrls.findIndex((url) => slideNumberFromUrl(url) === finding.slideNo);
+      if (index >= 0) currentIndex = index;
+      render();
+    },
   };
 
   function move(delta: number): void {
@@ -108,7 +116,12 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
     overlay.setAttribute("viewBox", `0 0 ${options.slideSizePt.w} ${options.slideSizePt.h}`);
     overlay.setAttribute("preserveAspectRatio", "none");
     overlay.setAttribute("aria-label", "finding オーバーレイ");
-    for (const finding of slideFindings) {
+    // フォーカス中の finding は最後に描いて最前面 + 強調。
+    // それ以外は薄いアウトラインのみ (赤一色で埋まるのを防ぐ)。
+    const ordered = [...slideFindings].sort((a, b) =>
+      a.key === focusKey ? 1 : b.key === focusKey ? -1 : 0,
+    );
+    for (const finding of ordered) {
       if (!finding.bboxPt) continue;
       const [x, y, width, height] = finding.bboxPt;
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -116,7 +129,7 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(Math.max(width, 6)));
       rect.setAttribute("height", String(Math.max(height, 6)));
-      rect.setAttribute("class", judgementClass(options.judgements, finding.key));
+      rect.setAttribute("class", boxClass(options.judgements, finding.key, finding.key === focusKey));
       rect.setAttribute("tabindex", "0");
       rect.setAttribute("role", "button");
       rect.setAttribute("aria-label", `${finding.check}: ${finding.message}`);
@@ -154,9 +167,9 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
   }
 }
 
-function judgementClass(judgements: FindingJudgementsFile, groupKey: string): string {
-  const judgement = judgements.judgements[groupKey];
-  return isJudged(judgement) ? "finding-box judged" : "finding-box";
+function boxClass(judgements: FindingJudgementsFile, groupKey: string, active: boolean): string {
+  if (active) return "finding-box active";
+  return isJudged(judgements.judgements[groupKey]) ? "finding-box judged" : "finding-box dim";
 }
 
 function isJudged(judgement: { review_status?: string; judgement_reason?: string | null } | undefined): boolean {

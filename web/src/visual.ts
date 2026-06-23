@@ -175,6 +175,8 @@ function renderLoaded(): void {
       onSelectFinding: focusFinding,
     });
     sticky.append(galleryHandle.element, progressText);
+    const firstWithBox = allFindings.find((f) => f.bboxPt);
+    if (firstWithBox) galleryHandle.focus(firstWithBox);
   } else {
     galleryHandle = undefined;
     sticky.append(
@@ -201,7 +203,7 @@ function renderLoaded(): void {
 }
 
 function focusFinding(finding: LintFinding): void {
-  galleryHandle?.goToSlide(finding.slideNo);
+  galleryHandle?.focus(finding);
   reviewHandle?.focusFinding(finding.key);
 }
 
