@@ -53,6 +53,7 @@ export function parseLintJson(value: unknown): LintData {
     throw new Error("lint.json must be an array of findings.");
   }
   const findings = value.map(parseFinding).filter((finding): finding is LintFinding => Boolean(finding));
+  fillMissingBboxFromShape(findings);
   const slideNumbers = Array.from(new Set(findings.map((finding) => finding.slideNo))).sort(
     (a, b) => a - b,
   );
@@ -129,9 +130,8 @@ function parseFinding(value: unknown): LintFinding | null {
     message: stringValue(raw.message) ?? "",
     bboxPt:
       bboxValue(target?.bbox_pt) ??
-      bboxValue(detail.bbox_pt) ??
-      bboxValue(evidence.bbox_pt) ??
-      bboxValue(detail.overlap_bbox_pt),
+      bboxFromPaths(detail) ??
+      bboxFromPaths(evidence),
     actualBBoxPt:
       bboxValue(target?.actual_bbox_pt) ??
       bboxValue(detail.actual_bbox_pt) ??
@@ -144,6 +144,62 @@ function parseFinding(value: unknown): LintFinding | null {
 
 function fallbackKey(check: string, slideIndex: number, shapeId: number | string | null): string {
   return `${check}:${slideIndex}:${shapeId ?? "unknown"}`;
+}
+
+/**
+ * check ごとに bbox の格納先が異なるため、既知の候補パスを優先順に探索する。
+ * text_outside_container は child (はみ出したテキスト) を、object_overlap は
+ * overlap 領域を優先。最初に見つかった有効な bbox_pt を返す。
+ */
+function bboxFromPaths(root: Record<string, unknown>): BBoxPt | null {
+  const paths: Array<Array<string | number>> = [
+    ["bbox_pt"],
+    ["overlap_bbox_pt"],
+    ["child", "bbox_pt"],
+    ["title_candidate", "bbox_pt"],
+    ["largest_body_candidate", "bbox_pt"],
+    ["shape_a", "bbox_pt"],
+    ["container", "bbox_pt"],
+    ["group", 0, "bbox_pt"],
+    ["visual_order", 0, "bbox_pt"],
+  ];
+  for (const path of paths) {
+    const found = bboxValue(resolvePath(root, path));
+    if (found) return found;
+  }
+  return null;
+}
+
+function resolvePath(root: unknown, path: ReadonlyArray<string | number>): unknown {
+  let cursor: unknown = root;
+  for (const segment of path) {
+    if (cursor == null) return undefined;
+    if (typeof segment === "number") {
+      cursor = Array.isArray(cursor) ? cursor[segment] : undefined;
+    } else {
+      cursor = typeof cursor === "object" ? (cursor as Record<string, unknown>)[segment] : undefined;
+    }
+  }
+  return cursor;
+}
+
+/**
+ * bbox を持たない finding (contrast / font_size / line_height など run 単位の検出) を、
+ * 同じ (slide, shape) を持つ別 finding の bbox で補完する。これでシェイプ位置が
+ * ハイライト可能になる。
+ */
+function fillMissingBboxFromShape(findings: LintFinding[]): void {
+  const byShape = new Map<string, BBoxPt>();
+  for (const finding of findings) {
+    if (!finding.bboxPt || finding.shapeId == null) continue;
+    const key = `${finding.slideNo}:${finding.shapeId}`;
+    if (!byShape.has(key)) byShape.set(key, finding.bboxPt);
+  }
+  for (const finding of findings) {
+    if (finding.bboxPt || finding.shapeId == null) continue;
+    const fallback = byShape.get(`${finding.slideNo}:${finding.shapeId}`);
+    if (fallback) finding.bboxPt = fallback;
+  }
 }
 
 function bboxValue(value: unknown): BBoxPt | null {
