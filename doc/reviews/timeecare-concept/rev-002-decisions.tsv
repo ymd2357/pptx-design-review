@@ -1,0 +1,17 @@
+review_no	check_id	priority	latest_lint_count	observation_decision	finding_dispositions	rationale	related_artifacts
+P0-1	text_outside_container	P0	9	remaining			rev-002 snapshot lint.json
+P0-2	object_overlap	P0	33	remaining			rev-002 snapshot lint.json
+P0-3	contrast_ratio	P0	11	remaining			rev-002 snapshot lint.json
+P1-1	card_grid_consistency	P1	6	remaining			rev-002 snapshot lint.json
+P1-2	safe_text_area_text	P1	14	remaining			rev-002 snapshot lint.json
+P1-3	safe_margins	P1	22	remaining			rev-002 snapshot lint.json
+P1-4	heading_hierarchy_broken	P1	3	remaining			rev-002 snapshot lint.json
+P1-5	reading_order	P1	3	remaining			rev-002 snapshot lint.json
+P1-6	color_only_meaning	P1	3	remaining			rev-002 snapshot lint.json
+P1-7	alignment_left_top	P1	37	remaining			rev-002 snapshot lint.json
+P2-1	object_gap_too_small	P2	8	remaining			rev-002 snapshot lint.json
+P2-2	font_size_scale	P2	82	remaining			rev-002 snapshot lint.json
+P2-3	line_height	P2	94	remaining			rev-002 snapshot lint.json
+P2-4	text_color_allowlist	P2	63	remaining			rev-002 snapshot lint.json
+P2-5	background_color_palette	P2	42	remaining			rev-002 snapshot lint.json
+P2-6	geometry_rounding	P2	157	remaining			rev-002 snapshot lint.json
