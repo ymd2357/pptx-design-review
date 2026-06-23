@@ -905,3 +905,167 @@ textarea {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 88px 42px;
   }
 }
+
+/* ===== /visual/ 1カラム inline 判定 ===== */
+.visual-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  margin: 0 -14px 14px;
+  padding: 10px 14px;
+  background: rgb(246 247 249 / 96%);
+  backdrop-filter: blur(4px);
+  border-bottom: 1px solid #dce2e9;
+}
+
+.visual-sticky .slide-frame {
+  max-width: 420px;
+  margin-inline: auto;
+}
+
+.visual-sticky .visual-progress {
+  margin: 0;
+  text-align: center;
+}
+
+.vfr {
+  display: grid;
+  gap: 18px;
+}
+
+.vfr-group {
+  display: grid;
+  gap: 8px;
+}
+
+.vfr-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid #e6eaef;
+}
+
+.vfr-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vfr-group-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vfr-prio {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #ffffff;
+  background: #64748b;
+}
+
+.vfr-prio--p0 { background: #b91c1c; }
+.vfr-prio--p1 { background: #b45309; }
+.vfr-prio--p2 { background: #4b5563; }
+
+.vfr-group-count {
+  flex: none;
+  color: #526173;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.vfr-row {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e0e5eb;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.vfr-row--judged {
+  border-color: #8bb99d;
+  background: #f3faf6;
+}
+
+.vfr-row--active {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 30%);
+}
+
+.vfr-row-info {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.vfr-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: #526173;
+}
+
+.vfr-row-slide {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #eef2f6;
+  font-weight: 800;
+}
+
+.vfr-row-shape {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.vfr-row-message {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.vfr-row-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.vfr-select {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid #bdc7d3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2933;
+}
+
+.vfr-select:disabled {
+  background: #f1f4f7;
+  color: #8a97a6;
+}
+
+@media (min-width: 720px) {
+  .visual-sticky .slide-frame {
+    max-width: 480px;
+  }
+}
