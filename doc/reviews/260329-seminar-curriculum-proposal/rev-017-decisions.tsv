@@ -1,0 +1,13 @@
+review_no	check_id	priority	latest_lint_count	observation_decision	finding_dispositions	rationale	related_artifacts
+P0-3	low_contrast	P0	21	remaining			rev-017-rendered-contrast-lint.json
+P1-3	color_only_meaning	P1	0	inferred_done		機械 lint で未検出。全 20 スライドが automated_only で OK。	rev-017-rendered-contrast-lint.json
+P1-4	contrast_ratio	P1	9	remaining			rev-017-rendered-contrast-lint.json
+P1-5	heading_hierarchy_broken	P1	0	inferred_done		機械 lint で未検出。title/body slot 推定で問題なし。	rev-017-rendered-contrast-lint.json
+P1-7	key_area_cropped	P1	0	inferred_done		機械 lint で未検出。画像 crop で重要部欠落なし。	rev-017-rendered-contrast-lint.json
+P1-9	missing_required_element	P1	1	remaining			rev-017-rendered-contrast-lint.json
+P1-13	reading_order	P1	1	remaining			rev-017-rendered-contrast-lint.json
+P1-15	wrap_break_changes_meaning	P1	0	inferred_done		機械 lint で未検出。明示改行に意味分断なし。	rev-017-rendered-contrast-lint.json
+P2-6	inner_padding_imbalance	P2	17	remaining			rev-017-rendered-contrast-lint.json
+P2-7	safe_margins	P2	1	remaining			rev-017-rendered-contrast-lint.json
+P2-8	safe_text_area_text	P2	27	remaining			rev-017-rendered-contrast-lint.json
+P2-12	card_grid_consistency	P2	4	remaining			rev-017-rendered-contrast-lint.json

@@ -1,0 +1,4 @@
+slide_no	decision	memo
+2	adopt	v3 (保守的 card_grid 修正) で採用。Codex デバッグ後、画像壊れなし。視覚的変化は微小 (padding 微調整のみ)。
+13	adopt	同上。
+20	adopt	同上。

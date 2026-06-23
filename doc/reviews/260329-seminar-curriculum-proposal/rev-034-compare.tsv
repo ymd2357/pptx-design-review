@@ -1,0 +1,3 @@
+slide_no	decision	memo
+2	adopt	font family normalize 後 deck への fixer 適用差分。変更は既存の card_grid role-based 微調整と同範囲で、wrap 破壊なし。
+13	adopt	同上。
