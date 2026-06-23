@@ -22,25 +22,27 @@ export type InlineFindingReviewOptions = {
   groups: readonly InlineFindingGroup[];
   judgements: FindingJudgementsFile;
   onChange: (key: string, judgement: FindingJudgement) => void;
-  onFocusFinding: (finding: LintFinding) => void;
+  /** ユーザーが行を選んだ (= アクティブを切替えた)。スライド側を同期するのに使う。 */
+  onActivate: (finding: LintFinding) => void;
 };
 
 export type InlineFindingReviewHandle = {
   element: HTMLElement;
   refresh(): void;
-  focusFinding(key: string): void;
+  /** 外部 (スライドの青枠タップ等) からアクティブ行を指定。展開してスクロール表示する。 */
+  activate(key: string, options?: { scroll?: boolean }): void;
 };
 
 type RowHandle = {
   finding: LintFinding;
   element: HTMLElement;
-  syncJudged(): void;
+  setOpen(open: boolean): void;
+  syncBadge(): void;
 };
 
 type GroupHandle = {
   count: HTMLElement;
   findings: readonly LintFinding[];
-  rows: RowHandle[];
 };
 
 export function renderInlineFindingReview(
@@ -51,29 +53,42 @@ export function renderInlineFindingReview(
 
   const groupHandles: GroupHandle[] = [];
   const rowByKey = new Map<string, RowHandle>();
+  let activeKey: string | null = null;
 
   for (const group of options.groups) {
-    const { element, handle } = renderGroup(group);
+    const { element, handle, rows } = renderGroup(group);
     section.append(element);
     groupHandles.push(handle);
-    for (const row of handle.rows) rowByKey.set(row.finding.key, row);
+    for (const row of rows) rowByKey.set(row.finding.key, row);
   }
 
   refresh();
-  return { element: section, refresh, focusFinding };
+  return { element: section, refresh, activate };
 
   function refresh(): void {
-    for (const group of groupHandles) {
-      for (const row of group.rows) row.syncJudged();
-      group.count.textContent = groupCountLabel(group);
+    for (const row of rowByKey.values()) row.syncBadge();
+    for (const group of groupHandles) group.count.textContent = groupCountLabel(group);
+  }
+
+  /** 行クリック由来: アクティブ切替 + スライド同期 (onActivate)。 */
+  function selectFromRow(finding: LintFinding): void {
+    setActive(finding.key);
+    options.onActivate(finding);
+  }
+
+  /** 外部由来 (スライドの枠タップ): アクティブ切替 + スクロール表示のみ。 */
+  function activate(key: string, opts?: { scroll?: boolean }): void {
+    setActive(key);
+    if (opts?.scroll !== false) {
+      rowByKey.get(key)?.element.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }
 
-  function focusFinding(key: string): void {
-    const row = rowByKey.get(key);
-    if (!row) return;
-    row.element.classList.add("vfr-row--active");
-    window.setTimeout(() => row.element.classList.remove("vfr-row--active"), 1600);
+  function setActive(key: string): void {
+    if (activeKey === key) return;
+    if (activeKey) rowByKey.get(activeKey)?.setOpen(false);
+    activeKey = key;
+    rowByKey.get(key)?.setOpen(true);
   }
 
   function groupCountLabel(group: GroupHandle): string {
@@ -81,13 +96,14 @@ export function renderInlineFindingReview(
     return `判定 ${judged} / ${group.findings.length}`;
   }
 
-  function renderGroup(group: InlineFindingGroup): { element: HTMLElement; handle: GroupHandle } {
+  function renderGroup(
+    group: InlineFindingGroup,
+  ): { element: HTMLElement; handle: GroupHandle; rows: RowHandle[] } {
     const wrapper = document.createElement("section");
     wrapper.className = "vfr-group";
 
     const header = document.createElement("div");
     header.className = "vfr-group-head";
-
     const title = document.createElement("div");
     title.className = "vfr-group-title";
     const priority = document.createElement("span");
@@ -97,10 +113,8 @@ export function renderInlineFindingReview(
     name.className = "vfr-group-name";
     name.textContent = `${group.observation.review_no} ${group.observation.check_id}`;
     title.append(priority, name);
-
     const count = document.createElement("span");
     count.className = "vfr-group-count";
-
     header.append(title, count);
     wrapper.append(header);
 
@@ -110,53 +124,52 @@ export function renderInlineFindingReview(
       rows.push(row);
       wrapper.append(row.element);
     }
-
-    return { element: wrapper, handle: { count, findings: group.findings, rows } };
+    return { element: wrapper, handle: { count, findings: group.findings }, rows };
   }
 
   function renderRow(finding: LintFinding): RowHandle {
     const item = document.createElement("div");
     item.className = "vfr-row";
 
-    // --- left: finding identity (click to sync gallery) ---
-    const info = document.createElement("button");
-    info.type = "button";
-    info.className = "vfr-row-info";
-    info.addEventListener("click", () => options.onFocusFinding(finding));
+    // --- 常時表示: コンパクトな見出し行 (タップで展開) ---
+    const head = document.createElement("button");
+    head.type = "button";
+    head.className = "vfr-row-head";
+    head.addEventListener("click", () => selectFromRow(finding));
 
-    const meta = document.createElement("span");
-    meta.className = "vfr-row-meta";
     const slide = document.createElement("span");
     slide.className = "vfr-row-slide";
     slide.textContent = `S${finding.slideNo}`;
     const shape = document.createElement("span");
     shape.className = "vfr-row-shape";
     shape.textContent = finding.shapeName || finding.key;
-    meta.append(slide, shape);
+    const badge = document.createElement("span");
+    badge.className = "vfr-row-badge";
+    head.append(slide, shape, badge);
 
-    const message = document.createElement("span");
+    // --- 展開時のみ表示: メッセージ + 判定コントロール ---
+    const body = document.createElement("div");
+    body.className = "vfr-row-body";
+
+    const message = document.createElement("p");
     message.className = "vfr-row-message";
     message.textContent = finding.message;
 
-    info.append(meta, message);
-
-    // --- right: inline judgement controls ---
     const controls = document.createElement("div");
     controls.className = "vfr-row-controls";
-
     const status = document.createElement("select");
     status.className = "vfr-select vfr-status";
     status.setAttribute("aria-label", "レビュー状態");
     for (const value of REVIEW_STATUSES) {
       status.append(new Option(labelForReviewStatus(value), value));
     }
-
     const reason = document.createElement("select");
     reason.className = "vfr-select vfr-reason";
     reason.setAttribute("aria-label", "判定理由");
-
     controls.append(status, reason);
-    item.append(info, controls);
+
+    body.append(message, controls);
+    item.append(head, body);
 
     const current = options.judgements.judgements[finding.key] ?? {
       review_status: "unreviewed" as ReviewStatus,
@@ -185,14 +198,21 @@ export function renderInlineFindingReview(
     const handle: RowHandle = {
       finding,
       element: item,
-      syncJudged(): void {
-        item.classList.toggle("vfr-row--judged", isJudged(options.judgements.judgements[finding.key]));
+      setOpen(open: boolean): void {
+        item.classList.toggle("vfr-row--open", open);
+      },
+      syncBadge(): void {
+        const judgement = options.judgements.judgements[finding.key];
+        const judged = isJudged(judgement);
+        item.classList.toggle("vfr-row--judged", judged);
+        badge.classList.toggle("judged", judged);
+        badge.textContent = judged && judgement ? labelForReviewStatus(judgement.review_status) : "未判定";
       },
     };
 
     function commit(judgement: FindingJudgement): void {
       options.judgements.judgements[finding.key] = judgement;
-      handle.syncJudged();
+      handle.syncBadge();
       options.onChange(finding.key, judgement);
     }
 

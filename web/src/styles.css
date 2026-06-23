@@ -1009,29 +1009,28 @@ textarea {
 }
 
 .vfr-row {
-  display: grid;
-  gap: 8px;
-  padding: 10px;
   border: 1px solid #e0e5eb;
   border-radius: 8px;
   background: #ffffff;
+  overflow: hidden;
 }
 
 .vfr-row--judged {
   border-color: #8bb99d;
-  background: #f3faf6;
 }
 
-.vfr-row--active {
+.vfr-row--open {
   border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgb(37 99 235 / 30%);
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 25%);
 }
 
-.vfr-row-info {
-  display: grid;
-  gap: 4px;
+/* 常時表示のコンパクト見出し行 (タップで展開) */
+.vfr-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  padding: 0;
+  padding: 9px 10px;
   border: none;
   background: none;
   text-align: left;
@@ -1039,12 +1038,8 @@ textarea {
   color: inherit;
 }
 
-.vfr-row-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.78rem;
-  color: #526173;
+.vfr-row--open .vfr-row-head {
+  background: #f4f8ff;
 }
 
 .vfr-row-slide {
@@ -1052,17 +1047,49 @@ textarea {
   padding: 1px 7px;
   border-radius: 999px;
   background: #eef2f6;
+  font-size: 0.78rem;
   font-weight: 800;
+  color: #526173;
 }
 
 .vfr-row-shape {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 0.86rem;
   font-weight: 700;
 }
 
+.vfr-row-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #eef2f6;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #8a97a6;
+}
+
+.vfr-row-badge.judged {
+  background: #e3f3ea;
+  color: #16834a;
+}
+
+/* 展開時のみ表示: メッセージ + 判定コントロール */
+.vfr-row-body {
+  display: none;
+}
+
+.vfr-row--open .vfr-row-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
 .vfr-row-message {
+  margin: 0;
   font-size: 0.9rem;
   line-height: 1.45;
 }

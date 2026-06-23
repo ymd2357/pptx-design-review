@@ -95,7 +95,6 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
     stage.replaceChildren();
     const imageUrl = options.imageUrls[currentIndex];
     const slideNo = slideNumberFromUrl(imageUrl) ?? currentIndex + 1;
-    const slideFindings = options.findings.filter((finding) => finding.slideNo === slideNo);
     position.textContent = `スライド ${slideNo} / ${options.imageUrls.length}`;
     previous.disabled = currentIndex === 0;
     next.disabled = currentIndex === options.imageUrls.length - 1;
@@ -116,28 +115,26 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
     overlay.setAttribute("viewBox", `0 0 ${options.slideSizePt.w} ${options.slideSizePt.h}`);
     overlay.setAttribute("preserveAspectRatio", "none");
     overlay.setAttribute("aria-label", "finding オーバーレイ");
-    // フォーカス中の finding は最後に描いて最前面 + 強調。
-    // それ以外は薄いアウトラインのみ (赤一色で埋まるのを防ぐ)。
-    const ordered = [...slideFindings].sort((a, b) =>
-      a.key === focusKey ? 1 : b.key === focusKey ? -1 : 0,
-    );
-    for (const finding of ordered) {
-      if (!finding.bboxPt) continue;
-      const [x, y, width, height] = finding.bboxPt;
+
+    // 選択中の 1 件だけを青枠で描画する。他の finding の枠は出さない。
+    const active = options.findings.find((finding) => finding.key === focusKey);
+    if (active && active.slideNo === slideNo && active.bboxPt) {
+      const [x, y, width, height] = active.bboxPt;
       const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       rect.setAttribute("x", String(x));
       rect.setAttribute("y", String(y));
       rect.setAttribute("width", String(Math.max(width, 6)));
       rect.setAttribute("height", String(Math.max(height, 6)));
-      rect.setAttribute("class", boxClass(options.judgements, finding.key, finding.key === focusKey));
+      rect.setAttribute("class", "finding-box active");
       rect.setAttribute("tabindex", "0");
       rect.setAttribute("role", "button");
-      rect.setAttribute("aria-label", `${finding.check}: ${finding.message}`);
-      rect.addEventListener("click", () => options.onSelectFinding(finding));
+      rect.setAttribute("aria-label", `${active.check}: ${active.message}`);
+      // 青枠タップ → 下のリストの該当行へ (A)
+      rect.addEventListener("click", () => options.onSelectFinding(active));
       rect.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
-          options.onSelectFinding(finding);
+          options.onSelectFinding(active);
         }
       });
       overlay.append(rect);
@@ -145,11 +142,8 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
 
     const empty = document.createElement("p");
     empty.className = "slide-empty";
-    if (slideFindings.length === 0) {
-      empty.textContent = "このスライドに紐づく bbox はありません (下の一覧から finding を選んでください)。";
-    } else {
-      empty.textContent = "";
-    }
+    empty.textContent =
+      active && active.slideNo === slideNo ? "" : "選択中の finding はこのスライドにありません。";
 
     frame.append(image, overlay);
     stage.append(frame);
@@ -165,17 +159,6 @@ export function renderSlideGallery(options: SlideGalleryOptions): SlideGalleryHa
     document.head.append(link);
     window.setTimeout(() => link.remove(), 5000);
   }
-}
-
-function boxClass(judgements: FindingJudgementsFile, groupKey: string, active: boolean): string {
-  if (active) return "finding-box active";
-  return isJudged(judgements.judgements[groupKey]) ? "finding-box judged" : "finding-box dim";
-}
-
-function isJudged(judgement: { review_status?: string; judgement_reason?: string | null } | undefined): boolean {
-  if (!judgement) return false;
-  if (!judgement.review_status || judgement.review_status === "unreviewed") return false;
-  return Boolean(judgement.judgement_reason);
 }
 
 function slideNumberFromUrl(url: string): number | null {

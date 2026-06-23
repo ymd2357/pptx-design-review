@@ -172,11 +172,9 @@ function renderLoaded(): void {
       judgements,
       slideSizePt: slideSize,
       initialSlideNo: allFindings[0]?.slideNo,
-      onSelectFinding: focusFinding,
+      onSelectFinding: selectFromSlide,
     });
     sticky.append(galleryHandle.element, progressText);
-    const firstWithBox = allFindings.find((f) => f.bboxPt);
-    if (firstWithBox) galleryHandle.focus(firstWithBox);
   } else {
     galleryHandle = undefined;
     sticky.append(
@@ -192,7 +190,7 @@ function renderLoaded(): void {
     groups,
     judgements,
     onChange: updateJudgement,
-    onFocusFinding: focusFinding,
+    onActivate: focusFinding,
   });
   root.append(reviewHandle.element);
 
@@ -200,11 +198,25 @@ function renderLoaded(): void {
   root.append(renderActions());
 
   app.replaceChildren(root);
+
+  // 初期: 先頭 finding をアクティブにして青枠 + 行展開 (スクロールはしない)。
+  const first = groups[0]?.findings[0];
+  if (first) {
+    galleryHandle?.focus(first);
+    reviewHandle.activate(first.key, { scroll: false });
+  }
 }
 
+// 行クリック由来: スライドにその finding の青枠を出す。
+// (行側は既に展開済みなので reviewHandle は触らない。)
 function focusFinding(finding: LintFinding): void {
   galleryHandle?.focus(finding);
-  reviewHandle?.focusFinding(finding.key);
+}
+
+// スライドの青枠タップ由来: 下のリストの該当行を開いてスクロール表示 (A)。
+function selectFromSlide(finding: LintFinding): void {
+  galleryHandle?.focus(finding);
+  reviewHandle?.activate(finding.key, { scroll: true });
 }
 
 function updateJudgement(key: string, next: FindingJudgement): void {
