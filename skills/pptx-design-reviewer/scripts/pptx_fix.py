@@ -2877,6 +2877,7 @@ def fix_pptx(
     rules: Sequence[str] = DEFAULT_RULES,
     findings: Optional[Sequence[Any]] = None,
     judgement_gate: bool = True,
+    selection: Optional[set[tuple[int, str]]] = None,
 ) -> List[FixAction]:
     """Apply registered fix rules to ``path``.
 
@@ -2888,14 +2889,29 @@ def fix_pptx(
     pre-段階 3 behavior that auto-applied any ``manual_required`` finding
     with concrete ``candidate_values`` (kept for legacy callers such as
     the REV-017/REV-019 pipelines).
+
+    ``selection`` (default ``None``): when provided, restricts every applied
+    fix to the ``(slide_index, rule)`` pairs in the set. A candidate action
+    whose ``(slide_index, rule)`` is absent is dropped entirely (not even
+    reported). ``None`` preserves the legacy behavior of fixing every
+    matching shape/finding deck-wide. This is the per-slide, per-check toggle
+    gate used by the lint/fix studio app; because shape-driven rules are 1:1
+    with their lint check, ``(slide, rule)`` honors check-level toggling.
     """
     prs = Presentation(str(path))
     actions: List[FixAction] = []
     active_rules = _enabled_rules(rules)
     shape_rules = tuple(rule for rule in active_rules if rule not in FINDING_DRIVEN_RULES)
 
+    def _selected(slide_index: int, rule: Optional[str]) -> bool:
+        if selection is None:
+            return True
+        return (slide_index, rule) in selection
+
     for shape, idx, sid, slide in _walk(prs):
         for rule in shape_rules:
+            if not _selected(idx, rule):
+                continue
             if rule == "contrast":
                 action = _detect_contrast(shape, idx, sid, slide, findings=findings)
             else:
@@ -2917,6 +2933,9 @@ def fix_pptx(
         for finding in findings:
             rule = _finding_rule(finding)
             if rule not in active_rules or rule not in FINDING_DRIVEN_RULES:
+                continue
+            finding_slide = _finding_field(finding, "slide_index")
+            if not _selected(finding_slide, rule):
                 continue
             detected = _detect_finding_action(prs, finding)
             if detected is None:
