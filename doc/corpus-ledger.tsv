@@ -1,0 +1,5 @@
+sha256	status	source	source_url	filename	fetched_at	slide_count	lint_before	fix_applied	lint_after	delta	checks_fired	harvest	processed_at	note
+296c0e5ce04ca2ed92608c0237f261b043bb4dcfb71e109f0c395eb4dfc123d5	processed	py4e-lectures	https://www.py4e.com/lectures3/intro-wrapup.pptx	296c0e5c__intro-wrapup.pptx	2026-07-10T05:36:50+00:00	7	12	17	10	-2	geometry_rounding,missing_required_element,text_autofit_disabled,wrap_break_changes_meaning	0	2026-07-10T05:55:26+00:00	
+3bf1ae9a80f579eb6036afb3a00c768123a94f72803378e9d7e8471b125defef	fetched	py4e-lectures	https://www.py4e.com/lectures3/Pythonlearn-02-Expressions.pptx	3bf1ae9a__Pythonlearn-02-Expressions.pptx	2026-07-10T05:36:52+00:00									
+6d163a7fffd6e0802f47508b23e65128ac03b058efedc77d799daacdd104f46e	fetched	py4e-lectures	https://www.py4e.com/lectures3/Pythonlearn-01-Intro.pptx	6d163a7f__Pythonlearn-01-Intro.pptx	2026-07-10T05:36:52+00:00									
+934084af4c42585915899d25f0cf19e993e765d5d135db20ad5aec30071ba0a2	fetched	py4e-lectures	https://www.py4e.com/lectures3/Pythonlearn-03-Conditional.pptx	934084af__Pythonlearn-03-Conditional.pptx	2026-07-10T05:36:53+00:00									

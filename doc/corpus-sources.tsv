@@ -1,0 +1,9 @@
+source_id	kind	url	note
+# kind: listing (HTMLから.pptx直リンクを抽出) / direct (URL自体が.pptx) / adapter (JSゲート型サイト用・要実装)
+# listing はサイトのカテゴリ/検索ページを指すと自動でデッキを発見する。
+# 直リンクを露出しない JS ゲート型サイトは listing では拾えない → adapter を書く。
+# 例 (実 URL は運用時に精査して追加する):
+# tmpl-example	listing	https://example.org/free-powerpoint-templates/	要 selector 検証
+py4e-lectures	listing	https://www.py4e.com/lectures3/	Apache index に .pptx 直リンク17件。CC-BY 教材。robots Allow /
+shibboleth-pres	listing	https://shibboleth.net/downloads/presentations/	Apache index に .pptx 7件。技術説明系。robots 全許可
+ietf-slides	listing	https://www.ietf.org/slides/	top 階層に .pptx 直リンク。年度配下に多数 (再帰は未対応)

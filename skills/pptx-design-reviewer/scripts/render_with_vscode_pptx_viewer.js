@@ -93,9 +93,12 @@ const WEBVIEW_JS = path.join(DIST_DIR, "webview.js");
 const WEBVIEW_CSS = path.join(DIST_DIR, "webview.css");
 
 function loadParser() {
-  const source =
-    fs.readFileSync(EXTENSION_JS, "utf8") +
-    "\n;module.exports.__parsePptx = Ad; module.exports.__loadSlide = Nd;\n";
+  // The viewer bundle exposes stable hooks: src/extension.ts re-exports
+  // openPptx as __parsePptx and parseSingleSlide as __loadSlide, and esbuild's
+  // CJS output keeps those export names even under minification. We must NOT
+  // reach for mangled internal identifiers (the old `Ad`/`Nd`) — those get
+  // renamed on every rebuild. Evaluate the bundle and read the stable exports.
+  const source = fs.readFileSync(EXTENSION_JS, "utf8");
   const module = { exports: {} };
   const extRequire = createRequire(EXTENSION_JS);
   const sandbox = {
@@ -140,6 +143,16 @@ function loadParser() {
     URLSearchParams,
   };
   vm.runInNewContext(source, sandbox, { filename: EXTENSION_JS });
+  if (
+    typeof module.exports.__parsePptx !== "function" ||
+    typeof module.exports.__loadSlide !== "function"
+  ) {
+    throw new Error(
+      `${EXTENSION_JS} does not expose __parsePptx/__loadSlide. Rebuild the ` +
+        `vscode-pptx-viewer extension from source: src/extension.ts must re-export ` +
+        `openPptx as __parsePptx and parseSingleSlide as __loadSlide (then npm run package).`
+    );
+  }
   return module.exports;
 }
 
