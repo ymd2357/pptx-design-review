@@ -1472,7 +1472,7 @@ def _sample_rendered_pixels(crop: Image.Image) -> tuple[Counter, int]:
 
     total_pixels = crop.width * crop.height
     if total_pixels <= RENDERED_CONTRAST_MAX_RAW_SAMPLE_PIXELS:
-        pixels = crop.get_flattened_data()
+        pixels = list(crop.getdata())
         return Counter(pixels), total_pixels
 
     stride = int((total_pixels / RENDERED_CONTRAST_MAX_RAW_SAMPLE_PIXELS) ** 0.5) + 1
