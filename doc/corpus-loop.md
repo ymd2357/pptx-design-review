@@ -81,6 +81,8 @@ python3 run_corpus.py --keep            # 全 workdir 保持 (デバッグ)
   parseSingleSlide を `__parsePptx`/`__loadSlide` として**安定 re-export** し、
   wrapper がその安定名を読む形へ変更 (esbuild CJS は export 名を mangle しない)。
   ハーネスは `resolve_viewer_ext_dir()` で viewer repo を追う (固定しない=合わせていく)。
-- **[未解決] `pptx_lint.py --rendered-image-dir` が `get_flattened_data` で crash**
-  し lint 出力が空に。ハーネスは既定で外し `--rendered-contrast` で opt-in。lint
-  修正後に有効化する (= de-overfit 以前の素のバグ。直せば rendered-contrast finding が復活)。
+- **[解決済] `pptx_lint.py --rendered-image-dir` の `get_flattened_data` crash**:
+  Pillow に無い `crop.get_flattened_data()` を `list(crop.getdata())` に修正
+  (pptx_lint.py)。ハーネスは rendered コントラスト検査を**既定 ON** に
+  (`--no-rendered-contrast` で無効化可)。timeecare デッキで `contrast_ratio`×7 /
+  `low_contrast`×1 の陽性発火を確認済み。

@@ -158,10 +158,8 @@ def process_one(pptx: Path, keep: bool, force: bool, rendered_contrast: bool = F
     if not render(normalized, work / "before", log):
         return fail("before 描画失敗")
 
-    # rendered-contrast 検査 (--rendered-image-dir) は現状 pptx_lint.py 側の
-    # `get_flattened_data` バグで全デッキ crash → lint 出力が空になる。既定では
-    # 外し、修正済み環境でのみ --rendered-contrast で opt-in する。描画自体は
-    # 視覚 diff 用に維持する。
+    # rendered-contrast 検査 (--rendered-image-dir) は既定 ON。--no-rendered-contrast
+    # で無効化できる (描画自体は視覚 diff 用に常に行う)。
     def rendered_args(images_dir: Path) -> list[str]:
         return ["--rendered-image-dir", str(images_dir)] if rendered_contrast else []
 
@@ -256,8 +254,9 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0, help="処理件数上限 (0=無制限)")
     parser.add_argument(
         "--rendered-contrast",
-        action="store_true",
-        help="lint/fix に --rendered-image-dir を渡す (pptx_lint の get_flattened_data バグ修正後のみ)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="lint/fix に --rendered-image-dir を渡し rendered コントラスト検査を有効化 (既定 ON)",
     )
     args = parser.parse_args()
 
