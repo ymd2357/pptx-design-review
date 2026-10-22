@@ -1,0 +1,261 @@
+{
+  "deck": "mcp-cource",
+  "rev": "008",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    1,
+    2,
+    4,
+    11,
+    12,
+    15,
+    18,
+    23,
+    24,
+    25,
+    27,
+    29,
+    30,
+    31,
+    32,
+    35,
+    37,
+    39,
+    41,
+    43,
+    44,
+    46
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 21213,
+      "changed": true
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 53329,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 4,
+      "ae_pixels": 23626,
+      "changed": true
+    },
+    {
+      "slide_no": 5,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 6,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 7,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 8,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 9,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 10,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 11,
+      "ae_pixels": 7551,
+      "changed": true
+    },
+    {
+      "slide_no": 12,
+      "ae_pixels": 9247,
+      "changed": true
+    },
+    {
+      "slide_no": 13,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 14,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 15,
+      "ae_pixels": 4985,
+      "changed": true
+    },
+    {
+      "slide_no": 16,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 17,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 18,
+      "ae_pixels": 20729,
+      "changed": true
+    },
+    {
+      "slide_no": 19,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 20,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 21,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 22,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 23,
+      "ae_pixels": 17662,
+      "changed": true
+    },
+    {
+      "slide_no": 24,
+      "ae_pixels": 3206,
+      "changed": true
+    },
+    {
+      "slide_no": 25,
+      "ae_pixels": 2699,
+      "changed": true
+    },
+    {
+      "slide_no": 26,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 27,
+      "ae_pixels": 38158,
+      "changed": true
+    },
+    {
+      "slide_no": 28,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 29,
+      "ae_pixels": 6027,
+      "changed": true
+    },
+    {
+      "slide_no": 30,
+      "ae_pixels": 29738,
+      "changed": true
+    },
+    {
+      "slide_no": 31,
+      "ae_pixels": 18477,
+      "changed": true
+    },
+    {
+      "slide_no": 32,
+      "ae_pixels": 40034,
+      "changed": true
+    },
+    {
+      "slide_no": 33,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 34,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 35,
+      "ae_pixels": 8429,
+      "changed": true
+    },
+    {
+      "slide_no": 36,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 37,
+      "ae_pixels": 2069,
+      "changed": true
+    },
+    {
+      "slide_no": 38,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 39,
+      "ae_pixels": 4093,
+      "changed": true
+    },
+    {
+      "slide_no": 40,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 41,
+      "ae_pixels": 1628,
+      "changed": true
+    },
+    {
+      "slide_no": 42,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 43,
+      "ae_pixels": 5536,
+      "changed": true
+    },
+    {
+      "slide_no": 44,
+      "ae_pixels": 2335,
+      "changed": true
+    },
+    {
+      "slide_no": 45,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 46,
+      "ae_pixels": 10548,
+      "changed": true
+    }
+  ]
+}

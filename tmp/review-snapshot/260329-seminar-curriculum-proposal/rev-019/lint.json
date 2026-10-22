@@ -1,0 +1,2428 @@
+[
+  {
+    "severity": "warning",
+    "check": "card_grid_consistency",
+    "slide_index": 2,
+    "slide_id": 257,
+    "shape_id": 6,
+    "shape_name": "Text 2",
+    "message": "4 repeated card containers in the same row are not visually consistent",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "row_containers": [
+        {
+          "shape_id": 6,
+          "shape_name": "Text 2",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 5,
+          "bbox_pt": [
+            90.0,
+            229.5,
+            298.0,
+            218.67
+          ]
+        },
+        {
+          "shape_id": 10,
+          "shape_name": "Text 5",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 9,
+          "bbox_pt": [
+            410.63,
+            229.5,
+            298.0,
+            218.67
+          ]
+        },
+        {
+          "shape_id": 14,
+          "shape_name": "Text 8",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 13,
+          "bbox_pt": [
+            731.25,
+            229.5,
+            298.0,
+            218.67
+          ]
+        },
+        {
+          "shape_id": 18,
+          "shape_name": "Text 11",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 17,
+          "bbox_pt": [
+            1052.0,
+            229.5,
+            298.0,
+            218.67
+          ]
+        }
+      ],
+      "group_medians": {
+        "top": 229.5,
+        "width": 298.0,
+        "height": 218.67,
+        "padding_left": 28.5,
+        "padding_right": 16.32,
+        "padding_top": 28.5,
+        "padding_bottom": 48.75
+      },
+      "inconsistent_containers": [
+        {
+          "container": {
+            "shape_id": 6,
+            "shape_name": "Text 2",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 5,
+            "bbox_pt": [
+              90.0,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 7,
+              "shape_name": "Image 2",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 6,
+              "bbox_pt": [
+                118.5,
+                282.75,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 8,
+              "shape_name": "Text 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                159.0,
+                258.0,
+                210.66,
+                81.0
+              ]
+            },
+            {
+              "shape_id": 9,
+              "shape_name": "Text 4",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 8,
+              "bbox_pt": [
+                118.5,
+                352.5,
+                253.18,
+                67.17
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 16.32,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 20.25
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            210.66,
+            81.0
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            34.33,
+            20.25
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 10,
+            "shape_name": "Text 5",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 9,
+            "bbox_pt": [
+              410.63,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 11,
+              "shape_name": "Image 3",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 10,
+              "bbox_pt": [
+                439.13,
+                282.75,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 12,
+              "shape_name": "Text 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 11,
+              "bbox_pt": [
+                479.63,
+                258.0,
+                210.66,
+                81.0
+              ]
+            },
+            {
+              "shape_id": 13,
+              "shape_name": "Text 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 12,
+              "bbox_pt": [
+                439.13,
+                352.5,
+                253.18,
+                67.17
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 16.32,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 20.25
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            210.66,
+            81.0
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            34.33,
+            20.25
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 14,
+            "shape_name": "Text 8",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 13,
+            "bbox_pt": [
+              731.25,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 15,
+              "shape_name": "Image 4",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 14,
+              "bbox_pt": [
+                759.75,
+                262.5,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 16,
+              "shape_name": "Text 9",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 15,
+              "bbox_pt": [
+                800.25,
+                258.0,
+                115.2,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 17,
+              "shape_name": "Text 10",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 16,
+              "bbox_pt": [
+                759.75,
+                312.0,
+                253.18,
+                67.17
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 16.32,
+            "top": 28.5,
+            "bottom": 69.0
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 20.25
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            115.2,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            61.13,
+            20.25
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 18,
+            "shape_name": "Text 11",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 17,
+            "bbox_pt": [
+              1052.0,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 19,
+              "shape_name": "Image 5",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 18,
+              "bbox_pt": [
+                1080.37,
+                262.5,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 20,
+              "shape_name": "Text 12",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 19,
+              "bbox_pt": [
+                1120.87,
+                258.0,
+                142.0,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 21,
+              "shape_name": "Text 13",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 20,
+              "bbox_pt": [
+                1080.37,
+                312.0,
+                253.18,
+                67.17
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.37,
+            "right": 16.44,
+            "top": 28.5,
+            "bottom": 69.0
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.13,
+            "padding_right": 0.13,
+            "padding_top": 0.0,
+            "padding_bottom": 20.25
+          },
+          "first_child_relative_bbox_pt": [
+            68.87,
+            28.5,
+            142.0,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.13,
+            0.0,
+            34.33,
+            20.25
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        }
+      ],
+      "thresholds": {
+        "group_min": 2,
+        "child_count_min": 2,
+        "row_center_tolerance_pt": 36.0,
+        "top_tolerance_pt": 4.0,
+        "size_tolerance_pt": 6.0,
+        "padding_tolerance_pt": 8.0,
+        "first_child_relative_tolerance_pt": 14.0
+      },
+      "measured_value": 20.25,
+      "threshold": 8.0,
+      "delta": 12.25,
+      "unit": "pt",
+      "check_id": "card_grid_consistency",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "row_containers": [
+          {
+            "shape_id": 6,
+            "shape_name": "Text 2",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 5,
+            "bbox_pt": [
+              90.0,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          {
+            "shape_id": 10,
+            "shape_name": "Text 5",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 9,
+            "bbox_pt": [
+              410.63,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          {
+            "shape_id": 14,
+            "shape_name": "Text 8",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 13,
+            "bbox_pt": [
+              731.25,
+              229.5,
+              298.0,
+              218.67
+            ]
+          },
+          {
+            "shape_id": 18,
+            "shape_name": "Text 11",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 17,
+            "bbox_pt": [
+              1052.0,
+              229.5,
+              298.0,
+              218.67
+            ]
+          }
+        ],
+        "group_medians": {
+          "top": 229.5,
+          "width": 298.0,
+          "height": 218.67,
+          "padding_left": 28.5,
+          "padding_right": 16.32,
+          "padding_top": 28.5,
+          "padding_bottom": 48.75
+        },
+        "inconsistent_containers": [
+          {
+            "container": {
+              "shape_id": 6,
+              "shape_name": "Text 2",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 5,
+              "bbox_pt": [
+                90.0,
+                229.5,
+                298.0,
+                218.67
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 7,
+                "shape_name": "Image 2",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 6,
+                "bbox_pt": [
+                  118.5,
+                  282.75,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 8,
+                "shape_name": "Text 3",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 7,
+                "bbox_pt": [
+                  159.0,
+                  258.0,
+                  210.66,
+                  81.0
+                ]
+              },
+              {
+                "shape_id": 9,
+                "shape_name": "Text 4",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 8,
+                "bbox_pt": [
+                  118.5,
+                  352.5,
+                  253.18,
+                  67.17
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 16.32,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 20.25
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              210.66,
+              81.0
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              34.33,
+              20.25
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 10,
+              "shape_name": "Text 5",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 9,
+              "bbox_pt": [
+                410.63,
+                229.5,
+                298.0,
+                218.67
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 11,
+                "shape_name": "Image 3",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 10,
+                "bbox_pt": [
+                  439.13,
+                  282.75,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 12,
+                "shape_name": "Text 6",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 11,
+                "bbox_pt": [
+                  479.63,
+                  258.0,
+                  210.66,
+                  81.0
+                ]
+              },
+              {
+                "shape_id": 13,
+                "shape_name": "Text 7",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 12,
+                "bbox_pt": [
+                  439.13,
+                  352.5,
+                  253.18,
+                  67.17
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 16.32,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 20.25
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              210.66,
+              81.0
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              34.33,
+              20.25
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 14,
+              "shape_name": "Text 8",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 13,
+              "bbox_pt": [
+                731.25,
+                229.5,
+                298.0,
+                218.67
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 15,
+                "shape_name": "Image 4",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 14,
+                "bbox_pt": [
+                  759.75,
+                  262.5,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 16,
+                "shape_name": "Text 9",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 15,
+                "bbox_pt": [
+                  800.25,
+                  258.0,
+                  115.2,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 17,
+                "shape_name": "Text 10",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 16,
+                "bbox_pt": [
+                  759.75,
+                  312.0,
+                  253.18,
+                  67.17
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 16.32,
+              "top": 28.5,
+              "bottom": 69.0
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 20.25
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              115.2,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              61.13,
+              20.25
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 18,
+              "shape_name": "Text 11",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 17,
+              "bbox_pt": [
+                1052.0,
+                229.5,
+                298.0,
+                218.67
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 19,
+                "shape_name": "Image 5",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 18,
+                "bbox_pt": [
+                  1080.37,
+                  262.5,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 20,
+                "shape_name": "Text 12",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 19,
+                "bbox_pt": [
+                  1120.87,
+                  258.0,
+                  142.0,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 21,
+                "shape_name": "Text 13",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 20,
+                "bbox_pt": [
+                  1080.37,
+                  312.0,
+                  253.18,
+                  67.17
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.37,
+              "right": 16.44,
+              "top": 28.5,
+              "bottom": 69.0
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.13,
+              "padding_right": 0.13,
+              "padding_top": 0.0,
+              "padding_bottom": 20.25
+            },
+            "first_child_relative_bbox_pt": [
+              68.87,
+              28.5,
+              142.0,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.13,
+              0.0,
+              34.33,
+              20.25
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          }
+        ],
+        "thresholds": {
+          "group_min": 2,
+          "child_count_min": 2,
+          "row_center_tolerance_pt": 36.0,
+          "top_tolerance_pt": 4.0,
+          "size_tolerance_pt": 6.0,
+          "padding_tolerance_pt": 8.0,
+          "first_child_relative_tolerance_pt": 14.0
+        },
+        "measured_value": 20.25,
+        "threshold": 8.0,
+        "delta": 12.25,
+        "unit": "pt"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": null,
+      "fixability_reason": "repeated card repair requires template grouping intent review",
+      "candidate_values": null,
+      "manual_required_reason": "repeated card repair requires template grouping intent review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "card_grid_consistency",
+    "slide_index": 7,
+    "slide_id": 262,
+    "shape_id": 6,
+    "shape_name": "Text 2",
+    "message": "3 repeated card containers in the same row are not visually consistent",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "row_containers": [
+        {
+          "shape_id": 6,
+          "shape_name": "Text 2",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 5,
+          "bbox_pt": [
+            90.0,
+            220.5,
+            405.0,
+            211.76
+          ]
+        },
+        {
+          "shape_id": 10,
+          "shape_name": "Text 5",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 9,
+          "bbox_pt": [
+            517.5,
+            220.5,
+            405.0,
+            211.76
+          ]
+        },
+        {
+          "shape_id": 14,
+          "shape_name": "Text 8",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 13,
+          "bbox_pt": [
+            945.0,
+            220.5,
+            405.0,
+            211.76
+          ]
+        }
+      ],
+      "group_medians": {
+        "top": 220.5,
+        "width": 405.0,
+        "height": 211.76,
+        "padding_left": 28.5,
+        "padding_right": 11.1,
+        "padding_top": 28.5,
+        "padding_bottom": 62.09
+      },
+      "inconsistent_containers": [
+        {
+          "container": {
+            "shape_id": 10,
+            "shape_name": "Text 5",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 9,
+            "bbox_pt": [
+              517.5,
+              220.5,
+              405.0,
+              211.76
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 11,
+              "shape_name": "Image 3",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 10,
+              "bbox_pt": [
+                546.0,
+                253.5,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 12,
+              "shape_name": "Text 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 11,
+              "bbox_pt": [
+                586.5,
+                249.0,
+                170.0,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 13,
+              "shape_name": "Text 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 12,
+              "bbox_pt": [
+                546.0,
+                303.0,
+                365.4,
+                100.76
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 11.1,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 33.59
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            170.0,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            2.0,
+            0.0
+          ],
+          "triggered_rules": [
+            "padding_bottom"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 14,
+            "shape_name": "Text 8",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 13,
+            "bbox_pt": [
+              945.0,
+              220.5,
+              405.0,
+              211.76
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 15,
+              "shape_name": "Image 4",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 14,
+              "bbox_pt": [
+                973.5,
+                253.5,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 16,
+              "shape_name": "Text 9",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 15,
+              "bbox_pt": [
+                1014.0,
+                249.0,
+                115.2,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 17,
+              "shape_name": "Text 10",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 16,
+              "bbox_pt": [
+                973.5,
+                303.0,
+                365.4,
+                67.17
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 11.1,
+            "top": 28.5,
+            "bottom": 62.09
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 0.0
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            115.2,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            52.8,
+            0.0
+          ],
+          "triggered_rules": [
+            "first_child_relative_bbox"
+          ]
+        }
+      ],
+      "thresholds": {
+        "group_min": 2,
+        "child_count_min": 2,
+        "row_center_tolerance_pt": 36.0,
+        "top_tolerance_pt": 4.0,
+        "size_tolerance_pt": 6.0,
+        "padding_tolerance_pt": 8.0,
+        "first_child_relative_tolerance_pt": 14.0
+      },
+      "measured_value": 33.59,
+      "threshold": 8.0,
+      "delta": 25.59,
+      "unit": "pt",
+      "check_id": "card_grid_consistency",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "row_containers": [
+          {
+            "shape_id": 6,
+            "shape_name": "Text 2",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 5,
+            "bbox_pt": [
+              90.0,
+              220.5,
+              405.0,
+              211.76
+            ]
+          },
+          {
+            "shape_id": 10,
+            "shape_name": "Text 5",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 9,
+            "bbox_pt": [
+              517.5,
+              220.5,
+              405.0,
+              211.76
+            ]
+          },
+          {
+            "shape_id": 14,
+            "shape_name": "Text 8",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 13,
+            "bbox_pt": [
+              945.0,
+              220.5,
+              405.0,
+              211.76
+            ]
+          }
+        ],
+        "group_medians": {
+          "top": 220.5,
+          "width": 405.0,
+          "height": 211.76,
+          "padding_left": 28.5,
+          "padding_right": 11.1,
+          "padding_top": 28.5,
+          "padding_bottom": 62.09
+        },
+        "inconsistent_containers": [
+          {
+            "container": {
+              "shape_id": 10,
+              "shape_name": "Text 5",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 9,
+              "bbox_pt": [
+                517.5,
+                220.5,
+                405.0,
+                211.76
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 11,
+                "shape_name": "Image 3",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 10,
+                "bbox_pt": [
+                  546.0,
+                  253.5,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 12,
+                "shape_name": "Text 6",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 11,
+                "bbox_pt": [
+                  586.5,
+                  249.0,
+                  170.0,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 13,
+                "shape_name": "Text 7",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 12,
+                "bbox_pt": [
+                  546.0,
+                  303.0,
+                  365.4,
+                  100.76
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 11.1,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 33.59
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              170.0,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              2.0,
+              0.0
+            ],
+            "triggered_rules": [
+              "padding_bottom"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 14,
+              "shape_name": "Text 8",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 13,
+              "bbox_pt": [
+                945.0,
+                220.5,
+                405.0,
+                211.76
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 15,
+                "shape_name": "Image 4",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 14,
+                "bbox_pt": [
+                  973.5,
+                  253.5,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 16,
+                "shape_name": "Text 9",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 15,
+                "bbox_pt": [
+                  1014.0,
+                  249.0,
+                  115.2,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 17,
+                "shape_name": "Text 10",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 16,
+                "bbox_pt": [
+                  973.5,
+                  303.0,
+                  365.4,
+                  67.17
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 11.1,
+              "top": 28.5,
+              "bottom": 62.09
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 0.0
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              115.2,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              52.8,
+              0.0
+            ],
+            "triggered_rules": [
+              "first_child_relative_bbox"
+            ]
+          }
+        ],
+        "thresholds": {
+          "group_min": 2,
+          "child_count_min": 2,
+          "row_center_tolerance_pt": 36.0,
+          "top_tolerance_pt": 4.0,
+          "size_tolerance_pt": 6.0,
+          "padding_tolerance_pt": 8.0,
+          "first_child_relative_tolerance_pt": 14.0
+        },
+        "measured_value": 33.59,
+        "threshold": 8.0,
+        "delta": 25.59,
+        "unit": "pt"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": null,
+      "fixability_reason": "repeated card repair requires template grouping intent review",
+      "candidate_values": null,
+      "manual_required_reason": "repeated card repair requires template grouping intent review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "card_grid_consistency",
+    "slide_index": 13,
+    "slide_id": 268,
+    "shape_id": 5,
+    "shape_name": "Text 1",
+    "message": "2 repeated card containers in the same row are not visually consistent",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "row_containers": [
+        {
+          "shape_id": 5,
+          "shape_name": "Text 1",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 4,
+          "bbox_pt": [
+            90.0,
+            153.0,
+            618.75,
+            273.26
+          ]
+        },
+        {
+          "shape_id": 11,
+          "shape_name": "Text 6",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 10,
+          "bbox_pt": [
+            731.25,
+            153.0,
+            618.75,
+            273.26
+          ]
+        }
+      ],
+      "group_medians": {
+        "top": 153.0,
+        "width": 618.75,
+        "height": 273.26,
+        "padding_left": 28.5,
+        "padding_right": 0.25,
+        "padding_top": 28.5,
+        "padding_bottom": 45.29
+      },
+      "inconsistent_containers": [
+        {
+          "container": {
+            "shape_id": 5,
+            "shape_name": "Text 1",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 4,
+            "bbox_pt": [
+              90.0,
+              153.0,
+              618.75,
+              273.26
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 6,
+              "shape_name": "Image 2",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 5,
+              "bbox_pt": [
+                118.5,
+                186.0,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 7,
+              "shape_name": "Text 2",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                159.0,
+                181.5,
+                224.27,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 8,
+              "shape_name": "Text 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                118.5,
+                235.5,
+                590.0,
+                67.17
+              ]
+            },
+            {
+              "shape_id": 9,
+              "shape_name": "Text 4",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 8,
+              "bbox_pt": [
+                118.5,
+                320.67,
+                207.0,
+                43.5
+              ]
+            },
+            {
+              "shape_id": 10,
+              "shape_name": "Text 5",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 9,
+              "bbox_pt": [
+                118.5,
+                320.67,
+                207.0,
+                43.5
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 0.25,
+            "top": 28.5,
+            "bottom": 62.09
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 16.79
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            224.27,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            41.13,
+            0.0
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 11,
+            "shape_name": "Text 6",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 10,
+            "bbox_pt": [
+              731.25,
+              153.0,
+              618.75,
+              273.26
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 12,
+              "shape_name": "Image 3",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 11,
+              "bbox_pt": [
+                759.75,
+                186.0,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 13,
+              "shape_name": "Text 7",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 12,
+              "bbox_pt": [
+                800.25,
+                181.5,
+                142.0,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 14,
+              "shape_name": "Text 8",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 13,
+              "bbox_pt": [
+                759.75,
+                235.5,
+                590.0,
+                100.76
+              ]
+            },
+            {
+              "shape_id": 15,
+              "shape_name": "Text 9",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 14,
+              "bbox_pt": [
+                759.75,
+                354.26,
+                252.0,
+                43.5
+              ]
+            },
+            {
+              "shape_id": 16,
+              "shape_name": "Text 10",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 15,
+              "bbox_pt": [
+                759.75,
+                354.26,
+                252.0,
+                43.5
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 0.25,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 16.79
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            142.0,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            41.13,
+            0.0
+          ],
+          "triggered_rules": [
+            "padding_bottom",
+            "first_child_relative_bbox"
+          ]
+        }
+      ],
+      "thresholds": {
+        "group_min": 2,
+        "child_count_min": 2,
+        "row_center_tolerance_pt": 36.0,
+        "top_tolerance_pt": 4.0,
+        "size_tolerance_pt": 6.0,
+        "padding_tolerance_pt": 8.0,
+        "first_child_relative_tolerance_pt": 14.0
+      },
+      "measured_value": 16.79,
+      "threshold": 8.0,
+      "delta": 8.79,
+      "unit": "pt",
+      "check_id": "card_grid_consistency",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "row_containers": [
+          {
+            "shape_id": 5,
+            "shape_name": "Text 1",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 4,
+            "bbox_pt": [
+              90.0,
+              153.0,
+              618.75,
+              273.26
+            ]
+          },
+          {
+            "shape_id": 11,
+            "shape_name": "Text 6",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 10,
+            "bbox_pt": [
+              731.25,
+              153.0,
+              618.75,
+              273.26
+            ]
+          }
+        ],
+        "group_medians": {
+          "top": 153.0,
+          "width": 618.75,
+          "height": 273.26,
+          "padding_left": 28.5,
+          "padding_right": 0.25,
+          "padding_top": 28.5,
+          "padding_bottom": 45.29
+        },
+        "inconsistent_containers": [
+          {
+            "container": {
+              "shape_id": 5,
+              "shape_name": "Text 1",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 4,
+              "bbox_pt": [
+                90.0,
+                153.0,
+                618.75,
+                273.26
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 6,
+                "shape_name": "Image 2",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 5,
+                "bbox_pt": [
+                  118.5,
+                  186.0,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 7,
+                "shape_name": "Text 2",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 6,
+                "bbox_pt": [
+                  159.0,
+                  181.5,
+                  224.27,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 8,
+                "shape_name": "Text 3",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 7,
+                "bbox_pt": [
+                  118.5,
+                  235.5,
+                  590.0,
+                  67.17
+                ]
+              },
+              {
+                "shape_id": 9,
+                "shape_name": "Text 4",
+                "design_element": "default",
+                "kind": "shape",
+                "source_order_index": 8,
+                "bbox_pt": [
+                  118.5,
+                  320.67,
+                  207.0,
+                  43.5
+                ]
+              },
+              {
+                "shape_id": 10,
+                "shape_name": "Text 5",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 9,
+                "bbox_pt": [
+                  118.5,
+                  320.67,
+                  207.0,
+                  43.5
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 0.25,
+              "top": 28.5,
+              "bottom": 62.09
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 16.79
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              224.27,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              41.13,
+              0.0
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 11,
+              "shape_name": "Text 6",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 10,
+              "bbox_pt": [
+                731.25,
+                153.0,
+                618.75,
+                273.26
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 12,
+                "shape_name": "Image 3",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 11,
+                "bbox_pt": [
+                  759.75,
+                  186.0,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 13,
+                "shape_name": "Text 7",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 12,
+                "bbox_pt": [
+                  800.25,
+                  181.5,
+                  142.0,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 14,
+                "shape_name": "Text 8",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 13,
+                "bbox_pt": [
+                  759.75,
+                  235.5,
+                  590.0,
+                  100.76
+                ]
+              },
+              {
+                "shape_id": 15,
+                "shape_name": "Text 9",
+                "design_element": "default",
+                "kind": "shape",
+                "source_order_index": 14,
+                "bbox_pt": [
+                  759.75,
+                  354.26,
+                  252.0,
+                  43.5
+                ]
+              },
+              {
+                "shape_id": 16,
+                "shape_name": "Text 10",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 15,
+                "bbox_pt": [
+                  759.75,
+                  354.26,
+                  252.0,
+                  43.5
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 0.25,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 16.79
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              142.0,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              41.13,
+              0.0
+            ],
+            "triggered_rules": [
+              "padding_bottom",
+              "first_child_relative_bbox"
+            ]
+          }
+        ],
+        "thresholds": {
+          "group_min": 2,
+          "child_count_min": 2,
+          "row_center_tolerance_pt": 36.0,
+          "top_tolerance_pt": 4.0,
+          "size_tolerance_pt": 6.0,
+          "padding_tolerance_pt": 8.0,
+          "first_child_relative_tolerance_pt": 14.0
+        },
+        "measured_value": 16.79,
+        "threshold": 8.0,
+        "delta": 8.79,
+        "unit": "pt"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": null,
+      "fixability_reason": "repeated card repair requires template grouping intent review",
+      "candidate_values": null,
+      "manual_required_reason": "repeated card repair requires template grouping intent review",
+      "measurement_confidence": null
+    }
+  },
+  {
+    "severity": "warning",
+    "check": "card_grid_consistency",
+    "slide_index": 20,
+    "slide_id": 275,
+    "shape_id": 5,
+    "shape_name": "Text 1",
+    "message": "2 repeated card containers in the same row are not visually consistent",
+    "detail": {
+      "evidence_source": "structure_json",
+      "evidence_confidence": "medium",
+      "row_containers": [
+        {
+          "shape_id": 5,
+          "shape_name": "Text 1",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 4,
+          "bbox_pt": [
+            90.0,
+            153.0,
+            618.75,
+            211.76
+          ]
+        },
+        {
+          "shape_id": 9,
+          "shape_name": "Text 4",
+          "design_element": "default",
+          "kind": "shape",
+          "source_order_index": 8,
+          "bbox_pt": [
+            731.25,
+            153.0,
+            618.75,
+            211.76
+          ]
+        }
+      ],
+      "group_medians": {
+        "top": 153.0,
+        "width": 618.75,
+        "height": 211.76,
+        "padding_left": 28.5,
+        "padding_right": 0.25,
+        "padding_top": 28.5,
+        "padding_bottom": 28.5
+      },
+      "inconsistent_containers": [
+        {
+          "container": {
+            "shape_id": 5,
+            "shape_name": "Text 1",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 4,
+            "bbox_pt": [
+              90.0,
+              153.0,
+              618.75,
+              211.76
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 6,
+              "shape_name": "Image 2",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 5,
+              "bbox_pt": [
+                118.5,
+                186.0,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 7,
+              "shape_name": "Text 2",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 6,
+              "bbox_pt": [
+                159.0,
+                181.5,
+                226.8,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 8,
+              "shape_name": "Text 3",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 7,
+              "bbox_pt": [
+                118.5,
+                235.5,
+                590.0,
+                100.76
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 0.25,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 0.0
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            226.8,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            14.93,
+            0.0
+          ],
+          "triggered_rules": [
+            "first_child_relative_bbox"
+          ]
+        },
+        {
+          "container": {
+            "shape_id": 9,
+            "shape_name": "Text 4",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 8,
+            "bbox_pt": [
+              731.25,
+              153.0,
+              618.75,
+              211.76
+            ]
+          },
+          "children": [
+            {
+              "shape_id": 10,
+              "shape_name": "Image 3",
+              "design_element": "default",
+              "kind": "image",
+              "source_order_index": 9,
+              "bbox_pt": [
+                759.75,
+                186.0,
+                31.5,
+                31.5
+              ]
+            },
+            {
+              "shape_id": 11,
+              "shape_name": "Text 5",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 10,
+              "bbox_pt": [
+                800.25,
+                181.5,
+                196.95,
+                40.5
+              ]
+            },
+            {
+              "shape_id": 12,
+              "shape_name": "Text 6",
+              "design_element": "default",
+              "kind": "text",
+              "source_order_index": 11,
+              "bbox_pt": [
+                759.75,
+                235.5,
+                590.0,
+                100.76
+              ]
+            }
+          ],
+          "padding_pt": {
+            "left": 28.5,
+            "right": 0.25,
+            "top": 28.5,
+            "bottom": 28.5
+          },
+          "deltas_from_group_median_pt": {
+            "top": 0.0,
+            "width": 0.0,
+            "height": 0.0,
+            "padding_left": 0.0,
+            "padding_right": 0.0,
+            "padding_top": 0.0,
+            "padding_bottom": 0.0
+          },
+          "first_child_relative_bbox_pt": [
+            69.0,
+            28.5,
+            196.95,
+            40.5
+          ],
+          "first_child_relative_delta_pt": [
+            0.0,
+            0.0,
+            14.93,
+            0.0
+          ],
+          "triggered_rules": [
+            "first_child_relative_bbox"
+          ]
+        }
+      ],
+      "thresholds": {
+        "group_min": 2,
+        "child_count_min": 2,
+        "row_center_tolerance_pt": 36.0,
+        "top_tolerance_pt": 4.0,
+        "size_tolerance_pt": 6.0,
+        "padding_tolerance_pt": 8.0,
+        "first_child_relative_tolerance_pt": 14.0
+      },
+      "measured_value": 0.0,
+      "threshold": 8.0,
+      "delta": 0.0,
+      "unit": "pt",
+      "check_id": "card_grid_consistency",
+      "evidence": {
+        "evidence_source": "structure_json",
+        "evidence_confidence": "medium",
+        "row_containers": [
+          {
+            "shape_id": 5,
+            "shape_name": "Text 1",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 4,
+            "bbox_pt": [
+              90.0,
+              153.0,
+              618.75,
+              211.76
+            ]
+          },
+          {
+            "shape_id": 9,
+            "shape_name": "Text 4",
+            "design_element": "default",
+            "kind": "shape",
+            "source_order_index": 8,
+            "bbox_pt": [
+              731.25,
+              153.0,
+              618.75,
+              211.76
+            ]
+          }
+        ],
+        "group_medians": {
+          "top": 153.0,
+          "width": 618.75,
+          "height": 211.76,
+          "padding_left": 28.5,
+          "padding_right": 0.25,
+          "padding_top": 28.5,
+          "padding_bottom": 28.5
+        },
+        "inconsistent_containers": [
+          {
+            "container": {
+              "shape_id": 5,
+              "shape_name": "Text 1",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 4,
+              "bbox_pt": [
+                90.0,
+                153.0,
+                618.75,
+                211.76
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 6,
+                "shape_name": "Image 2",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 5,
+                "bbox_pt": [
+                  118.5,
+                  186.0,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 7,
+                "shape_name": "Text 2",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 6,
+                "bbox_pt": [
+                  159.0,
+                  181.5,
+                  226.8,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 8,
+                "shape_name": "Text 3",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 7,
+                "bbox_pt": [
+                  118.5,
+                  235.5,
+                  590.0,
+                  100.76
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 0.25,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 0.0
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              226.8,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              14.93,
+              0.0
+            ],
+            "triggered_rules": [
+              "first_child_relative_bbox"
+            ]
+          },
+          {
+            "container": {
+              "shape_id": 9,
+              "shape_name": "Text 4",
+              "design_element": "default",
+              "kind": "shape",
+              "source_order_index": 8,
+              "bbox_pt": [
+                731.25,
+                153.0,
+                618.75,
+                211.76
+              ]
+            },
+            "children": [
+              {
+                "shape_id": 10,
+                "shape_name": "Image 3",
+                "design_element": "default",
+                "kind": "image",
+                "source_order_index": 9,
+                "bbox_pt": [
+                  759.75,
+                  186.0,
+                  31.5,
+                  31.5
+                ]
+              },
+              {
+                "shape_id": 11,
+                "shape_name": "Text 5",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 10,
+                "bbox_pt": [
+                  800.25,
+                  181.5,
+                  196.95,
+                  40.5
+                ]
+              },
+              {
+                "shape_id": 12,
+                "shape_name": "Text 6",
+                "design_element": "default",
+                "kind": "text",
+                "source_order_index": 11,
+                "bbox_pt": [
+                  759.75,
+                  235.5,
+                  590.0,
+                  100.76
+                ]
+              }
+            ],
+            "padding_pt": {
+              "left": 28.5,
+              "right": 0.25,
+              "top": 28.5,
+              "bottom": 28.5
+            },
+            "deltas_from_group_median_pt": {
+              "top": 0.0,
+              "width": 0.0,
+              "height": 0.0,
+              "padding_left": 0.0,
+              "padding_right": 0.0,
+              "padding_top": 0.0,
+              "padding_bottom": 0.0
+            },
+            "first_child_relative_bbox_pt": [
+              69.0,
+              28.5,
+              196.95,
+              40.5
+            ],
+            "first_child_relative_delta_pt": [
+              0.0,
+              0.0,
+              14.93,
+              0.0
+            ],
+            "triggered_rules": [
+              "first_child_relative_bbox"
+            ]
+          }
+        ],
+        "thresholds": {
+          "group_min": 2,
+          "child_count_min": 2,
+          "row_center_tolerance_pt": 36.0,
+          "top_tolerance_pt": 4.0,
+          "size_tolerance_pt": 6.0,
+          "padding_tolerance_pt": 8.0,
+          "first_child_relative_tolerance_pt": 14.0
+        },
+        "measured_value": 0.0,
+        "threshold": 8.0,
+        "delta": 0.0,
+        "unit": "pt"
+      },
+      "fixability": "manual_required",
+      "fixability_rule": null,
+      "fixability_reason": "repeated card repair requires template grouping intent review",
+      "candidate_values": null,
+      "manual_required_reason": "repeated card repair requires template grouping intent review",
+      "measurement_confidence": null
+    }
+  }
+]

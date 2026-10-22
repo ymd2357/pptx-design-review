@@ -1,0 +1,27 @@
+{
+  "deck": "fix-demo",
+  "rev": "001",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    1,
+    2,
+    3
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 11714,
+      "changed": true
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 1800,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 6033,
+      "changed": true
+    }
+  ]
+}

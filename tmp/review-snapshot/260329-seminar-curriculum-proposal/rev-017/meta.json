@@ -1,0 +1,111 @@
+{
+  "deck": "260329-seminar-curriculum-proposal",
+  "rev": "017",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    1,
+    13
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 4314,
+      "changed": true
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 167,
+      "changed": false
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 167,
+      "changed": false
+    },
+    {
+      "slide_no": 4,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 5,
+      "ae_pixels": 180,
+      "changed": false
+    },
+    {
+      "slide_no": 6,
+      "ae_pixels": 175,
+      "changed": false
+    },
+    {
+      "slide_no": 7,
+      "ae_pixels": 129,
+      "changed": false
+    },
+    {
+      "slide_no": 8,
+      "ae_pixels": 212,
+      "changed": false
+    },
+    {
+      "slide_no": 9,
+      "ae_pixels": 172,
+      "changed": false
+    },
+    {
+      "slide_no": 10,
+      "ae_pixels": 287,
+      "changed": false
+    },
+    {
+      "slide_no": 11,
+      "ae_pixels": 197,
+      "changed": false
+    },
+    {
+      "slide_no": 12,
+      "ae_pixels": 275,
+      "changed": false
+    },
+    {
+      "slide_no": 13,
+      "ae_pixels": 9030,
+      "changed": true
+    },
+    {
+      "slide_no": 14,
+      "ae_pixels": 266,
+      "changed": false
+    },
+    {
+      "slide_no": 15,
+      "ae_pixels": 0,
+      "changed": false
+    },
+    {
+      "slide_no": 16,
+      "ae_pixels": 275,
+      "changed": false
+    },
+    {
+      "slide_no": 17,
+      "ae_pixels": 241,
+      "changed": false
+    },
+    {
+      "slide_no": 18,
+      "ae_pixels": 320,
+      "changed": false
+    },
+    {
+      "slide_no": 19,
+      "ae_pixels": 275,
+      "changed": false
+    },
+    {
+      "slide_no": 20,
+      "ae_pixels": 346,
+      "changed": false
+    }
+  ]
+}

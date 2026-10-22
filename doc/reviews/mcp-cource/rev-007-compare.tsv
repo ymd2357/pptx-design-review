@@ -1,0 +1,27 @@
+slide_no	decision	memo
+1	adopt	
+2	adopt	
+4	reject	何で3つめだけ変化して4,5番目が適用してないのか
+9	reject	3番目の背景が誤って消えている
+10	reject	カード背景が誤って消えている
+11	adopt	
+12	reject	カードからはみ出ているのを拾えてない
+15	adopt	
+18	adopt	
+19	reject	白カードの1,3,4枚目が誤って消えている
+23	reject	Step XXを中央寄せ出来ていない。 / むしろ、全体的に3つの暗黙カードがあると考えないといけない
+24	reject	ブラウザの中だけでー、の文を修正できてない
+25	adopt	
+27	adopt	
+28	reject	要約する。、をレスキュー出来てない
+29	reject	いうまでもなく酷い
+30	adopt	
+31	reject	
+32	adopt	
+35	reject	
+37	reject	
+39	reject	
+41	reject	
+43	reject	
+44	reject	動かしてはいけない縦移動が発生。 / カードも変な位置に移動してる。
+46	reject	
