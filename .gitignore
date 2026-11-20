@@ -7,3 +7,4 @@ tmp/*
 !tmp/review-snapshot/
 !tmp/review-snapshot/**
 evidence/
+doc/private-preview-access.md
