@@ -1,0 +1,2 @@
+review_no	check_id	priority	latest_lint_count	observation_decision	finding_dispositions	rationale	related_artifacts
+P2-12	card_grid_consistency	P2	4	remaining			tmp/review-snapshot/260329-seminar-curriculum-proposal/rev-019/lint.json

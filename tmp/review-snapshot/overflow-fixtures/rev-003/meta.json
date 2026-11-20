@@ -1,0 +1,26 @@
+{
+  "deck": "overflow-fixtures",
+  "rev": "003",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    2,
+    3
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 728,
+      "changed": false
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 169809,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 107071,
+      "changed": true
+    }
+  ]
+}

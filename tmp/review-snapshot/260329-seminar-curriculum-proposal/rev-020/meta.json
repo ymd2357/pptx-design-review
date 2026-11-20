@@ -1,0 +1,129 @@
+{
+  "deck": "260329-seminar-curriculum-proposal",
+  "rev": "020",
+  "threshold_ae_pixels": 1000,
+  "changed_slides": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "slide_diffs": [
+    {
+      "slide_no": 1,
+      "ae_pixels": 79721,
+      "changed": true
+    },
+    {
+      "slide_no": 2,
+      "ae_pixels": 89528,
+      "changed": true
+    },
+    {
+      "slide_no": 3,
+      "ae_pixels": 113276,
+      "changed": true
+    },
+    {
+      "slide_no": 4,
+      "ae_pixels": 40774,
+      "changed": true
+    },
+    {
+      "slide_no": 5,
+      "ae_pixels": 116290,
+      "changed": true
+    },
+    {
+      "slide_no": 6,
+      "ae_pixels": 107185,
+      "changed": true
+    },
+    {
+      "slide_no": 7,
+      "ae_pixels": 108635,
+      "changed": true
+    },
+    {
+      "slide_no": 8,
+      "ae_pixels": 114345,
+      "changed": true
+    },
+    {
+      "slide_no": 9,
+      "ae_pixels": 122584,
+      "changed": true
+    },
+    {
+      "slide_no": 10,
+      "ae_pixels": 109802,
+      "changed": true
+    },
+    {
+      "slide_no": 11,
+      "ae_pixels": 120830,
+      "changed": true
+    },
+    {
+      "slide_no": 12,
+      "ae_pixels": 103276,
+      "changed": true
+    },
+    {
+      "slide_no": 13,
+      "ae_pixels": 98270,
+      "changed": true
+    },
+    {
+      "slide_no": 14,
+      "ae_pixels": 112819,
+      "changed": true
+    },
+    {
+      "slide_no": 15,
+      "ae_pixels": 58173,
+      "changed": true
+    },
+    {
+      "slide_no": 16,
+      "ae_pixels": 138530,
+      "changed": true
+    },
+    {
+      "slide_no": 17,
+      "ae_pixels": 144013,
+      "changed": true
+    },
+    {
+      "slide_no": 18,
+      "ae_pixels": 140935,
+      "changed": true
+    },
+    {
+      "slide_no": 19,
+      "ae_pixels": 94017,
+      "changed": true
+    },
+    {
+      "slide_no": 20,
+      "ae_pixels": 70117,
+      "changed": true
+    }
+  ]
+}
