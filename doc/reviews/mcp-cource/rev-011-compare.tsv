@@ -1,0 +1,31 @@
+slide_no	decision	memo
+3	reject	全体には改善なのだが、 / 「MCP業務効率化 / コース」が左に行ってはいけないのと、 / 「MCP(Model」の間に改行残すのが不適切。 / 改行の方は、元々入ってるので判定が難しい。
+4	reject	2列が、5行ずつ1ルールになってないといけない。
+7	reject	左のカードがng
+9	reject	イコールの位置がおかしい。
+10	reject	全体的にテキストがあちこち
+11	reject	不適切な改行状態。横幅？
+12	reject	カード内の左に詰まりすぎ
+17	adopt	
+20	adopt	
+23	reject	文字が重なってる。文字同士の位置調整が効いてない。 / また、slide0xも右に寄ったままになってる
+24	reject	左右カードで配置合ってない / 下の情報も独立すべきなのに左カードになってしまってる。
+26	reject	
+27	reject	2,3が左に寄りすぎ。左寄りすぎ
+28	reject	
+29	adopt	
+30	reject	
+31	adopt	
+32	reject	
+35	reject	隣のカードに入ってしまってる
+36	adopt	
+37	adopt	
+38	reject	
+39	reject	下テキストが不要な改行
+40	adopt	
+41	reject	下テキストが崩壊
+42	adopt	
+43	reject	下テキストが一部ずれてる
+44	adopt	
+45	reject	
+46	adopt	
